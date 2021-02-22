@@ -1,0 +1,97 @@
+swagger: "2.0"
+info:
+  description: "Mau HTTP Interface specifications"
+  version: "0.1.0"
+  title: "Mau"
+  license:
+    name: "GPL v3.0"
+    url: "https://www.gnu.org/licenses/gpl-3.0.en.html"
+basePath: "/"
+schemes:
+- "https"
+paths:
+  /p2p/{FPR}:
+    get:
+      summary: "List modified files since last update"
+      description: "Server will look in FPR directory and list all the files accessible by the client. Order the files by modification date in ascending order and limit the files list to files modified after the If-Modified-Since header value and also limit the list to a reasonable length. So expect to call this with new If-Modified-Since value until you get 304 status."
+      produces:
+      - "application/json"
+      parameters:
+      - in: "path"
+        name: "FPR"
+        description: "Peer public key fingerprint"
+        type: string
+        required: true
+      - in: "header"
+        name: "If-Modified-Since"
+        type: string
+        required: true
+        description: "Last date of update in GMT timezone as specified by RFC7232"
+      responses:
+        "304":
+          description: "No changes since last update"
+        "200":
+          description: "A list of changes found"
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                path:
+                  type: string
+                  description: "multiaddress representation of the file without the user multiaddress prefix"
+                  example: "/file/content-file.pgp"
+                size:
+                  type: integer
+                  description: "size of the file in bytes"
+                  example: 235123
+                sum:
+                  type: string
+                  description: "SHA256 sum of the file presented in multihash format base58 encoded"
+                  example: "S5WhR8DewVr1S8pxtBUVetLZ2RztsobVLpFX8h2c7gXUcT"
+  /p2p/{FPR}/file/{fileID}:
+    get:
+      summary: "returns the requested file - should support resume via Range header."
+      parameters:
+      - in: "path"
+        name: "FPR"
+        description: "Peer public key fingerprint"
+        type: string
+        required: true
+      - in: "path"
+        name: "fileID"
+        description: "file ID value returned from the /p2p/{FPR} endpoint value or from reference in another file"
+        required: true
+        type: string
+      produces:
+      - "application/octet-stream"
+      responses:
+        "200":
+          description: "File content in binary format"
+  /p2p/{FPR}/file/{fileID}/version/{versionID}:
+    get:
+      summary: "returns the requested file version - should support resume via Range header."
+      parameters:
+      - in: "path"
+        name: "FPR"
+        description: "Peer public key fingerprint"
+        type: string
+        required: true
+      - in: "path"
+        name: "fileID"
+        description: "file ID value returned from the /p2p/{FPR} endpoint value or from reference in another file"
+        required: true
+        type: string
+      - in: "path"
+        name: "versionID"
+        description: "file version ID value returned from reference in another file. multihash format base58-encoded"
+        required: true
+        type: string
+      produces:
+      - "application/octet-stream"
+      responses:
+        "200":
+          description: "File content in binary format"
+externalDocs:
+  description: "Find out more about Mau"
+  url: "https://github.com/emad-elsaid/mau"
