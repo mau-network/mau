@@ -92,7 +92,7 @@ func DownloadFriend(ctx context.Context, account *Account, address, fingerprint 
 }
 
 func DownloadFile(ctx context.Context, account *Account, address, fingerprint string, file *FileListItem, client *Client) error {
-	fpath := path.Join(accountRoot, fingerprint, file.Name)
+	fpath := path.Join(account.path, fingerprint, file.Name)
 
 	f := File{
 		Path:    fpath,

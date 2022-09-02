@@ -149,8 +149,8 @@ func (f *File) Deleted(account *Account) bool {
 }
 
 func GetVersion(account *Account, fpr, name, version string) (*File, error) {
-	followedPath := path.Join(accountRoot, fpr, name+".versions", version)
-	unfollowedPath := path.Join(accountRoot, "."+fpr, name+".versions", version)
+	followedPath := path.Join(account.path, fpr, name+".versions", version)
+	unfollowedPath := path.Join(account.path, "."+fpr, name+".versions", version)
 	var filepath string
 
 	if _, err := os.Stat(followedPath); err == nil {
@@ -165,8 +165,8 @@ func GetVersion(account *Account, fpr, name, version string) (*File, error) {
 }
 
 func GetFile(account *Account, fpr, name string) (*File, error) {
-	followedPath := path.Join(accountRoot, fpr, name)
-	unfollowedPath := path.Join(accountRoot, "."+fpr, name)
+	followedPath := path.Join(account.path, fpr, name)
+	unfollowedPath := path.Join(account.path, "."+fpr, name)
 	var filepath string
 
 	if _, err := os.Stat(followedPath); err == nil {
@@ -187,11 +187,11 @@ func AddFile(account *Account, r io.Reader, name string, recipients []*Friend) (
 
 	fpr := account.Fingerprint()
 
-	if err := ensureDirectory(path.Join(accountRoot, fpr)); err != nil {
+	if err := os.MkdirAll(path.Join(account.path, fpr), dirPerm); err != nil {
 		return nil, err
 	}
 
-	p := path.Join(accountRoot, fpr, name)
+	p := path.Join(account.path, fpr, name)
 	if _, err := os.Stat(p); err == nil {
 		file := File{Path: p}
 		np, err := file.Hash()
@@ -199,7 +199,7 @@ func AddFile(account *Account, r io.Reader, name string, recipients []*Friend) (
 			return nil, err
 		}
 
-		if err = ensureDirectory(p + ".versions"); err != nil {
+		if err = os.MkdirAll(p+".versions", dirPerm); err != nil {
 			return nil, err
 		}
 
@@ -241,8 +241,8 @@ func RemoveFile(account *Account, file *File) error {
 }
 
 func ListFiles(account *Account, fingerprint string, after time.Time, limit uint) []*File {
-	followedPath := path.Join(accountRoot, fingerprint)
-	unfollowedPath := path.Join(accountRoot, "."+fingerprint)
+	followedPath := path.Join(account.path, fingerprint)
+	unfollowedPath := path.Join(account.path, "."+fingerprint)
 	var dirpath string
 
 	if _, err := os.Stat(followedPath); err == nil {

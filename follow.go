@@ -6,7 +6,7 @@ import (
 )
 
 func ListFollows(account *Account) ([]*Friend, error) {
-	files, err := os.ReadDir(accountRoot)
+	files, err := os.ReadDir(account.path)
 	if err != nil {
 		return nil, err
 	}
@@ -30,8 +30,8 @@ func ListFollows(account *Account) ([]*Friend, error) {
 }
 
 func Follow(account *Account, friend *Friend) error {
-	unfollowed := path.Join(accountRoot, "."+friend.Fingerprint())
-	followed := path.Join(accountRoot, friend.Fingerprint())
+	unfollowed := path.Join(account.path, "."+friend.Fingerprint())
+	followed := path.Join(account.path, friend.Fingerprint())
 
 	if _, err := os.Stat(followed); err == nil {
 		return nil
@@ -45,8 +45,8 @@ func Follow(account *Account, friend *Friend) error {
 }
 
 func Unfollow(account *Account, friend *Friend) error {
-	unfollowed := path.Join(accountRoot, "."+friend.Fingerprint())
-	followed := path.Join(accountRoot, friend.Fingerprint())
+	unfollowed := path.Join(account.path, "."+friend.Fingerprint())
+	followed := path.Join(account.path, friend.Fingerprint())
 
 	if _, err := os.Stat(followed); err == nil {
 		return os.Rename(followed, unfollowed)

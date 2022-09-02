@@ -22,13 +22,8 @@ import (
 const (
 	mauDirName         = ".mau"
 	accountKeyFilename = "account.pgp"
-)
-
-var (
-	accountRoot, _ = os.Getwd()
-	mauDir         = path.Join(accountRoot, mauDirName)
-	accountFile    = path.Join(mauDir, accountKeyFilename)
-	rsaKeyLength   = 4096
+	rsaKeyLength       = 4096
+	dirPerm            = 0700
 )
 
 var (
@@ -38,17 +33,25 @@ var (
 	ErrAccountAlreadyExists = errors.New("Account already exists")
 )
 
-func NewAccount(name, email, passphrase string) (*Account, error) {
+func mauDir(rootPath string) string {
+	return path.Join(rootPath, mauDirName)
+}
+
+func accountFile(rootPath string) string {
+	return path.Join(mauDir(rootPath), accountKeyFilename)
+}
+
+func NewAccount(rootPath, name, email, passphrase string) (*Account, error) {
 	if len(passphrase) == 0 {
 		return nil, ErrPassphraseRequired
 	}
 
-	err := ensureDirectory(mauDir)
+	err := os.MkdirAll(mauDir(rootPath), dirPerm)
 	if err != nil {
 		return nil, err
 	}
 
-	if _, err := os.Stat(accountFile); err == nil {
+	if _, err := os.Stat(accountFile(rootPath)); err == nil {
 		return nil, ErrAccountAlreadyExists
 	}
 
@@ -60,7 +63,7 @@ func NewAccount(name, email, passphrase string) (*Account, error) {
 		return nil, err
 	}
 
-	plainFile, err := os.Create(accountFile)
+	plainFile, err := os.Create(accountFile(rootPath))
 	if err != nil {
 		return nil, err
 	}
@@ -76,17 +79,17 @@ func NewAccount(name, email, passphrase string) (*Account, error) {
 		return nil, err
 	}
 
-	account := Account{entity: entity}
+	account := Account{entity: entity, path: rootPath}
 	return &account, nil
 }
 
-func OpenAccount(passphrase string) (*Account, error) {
-	err := ensureDirectory(mauDir)
+func OpenAccount(rootPath, passphrase string) (*Account, error) {
+	err := os.MkdirAll(mauDir(rootPath), dirPerm)
 	if err != nil {
 		return nil, err
 	}
 
-	encryptedFile, err := os.Open(accountFile)
+	encryptedFile, err := os.Open(accountFile(rootPath))
 	if err != nil {
 		return nil, err
 	}
@@ -112,10 +115,11 @@ func OpenAccount(passphrase string) (*Account, error) {
 		return nil, err
 	}
 
-	return &Account{entity: entity}, nil
+	return &Account{entity: entity, path: rootPath}, nil
 }
 
 type Account struct {
+	path   string
 	entity *openpgp.Entity
 }
 

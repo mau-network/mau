@@ -64,7 +64,7 @@ func AddFriend(account *Account, reader io.Reader) (*Friend, error) {
 		return nil, err
 	}
 
-	f, err := os.Create(fmt.Sprintf("%s/%X.pgp", mauDir, entity.PrimaryKey.Fingerprint))
+	f, err := os.Create(fmt.Sprintf("%s/%X.pgp", mauDir(account.path), entity.PrimaryKey.Fingerprint))
 	if err != nil {
 		return nil, err
 	}
@@ -83,8 +83,8 @@ func AddFriend(account *Account, reader io.Reader) (*Friend, error) {
 
 func RemoveFriend(account *Account, friend *Friend) error {
 	file := fmt.Sprintf("%s.pgp", friend.Fingerprint())
-	uncategorized := fmt.Sprintf("%s/%s", mauDir, file)
-	pattern := fmt.Sprintf("%s/**/%s", mauDir, file)
+	uncategorized := fmt.Sprintf("%s/%s", mauDir(account.path), file)
+	pattern := fmt.Sprintf("%s/**/%s", mauDir(account.path), file)
 
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
@@ -106,7 +106,7 @@ func RemoveFriend(account *Account, friend *Friend) error {
 }
 
 func ListFriends(account *Account) (*KeyRing, error) {
-	friends := KeyRing{Path: mauDir}
+	friends := KeyRing{Path: mauDir(account.path)}
 
 	err := friends.read()
 	if err != nil {

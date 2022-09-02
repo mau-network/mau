@@ -37,6 +37,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	wd, _ := os.Getwd()
+
 	switch os.Args[1] {
 	case "init":
 		initCmd := flag.NewFlagSet("init", flag.ExitOnError)
@@ -47,7 +49,7 @@ func main() {
 		passphrase := getPassword()
 
 		fmt.Println("Initializing account...")
-		_, err := NewAccount(*name, *email, passphrase)
+		_, err := NewAccount(wd, *name, *email, passphrase)
 		raise(err)
 		fmt.Println("Done")
 
@@ -294,7 +296,8 @@ func main() {
 }
 
 func getAccount() *Account {
-	account, err := OpenAccount(getPassword())
+	wd, _ := os.Getwd()
+	account, err := OpenAccount(wd, getPassword())
 	raise(err)
 
 	return account
