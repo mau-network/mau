@@ -83,7 +83,7 @@ func (p *Peer) Serve() error {
 	}
 	defer listener.Close()
 
-	server, err := NewServer(p.Account, ":0")
+	server, err := NewServer(p.Account)
 	if err != nil {
 		return err
 	}

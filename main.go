@@ -266,13 +266,20 @@ func main() {
 
 	case "serve":
 		account := getAccount()
-		server, err := NewServer(account, ":0")
+		server, err := NewServer(account)
 		raise(err)
 
 		listener, err := net.Listen("tcp", ":0")
 		raise(err)
 
-		fmt.Println("Using port:", listener.Addr().(*net.TCPAddr).Port)
+		port := listener.Addr().(*net.TCPAddr).Port
+		fmt.Println("Using port:", port)
+
+		mdns, err := NewMDNSServer(account, port)
+		raise(err)
+		fmt.Println("MDNS service discovery started...")
+
+		defer mdns.Close()
 
 		server.Serve(listener)
 

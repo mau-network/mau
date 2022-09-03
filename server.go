@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 
+	// TODO: Remove dependency
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/openpgp/packet"
 )
@@ -26,7 +27,8 @@ type FileListItem struct {
 	Sum  string `json:"sum"`
 }
 
-func NewServer(account *Account, port string) (*Server, error) {
+// TODO: Change it to UDP over QUIC protocol
+func NewServer(account *Account) (*Server, error) {
 	cert, err := account.Certificate()
 	if err != nil {
 		return nil, err
@@ -37,7 +39,6 @@ func NewServer(account *Account, port string) (*Server, error) {
 		account: account,
 		limit:   100,
 		httpServer: http.Server{
-			Addr:    port,
 			Handler: router,
 			TLSConfig: &tls.Config{
 				Certificates:       []tls.Certificate{*cert},
