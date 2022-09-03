@@ -327,9 +327,13 @@ The following is a minimum list of modules that is needed to make up the core fu
 ## CHALLENGES
 
 * **Versioning propagation**: After User(B) shares his version to his social network: the content could change to add more references or fix mistakes leading to User(B) social network browsing the old version. As there is no way to get updates on the content after the first share.
+
 * **Groups**: The concept support sharing to multiple people. which can work as private group. if a hash tag is used to mark content it can be separated by hash. User can pin hashes then browse all local content in it. so hash tag can be synonym to group name. all or this works only if users are following each other so the content flows from one person to the next if they shared it together. so if one person posted to a hashtag the rest of the people won't know about him unless one of them is following him and decides to share his content on this hashtag. so the implementation will be hard to reason about.
+
 * **Multiple devices**: Accessing one account from multiple devices isn't possible with the current concept state.
+
 * **Key revocation**: There is no mechanism to revoke or change keys. unless done manually through another channel like PGP keyservers synchronization.
+
 * **Deletion**: Deletion of a file happens by overwriting the file with empty content and moving the old content to the `.versions` directory. Simply overwriting the file content with empty content will not prove the authenticity of the operation so the file content has to be signed by the author and encrypted to the same users who had access to the file. This means the deleted file size will not be 0 bytes. this means by listing files with the HTTP endpoint the deleted files can't be detected from the size. it has to be downloaded as any other file. and while viewing the files then we'll know that this file is a mark of deletion after decryption which consumes CPU and memory for each deleted file. This also means to delete a file you need to decrypt the file and make sure it's not already deleted otherwise you'll delete a deleted file alredy. I was hoping to know about the deleted files from the files listing HTTP endpoint by its size.
 
 ## PROJECT STATUS
@@ -338,7 +342,7 @@ The project is between refining the concept and writing the Proof of concept pha
 
 ## FAQ
 
-### Why keys are written in binary format?
+### Why are keys written in binary format?
 
 - Initially I thought we should accept both formats
    - `.pgp` for binary format
