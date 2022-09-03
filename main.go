@@ -273,13 +273,8 @@ func main() {
 		raise(err)
 
 		port := listener.Addr().(*net.TCPAddr).Port
+		fmt.Println("Account: ", account.Name(), account.Fingerprint())
 		fmt.Println("Using port:", port)
-
-		mdns, err := NewMDNSServer(account, port)
-		raise(err)
-		fmt.Println("MDNS service discovery started...")
-
-		defer mdns.Close()
 
 		server.Serve(listener)
 

@@ -12,12 +12,18 @@ import (
 
 	// TODO: Remove dependency
 	"github.com/gorilla/mux"
+	"github.com/hashicorp/mdns"
 	"golang.org/x/crypto/openpgp/packet"
+)
+
+const (
+	MDNSServiceName = "_mau._tcp"
 )
 
 type Server struct {
 	account    *Account
 	httpServer http.Server
+	mdnsServer *mdns.Server
 	limit      uint
 }
 
@@ -66,11 +72,34 @@ func NewServer(account *Account) (*Server, error) {
 }
 
 func (s *Server) Serve(l net.Listener) error {
+	fingerprint := s.account.Fingerprint()
+	port := l.Addr().(*net.TCPAddr).Port
+
+	service, err := mdns.NewMDNSService(fingerprint, MDNSServiceName, "", "", port, nil, []string{})
+	if err != nil {
+		return err
+	}
+
+	server, err := mdns.NewServer(&mdns.Config{Zone: service})
+	if err != nil {
+		return err
+	}
+
+	s.mdnsServer = server
+
 	return s.httpServer.ServeTLS(l, "", "")
 }
 
 func (s *Server) Close() error {
-	return s.httpServer.Close()
+	// regardless of the errors I need to try closing all interfaces
+	mdns_err := s.mdnsServer.Shutdown()
+	http_err := s.httpServer.Close()
+
+	if mdns_err != nil {
+		return mdns_err
+	}
+
+	return http_err
 }
 
 func (s *Server) list(w http.ResponseWriter, r *http.Request) {
