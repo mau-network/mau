@@ -265,7 +265,7 @@ friend2-FPR:
 
 * Directories prefixed with `.` are ignored by the application that downloads new content. can be used to unfollow a friend while keeping his old information. or keep posts that are shared by your friends from users that you don't want to follow.
 
-* `.mau` directory is reserved for friends public key files. saved as `.pgp` in binary format [[why?]](#why-keys-are-written-in-binary-format). each directory file should represent a group of friends. keys can be duplicate (one friend is work and close friend at the same time). account secret/pub key must be named `account.pgp` to make it easy to find among all other keys. `account.pgp` should be the private key export of the PGP identity with subkeys and signatures then symmetrically encrypted with a password of the user choice.
+* `.mau` directory is reserved for friends public key files. saved as `.pgp` in binary format <sup>[?](#why-keys-are-written-in-binary-format)</sup>. each directory file should represent a group of friends. keys can be duplicate (one friend is work and close friend at the same time). account secret/pub key must be named `account.pgp` to make it easy to find among all other keys. `account.pgp` should be the private key export of the PGP identity with subkeys and signatures then symmetrically encrypted with a password of the user choice.
 
 * Files are written in [OpenPGP message format](https://tools.ietf.org/html/rfc4880) which is supported by any OpenPGP implementation.
 
@@ -315,13 +315,14 @@ The previous stack should allow peers discovery over the same network. or with S
 
 ## ROADMAP
 
-The following is a list of small tools that could be developed independently and work together to deliver a single experience. Each will be given a descriptive name and prefixed with `mau-` to ease referencing it in other documents:
+The following is a minimum list of modules that is needed to make up the core functionality of **Mau**:
 
-* **mau-account**: An interface to create and manage file system structure and keyrings.
-* **mau-editor**: An interface that creates and edits encrypted JSON+LD (schema.org) files for existing user.
-* **mau-syncer**: A daemon that implement the peer to peer stack. it downloads new content and exposes existing content via HTTP interface.
-* **mau-browser**: An interface to show content in chronological order
-* **mau-messenger**: An interface that provides private messaging common features.
+* [x] **account**: An interface to create and manage file system structure and keyrings.
+* [x] **editor**: An interface that creates and edits encrypted JSON+LD (schema.org) files for existing user and friends.
+* [x] **syncer**: A daemon that implement the peer to peer stack. it downloads new content.
+* [x] **server**: A deamon that exposes existing content via HTTP interface.
+* [ ] **peer**: A deamon that allow P2P networking, peer announcement and discovery over local network and the internet
+* [ ] **browser**: An interface to show content in chronological order
 
 ## CHALLENGES
 
