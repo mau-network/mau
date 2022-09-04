@@ -282,7 +282,7 @@ friend2-FPR:
 * Initially a file has one version (the latest version) which is written in `<file-name>.pgp`
 * When editing the file `<file-name>` and before writing the new version the following should be done to keep track of the versions:
   * Create a directory `<file-name>.pgp.versions/` if it doesn't exist
-  * Sum the `<file-name>.pgp` with SHA256 and present it in multihash format base58. we'll call it `<version-hash>`
+  * Sum the `<file-name>.pgp` with SHA256. we'll call it `<version-hash>`
   * Write the file old content to `<file-name>.pgp.versions/<version-hash>`
   * Write the new file content after editing to `<file-name>.pgp`
 * This will keep the file versions in the user directory

@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -11,9 +13,6 @@ import (
 
 	"github.com/keybase/go-crypto/openpgp"
 	"github.com/keybase/go-crypto/openpgp/packet"
-
-	// TODO: Remove multihash and use specific hash
-	"github.com/multiformats/go-multihash"
 )
 
 type File struct {
@@ -121,12 +120,9 @@ func (f *File) Hash() (string, error) {
 		return "", err
 	}
 
-	hash, err := multihash.Sum(content, multihash.SHA2_256, -1)
-	if err != nil {
-		return "", err
-	}
+	hash := sha256.Sum256(content)
 
-	return hash.B58String(), nil
+	return fmt.Sprintf("%x", hash), nil
 }
 
 func (f *File) Size() (int64, error) {

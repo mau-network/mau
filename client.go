@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/mdns"
-	"github.com/multiformats/go-multihash"
 )
 
 type Client struct {
@@ -166,12 +166,8 @@ func DownloadFile(ctx context.Context, account *Account, address, fingerprint st
 		return fmt.Errorf("Size is different for %s\nexpected %d received %d\ncontent:\n%s", url, file.Size, len(content), content)
 	}
 
-	hash, err := multihash.Sum(content, multihash.SHA2_256, -1)
-	if err != nil {
-		return err
-	}
-
-	h := hash.B58String()
+	hash := sha256.Sum256(content)
+	h := fmt.Sprintf("%x", hash)
 	if h != file.Sum {
 		return fmt.Errorf("Hash sum is different received %s", h)
 	}
