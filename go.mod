@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9 // indirect
 	github.com/gorilla/mux v1.8.0
-	github.com/hashicorp/mdns v1.0.5 // indirect
+	github.com/hashicorp/mdns v1.0.5
 	github.com/ipfs/go-log/v2 v2.1.2 // indirect
 	github.com/keybase/go-crypto v0.0.0-20200123153347-de78d2cb44f4
 	github.com/libp2p/go-libp2p v0.13.0

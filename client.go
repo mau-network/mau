@@ -12,6 +12,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/hashicorp/mdns"
 	"github.com/multiformats/go-multihash"
 )
 
@@ -19,6 +20,11 @@ type Client struct {
 	account    *Account
 	httpClient *http.Client
 }
+
+const (
+	URIProtocolName = "https"
+	MDNSDomain      = "local"
+)
 
 func NewClient(account *Account) (*Client, error) {
 	cert, err := account.Certificate()
@@ -45,6 +51,31 @@ func NewClient(account *Account) (*Client, error) {
 	}
 
 	return &c, nil
+}
+
+func FindFriend(ctx context.Context, fingerprint string, addresses chan<- string) error {
+	defer close(addresses)
+
+	name := fmt.Sprintf("%s.%s.%s.", fingerprint, MDNSServiceName, MDNSDomain)
+	entriesCh := make(chan *mdns.ServiceEntry, cap(addresses))
+
+	err := mdns.Lookup(MDNSServiceName, entriesCh)
+	if err != nil {
+		return err
+	}
+
+	for {
+		select {
+		case entry := <-entriesCh:
+			if entry.Name == name {
+				addresses <- fmt.Sprintf("%s://%s:%d", URIProtocolName, entry.AddrV4, entry.Port)
+			}
+		case <-ctx.Done():
+			return nil
+		}
+	}
+
+	return nil
 }
 
 func DownloadFriend(ctx context.Context, account *Account, address, fingerprint string, after time.Time, client *Client) error {
