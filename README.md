@@ -306,6 +306,19 @@ Authentication should happen in the security layer with both peers doing a TLS1.
 
 The previous stack should allow peers discovery over the same network. or with S/Kademlia-DHT routing if not on the same network.
 
+#### MDNS Service discovery
+
+If local network is desired the service may announce itself on the network using MDNS multicast. The service name format must be as follows:
+
+```
+5D000B2F2C040A1675B49D7F0C7CB7DC36999D56._mau._tcp.local.
+|------------ Fingerprint --------------|app-|protocol|domain|
+```
+
+- Fingerprint: corresponds to the instance user public key fingerprint
+- app: corresponds to the application name
+- protocol: tcp or udp (if QUIC then udp)
+- domain: should be always "local"
 
 ## ARCHITECTURE DIAGRAM
 
