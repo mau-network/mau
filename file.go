@@ -11,6 +11,8 @@ import (
 
 	"github.com/keybase/go-crypto/openpgp"
 	"github.com/keybase/go-crypto/openpgp/packet"
+
+	// TODO: Remove multihash and use specific hash
 	"github.com/multiformats/go-multihash"
 )
 
