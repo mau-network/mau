@@ -74,10 +74,9 @@ func FindFriend(ctx context.Context, fingerprint string, addresses chan<- string
 			return nil
 		}
 	}
-
-	return nil
 }
 
+// TODO: make sure your really connecting to the correct user
 func DownloadFriend(ctx context.Context, account *Account, address, fingerprint string, after time.Time, client *Client) error {
 	// Get list of remote files since the last modification we have
 	url := fmt.Sprintf("%s/p2p/%s", address, fingerprint)
@@ -122,6 +121,7 @@ func DownloadFriend(ctx context.Context, account *Account, address, fingerprint 
 	return nil
 }
 
+// TODO: make sure your really connecting to the correct user
 func DownloadFile(ctx context.Context, account *Account, address, fingerprint string, file *FileListItem, client *Client) error {
 	fpath := path.Join(account.path, fingerprint, file.Name)
 
