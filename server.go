@@ -72,8 +72,17 @@ func NewServer(account *Account) (*Server, error) {
 }
 
 func (s *Server) Serve(l net.Listener) error {
-	fingerprint := s.account.Fingerprint()
 	port := l.Addr().(*net.TCPAddr).Port
+
+	if err := s.serveMDNS(port); err != nil {
+		return err
+	}
+
+	return s.httpServer.ServeTLS(l, "", "")
+}
+
+func (s *Server) serveMDNS(port int) error {
+	fingerprint := s.account.Fingerprint()
 
 	service, err := mdns.NewMDNSService(fingerprint, MDNSServiceName, "", "", port, nil, []string{})
 	if err != nil {
@@ -87,7 +96,7 @@ func (s *Server) Serve(l net.Listener) error {
 
 	s.mdnsServer = server
 
-	return s.httpServer.ServeTLS(l, "", "")
+	return nil
 }
 
 func (s *Server) Close() error {
