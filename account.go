@@ -19,13 +19,6 @@ import (
 	keybasersa "github.com/keybase/go-crypto/rsa"
 )
 
-const (
-	mauDirName         = ".mau"
-	accountKeyFilename = "account.pgp"
-	rsaKeyLength       = 4096
-	dirPerm            = 0700
-)
-
 var (
 	ErrPassphraseRequired   = errors.New("Passphrase must be specified")
 	ErrIncorrectPassphrase  = errors.New("Incorrect passphrase")

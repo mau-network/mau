@@ -16,5 +16,7 @@ require (
 	github.com/multiformats/go-multihash v0.0.15 // indirect
 	github.com/onsi/ginkgo v1.14.0 // indirect
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
+	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f // indirect
 	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
+	golang.org/x/tools v0.0.0-20200129045341-207d3de1faaf // indirect
 )

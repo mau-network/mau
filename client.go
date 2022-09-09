@@ -21,11 +21,6 @@ type Client struct {
 	httpClient *http.Client
 }
 
-const (
-	URIProtocolName = "https"
-	MDNSDomain      = "local"
-)
-
 func NewClient(account *Account) (*Client, error) {
 	cert, err := account.Certificate()
 	if err != nil {

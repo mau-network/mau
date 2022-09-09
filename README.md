@@ -353,6 +353,10 @@ The following is a minimum list of modules that is needed to make up the core fu
 
 The project is between refining the concept and writing the Proof of concept phases.
 
+## TODOs
+
+Project TODOs are mentioned in comments starting with `TODO`.
+
 ## FAQ
 
 ### Why are keys written in binary format?

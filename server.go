@@ -16,10 +16,6 @@ import (
 	"golang.org/x/crypto/openpgp/packet"
 )
 
-const (
-	MDNSServiceName = "_mau._tcp"
-)
-
 type Server struct {
 	account    *Account
 	httpServer http.Server

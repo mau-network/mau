@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"time"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -10,7 +9,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/routing"
-	"github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/multiformats/go-multiaddr"
 
 	gostream "github.com/libp2p/go-libp2p-gostream"
@@ -87,13 +85,6 @@ func (p *Peer) Serve() error {
 	if err != nil {
 		return err
 	}
-
-	mdns, err := discovery.NewMdnsService(p.context, p.host, time.Second, discoveryID)
-	if err != nil {
-		return err
-	}
-
-	mdns.RegisterNotifee(p)
 
 	return server.Serve(listener)
 }
