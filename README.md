@@ -320,6 +320,10 @@ If local network is desired the service may announce itself on the network using
 - protocol: tcp or udp (if QUIC then udp)
 - domain: should be always "local"
 
+#### Listening on internet requests
+
+The program is responsible for allowing the user to receive connections from outside of local network by utilizing NAT traversal protocols such as UPNP, NAT-PMP or Hole punshing.
+
 ## ARCHITECTURE DIAGRAM
 
 
