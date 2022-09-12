@@ -26,12 +26,15 @@
             - [Keeping file versions](#keeping-file-versions)
         - [HTTP server interface](#http-server-interface)
         - [Peer to Peer Stack](#peer-to-peer-stack)
+            - [MDNS Service discovery](#mdns-service-discovery)
+            - [Listening on internet requests](#listening-on-internet-requests)
     - [ARCHITECTURE DIAGRAM](#architecture-diagram)
     - [ROADMAP](#roadmap)
     - [CHALLENGES](#challenges)
     - [PROJECT STATUS](#project-status)
+    - [TODOs](#todos)
     - [FAQ](#faq)
-        - [Why keys are written in binary format?](#why-keys-are-written-in-binary-format)
+        - [Why are keys written in binary format?](#why-are-keys-written-in-binary-format)
 
 <!-- markdown-toc end -->
 

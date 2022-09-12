@@ -288,26 +288,11 @@ func main() {
 		client, err := NewClient(account)
 		raise(err)
 
+		// TODO get the latest synced file date
 		t := time.Date(2000, 1, 1, 1, 1, 1, 1, time.UTC)
 
-		if *address != "" {
-			err = DownloadFriend(context.Background(), account, *address, *fpr, t, client)
-			raise(err)
-		} else {
-
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-			addresses := make(chan string, 10)
-			go FindFriend(ctx, *fpr, addresses)
-			for address := range addresses {
-				fmt.Printf("Found %s @ %s\n", *fpr, address)
-				err = DownloadFriend(context.Background(), account, address, *fpr, t, client)
-				raise(err)
-
-				if err == nil {
-					cancel()
-				}
-			}
-		}
+		err = DownloadFriend(context.Background(), account, *address, *fpr, t, client)
+		raise(err)
 
 	default:
 		fmt.Printf("Command %s is not recognized", os.Args[1])

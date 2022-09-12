@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -14,6 +15,15 @@ import (
 	"time"
 
 	"github.com/hashicorp/mdns"
+)
+
+var (
+	MDNS_FIND_FRIEND_TIMEOUT = time.Second * 10
+)
+
+var (
+	ErrFriendNotFollowed = errors.New("Friend is not being followed.")
+	ErrCantFindFriend    = errors.New("Couldn't find friend.")
 )
 
 type Client struct {
@@ -73,6 +83,27 @@ func FindFriend(ctx context.Context, fingerprint string, addresses chan<- string
 
 // TODO: make sure your really connecting to the correct user
 func DownloadFriend(ctx context.Context, account *Account, address, fingerprint string, after time.Time, client *Client) error {
+	followed := path.Join(account.path, fingerprint)
+	if _, err := os.Stat(followed); err != nil {
+		return ErrFriendNotFollowed
+	}
+
+	// if no address is provided we'll search for it with MDNS
+	if address == "" {
+		ctx, cancel := context.WithTimeout(context.Background(), MDNS_FIND_FRIEND_TIMEOUT)
+		addresses := make(chan string, 10)
+		go FindFriend(ctx, fingerprint, addresses)
+		select {
+		case address = <-addresses:
+			cancel()
+		default:
+			cancel()
+			return ErrCantFindFriend
+		}
+	}
+
+	// TODO if we still don't have an address lets search on the internet with Kad
+
 	// Get list of remote files since the last modification we have
 	url := fmt.Sprintf("%s/p2p/%s", address, fingerprint)
 
