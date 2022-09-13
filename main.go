@@ -291,7 +291,8 @@ func main() {
 		// TODO get the latest synced file date
 		t := time.Date(2000, 1, 1, 1, 1, 1, 1, time.UTC)
 
-		err = DownloadFriend(context.Background(), account, *address, *fpr, t, client)
+		ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
+		err = DownloadFriend(ctx, account, *address, *fpr, t, client)
 		raise(err)
 
 	default:

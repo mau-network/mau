@@ -18,10 +18,6 @@ import (
 )
 
 var (
-	MDNS_FIND_FRIEND_TIMEOUT = time.Second * 10
-)
-
-var (
 	ErrFriendNotFollowed = errors.New("Friend is not being followed.")
 	ErrCantFindFriend    = errors.New("Couldn't find friend.")
 )
@@ -90,16 +86,14 @@ func DownloadFriend(ctx context.Context, account *Account, address, fingerprint 
 
 	// if no address is provided we'll search for it with MDNS
 	if address == "" {
-		ctx, cancel := context.WithTimeout(context.Background(), MDNS_FIND_FRIEND_TIMEOUT)
-		addresses := make(chan string, 10)
+		addresses := make(chan string, 1)
 		go FindFriend(ctx, fingerprint, addresses)
 		select {
 		case address = <-addresses:
-			cancel()
-		default:
-			cancel()
+		case <-ctx.Done():
 			return ErrCantFindFriend
 		}
+		close(addresses)
 	}
 
 	// TODO if we still don't have an address lets search on the internet with Kad
