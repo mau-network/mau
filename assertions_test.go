@@ -30,6 +30,16 @@ func ASSERT_FILE_EXISTS(t T, file string) {
 	}
 }
 
+func REFUTE_FILE_EXISTS(t T, file string) {
+	t.Helper()
+	if _, err := os.Stat(file); os.IsNotExist(err) {
+		return
+	}
+
+	ASSERT(t, false, `File "%s" shouldn't have existed but it was found.`, file)
+
+}
+
 func ASSERT_EQUAL[Param comparable](t T, expected, actual Param) {
 	t.Helper()
 	ASSERT(t, expected == actual, "Expected: %v, Actual: %v", expected, actual)
@@ -38,4 +48,9 @@ func ASSERT_EQUAL[Param comparable](t T, expected, actual Param) {
 func ASSERT_ERROR(t T, expected, actual error) {
 	t.Helper()
 	ASSERT(t, errors.Is(actual, expected), "Error: %s is not a: %s", actual, expected)
+}
+
+func REFUTE_EQUAL[Param comparable](t T, expected, actual Param) {
+	t.Helper()
+	ASSERT(t, expected != actual, "Expected values not to be equal, Expected: %v Actual: %v", expected, actual)
 }

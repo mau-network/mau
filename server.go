@@ -96,6 +96,7 @@ func (s *Server) serveMDNS(port int) error {
 }
 
 func (s *Server) Close() error {
+	// TODO check why the fuck this panics when closing the server?
 	// regardless of the errors I need to try closing all interfaces
 	mdns_err := s.mdnsServer.Shutdown()
 	http_err := s.httpServer.Close()
@@ -233,10 +234,6 @@ func (s *Server) version(w http.ResponseWriter, r *http.Request) {
 }
 
 func isPermitted(certs []*x509.Certificate, recepients []*Friend) bool {
-	if len(recepients) == 0 {
-		return true
-	}
-
 	for _, c := range certs {
 		var id string
 		switch c.PublicKeyAlgorithm {

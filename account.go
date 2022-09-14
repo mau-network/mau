@@ -161,6 +161,8 @@ func (a *Account) Export() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
+// TODO should we test this or make it internal. it's useful if someone want to
+// provide an HTTP server implementation
 func (a *Account) Certificate() (*tls.Certificate, error) {
 	template := x509.Certificate{
 		Version:      3,

@@ -54,29 +54,6 @@ func NewClient(account *Account) (*Client, error) {
 	return &c, nil
 }
 
-func FindFriend(ctx context.Context, fingerprint string, addresses chan<- string) error {
-	defer close(addresses)
-
-	name := fmt.Sprintf("%s.%s.%s.", fingerprint, MDNSServiceName, MDNSDomain)
-	entriesCh := make(chan *mdns.ServiceEntry, cap(addresses))
-
-	err := mdns.Lookup(MDNSServiceName, entriesCh)
-	if err != nil {
-		return err
-	}
-
-	for {
-		select {
-		case entry := <-entriesCh:
-			if entry.Name == name {
-				addresses <- fmt.Sprintf("%s://%s:%d", URIProtocolName, entry.AddrV4, entry.Port)
-			}
-		case <-ctx.Done():
-			return nil
-		}
-	}
-}
-
 // TODO: make sure your really connecting to the correct user
 func DownloadFriend(ctx context.Context, account *Account, address, fingerprint string, after time.Time, client *Client) error {
 	followed := path.Join(account.path, fingerprint)
@@ -87,7 +64,7 @@ func DownloadFriend(ctx context.Context, account *Account, address, fingerprint 
 	// if no address is provided we'll search for it with MDNS
 	if address == "" {
 		addresses := make(chan string, 1)
-		go FindFriend(ctx, fingerprint, addresses)
+		go findFriend(ctx, fingerprint, addresses)
 		select {
 		case address = <-addresses:
 		case <-ctx.Done():
@@ -202,4 +179,27 @@ func DownloadFile(ctx context.Context, account *Account, address, fingerprint st
 	}
 
 	return nil
+}
+
+func findFriend(ctx context.Context, fingerprint string, addresses chan<- string) error {
+	defer close(addresses)
+
+	name := fmt.Sprintf("%s.%s.%s.", fingerprint, MDNSServiceName, MDNSDomain)
+	entriesCh := make(chan *mdns.ServiceEntry, cap(addresses))
+
+	err := mdns.Lookup(MDNSServiceName, entriesCh)
+	if err != nil {
+		return err
+	}
+
+	for {
+		select {
+		case entry := <-entriesCh:
+			if entry.Name == name {
+				addresses <- fmt.Sprintf("%s://%s:%d", URIProtocolName, entry.AddrV4, entry.Port)
+			}
+		case <-ctx.Done():
+			return nil
+		}
+	}
 }
