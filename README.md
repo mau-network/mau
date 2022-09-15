@@ -362,6 +362,7 @@ The project is between refining the concept and writing the Proof of concept pha
 
 - Test Coverage: [![codecov](https://codecov.io/gh/mau-network/mau/branch/master/graph/badge.svg?token=GL1MDCEIVK)](https://codecov.io/gh/mau-network/mau)
 - Documentation: [![GoDoc](https://godoc.org/github.com/mau-network/mau?status.svg)](https://godoc.org/github.com/mau-network/mau)
+- Go Card: [![Go Report Card](https://goreportcard.com/badge/github.com/mau-network/mau)](https://goreportcard.com/report/github.com/mau-network/mau)
 
 ## TODOs
 
