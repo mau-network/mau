@@ -3,7 +3,14 @@ package main
 import (
 	"errors"
 	"os"
+	"testing"
 )
+
+type T = *testing.T
+
+func init() {
+	rsaKeyLength = 1024 // for faster account generation
+}
 
 func ASSERT(t T, condition bool, message string, args ...interface{}) {
 	t.Helper()

@@ -5,12 +5,6 @@ import (
 	"testing"
 )
 
-type T = *testing.T
-
-func init() {
-	rsaKeyLength = 1024 // for faster account generation
-}
-
 func TestNewAccount(t *testing.T) {
 	t.Run("Creating an account with valid parameters", func(t T) {
 		dir := t.TempDir()
