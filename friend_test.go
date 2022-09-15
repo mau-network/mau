@@ -52,3 +52,29 @@ func TestRemoveFriend(t *testing.T) {
 	ASSERT_ERROR(t, nil, err)
 	REFUTE_FILE_EXISTS(t, path.Join(dir, ".mau", fingerprint+".pgp"))
 }
+
+func TestListFriends(t *testing.T) {
+	dir := t.TempDir()
+	account, _ := NewAccount(dir, "Ahmed Mohamed", "ahmed@example.com", "strong password")
+
+	friend_dir := t.TempDir()
+	friend_account, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
+	friend_account_pub, _ := friend_account.Export()
+	friend, _ := AddFriend(account, bytes.NewBuffer(friend_account_pub))
+
+	keyring, err := ListFriends(account)
+	ASSERT_ERROR(t, nil, err)
+	REFUTE_EQUAL(t, nil, keyring)
+	ASSERT_EQUAL(t, path.Join(dir, ".mau"), keyring.Path)
+	ASSERT_EQUAL(t, 1, len(keyring.Friends))
+	ASSERT_EQUAL(t, 0, len(keyring.KeyRings))
+
+	err = RemoveFriend(account, friend)
+
+	keyring, err = ListFriends(account)
+	ASSERT_ERROR(t, nil, err)
+	REFUTE_EQUAL(t, nil, keyring)
+	ASSERT_EQUAL(t, path.Join(dir, ".mau"), keyring.Path)
+	ASSERT_EQUAL(t, 0, len(keyring.Friends))
+	ASSERT_EQUAL(t, 0, len(keyring.KeyRings))
+}
