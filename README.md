@@ -360,6 +360,7 @@ The following is a minimum list of modules that is needed to make up the core fu
 
 The project is between refining the concept and writing the Proof of concept phases.
 
+|      State         |  Badge  |
 |---------------|--------------------------------------------------------------------------------------------------------------------------------------------|
 | Test Coverage | [![codecov](https://codecov.io/gh/mau-network/mau/branch/master/graph/badge.svg?token=GL1MDCEIVK)](https://codecov.io/gh/mau-network/mau)  |
 | Documentation | [![GoDoc](https://godoc.org/github.com/mau-network/mau?status.svg)](https://godoc.org/github.com/mau-network/mau)                          |
