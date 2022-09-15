@@ -170,7 +170,7 @@ func main() {
 	case "share":
 		shareCmd := flag.NewFlagSet("share", flag.ExitOnError)
 		file := shareCmd.String("file", "", "file path to share")
-		fingerprints := shareCmd.String("fingerprints", "", "comma seperated list of fingerprints to share the file with")
+		fingerprints := shareCmd.String("fingerprints", "", "comma separated list of fingerprints to share the file with")
 		shareCmd.Parse(os.Args[2:])
 
 		account := getAccount()
