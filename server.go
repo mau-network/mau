@@ -138,12 +138,12 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 			hash = ""
 		}
 
-		recepients, err := item.Recipients(s.account)
+		recipients, err := item.Recipients(s.account)
 		if err != nil {
 			continue
 		}
 
-		permitted := isPermitted(r.TLS.PeerCertificates, recepients)
+		permitted := isPermitted(r.TLS.PeerCertificates, recipients)
 		if !permitted {
 			continue
 		}
@@ -174,13 +174,13 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	recepients, err := file.Recipients(s.account)
+	recipients, err := file.Recipients(s.account)
 	if err != nil {
-		http.Error(w, "Error reading file recepients", http.StatusInternalServerError)
+		http.Error(w, "Error reading file recipients", http.StatusInternalServerError)
 		return
 	}
 
-	allowed := isPermitted(r.TLS.PeerCertificates, recepients)
+	allowed := isPermitted(r.TLS.PeerCertificates, recipients)
 	if !allowed {
 		http.Error(w, "Error file is not allowed for user", http.StatusUnauthorized)
 		return
@@ -208,13 +208,13 @@ func (s *Server) version(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	recepients, err := file.Recipients(s.account)
+	recipients, err := file.Recipients(s.account)
 	if err != nil {
-		http.Error(w, "Error reading file recepients", http.StatusInternalServerError)
+		http.Error(w, "Error reading file recipients", http.StatusInternalServerError)
 		return
 	}
 
-	allowed := isPermitted(r.TLS.PeerCertificates, recepients)
+	allowed := isPermitted(r.TLS.PeerCertificates, recipients)
 	if !allowed {
 		http.Error(w, "Error file is not allowed for user", http.StatusUnauthorized)
 		return
@@ -233,7 +233,7 @@ func (s *Server) version(w http.ResponseWriter, r *http.Request) {
 	w.Write(content)
 }
 
-func isPermitted(certs []*x509.Certificate, recepients []*Friend) bool {
+func isPermitted(certs []*x509.Certificate, recipients []*Friend) bool {
 	for _, c := range certs {
 		var id string
 		switch c.PublicKeyAlgorithm {
@@ -245,7 +245,7 @@ func isPermitted(certs []*x509.Certificate, recepients []*Friend) bool {
 			return false
 		}
 
-		for _, r := range recepients {
+		for _, r := range recipients {
 			if id == r.Fingerprint() {
 				return true
 			}
