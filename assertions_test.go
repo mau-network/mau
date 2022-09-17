@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/tls"
 	"errors"
+	"net/http"
 	"os"
+	"path"
 	"testing"
 )
 
@@ -10,6 +13,18 @@ type T = *testing.T
 
 func init() {
 	rsaKeyLength = 1024 // for faster account generation
+
+	http.DefaultClient.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+			},
+		},
+	}
 }
 
 func ASSERT(t T, condition bool, message string, args ...interface{}) {
@@ -31,7 +46,16 @@ func ASSERT_DIR_EXISTS(t T, dir string) {
 func ASSERT_FILE_EXISTS(t T, file string) {
 	t.Helper()
 	if stat, err := os.Stat(file); os.IsNotExist(err) {
-		ASSERT(t, false, `File "%s" should have existed but not found.`, file)
+
+		parent := path.Dir(file)
+		siblings := []string{}
+		entries, err := os.ReadDir(parent)
+		ASSERT_ERROR(t, nil, err)
+		for _, entry := range entries {
+			siblings = append(siblings, entry.Name())
+		}
+
+		ASSERT(t, false, "File \"%s\" should have existed but not found.\nOther files in same directory: %s", file, siblings)
 	} else if !stat.Mode().IsRegular() {
 		ASSERT(t, false, `Expected "%s" to be Regular file instead was: %s`, file, stat.Mode().Type())
 	}
@@ -44,7 +68,6 @@ func REFUTE_FILE_EXISTS(t T, file string) {
 	}
 
 	ASSERT(t, false, `File "%s" shouldn't have existed but it was found.`, file)
-
 }
 
 func ASSERT_EQUAL[Param comparable](t T, expected, actual Param) {

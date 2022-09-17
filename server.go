@@ -60,9 +60,9 @@ func NewServer(account *Account) (*Server, error) {
 		},
 	}
 
-	router.HandleFunc("/p2p/{FPR:[0-9A-F]+}", s.list).Methods("GET")
-	router.HandleFunc("/p2p/{FPR:[0-9A-F]+}/{fileID}", s.get).Methods("GET")
-	router.HandleFunc("/p2p/{FPR:[0-9A-F]+}/{fileID}/{versionID}", s.version).Methods("GET")
+	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}", s.list).Methods("GET")
+	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}/{fileID}", s.get).Methods("GET")
+	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}/{fileID}/{versionID}", s.version).Methods("GET")
 
 	return &s, nil
 }
@@ -78,7 +78,7 @@ func (s *Server) Serve(l net.Listener) error {
 }
 
 func (s *Server) serveMDNS(port int) error {
-	fingerprint := s.account.Fingerprint()
+	fingerprint := s.account.Fingerprint().String()
 
 	service, err := mdns.NewMDNSService(fingerprint, MDNSServiceName, "", "", port, nil, []string{})
 	if err != nil {
@@ -111,7 +111,7 @@ func (s *Server) Close() error {
 func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 	ifModifiedSince := r.Header.Get("If-Modified-Since")
 	if ifModifiedSince == "" {
-		http.Error(w, "Missing If-Modified_Since header", http.StatusBadRequest)
+		http.Error(w, "Missing If-Modified-Since header", http.StatusBadRequest)
 		return
 	}
 
@@ -122,7 +122,17 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 	}
 
 	vars := mux.Vars(r)
-	page := ListFiles(s.account, vars["FPR"], lastModified, s.limit)
+	fprStr := vars["FPR"]
+
+	var fpr Fingerprint
+
+	fpr, err = ParseFingerprint(fprStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	page := ListFiles(s.account, fpr, lastModified, s.limit)
 
 	list := make([]FileListItem, 0, len(page))
 	for _, item := range page {
@@ -158,6 +168,7 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 	marshaled, err := json.Marshal(list)
 	if err != nil {
 		http.Error(w, "Error while processing the list of files", http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Add("Content-Type", "application/json")
@@ -168,7 +179,16 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
-	file, err := GetFile(s.account, vars["FPR"], vars["fileID"])
+	fprStr := vars["FPR"]
+	var fpr Fingerprint
+	var err error
+	fpr, err = ParseFingerprint(fprStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	file, err := GetFile(s.account, fpr, vars["fileID"])
 	if err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
@@ -235,11 +255,11 @@ func (s *Server) version(w http.ResponseWriter, r *http.Request) {
 
 func isPermitted(certs []*x509.Certificate, recipients []*Friend) bool {
 	for _, c := range certs {
-		var id string
+		var id Fingerprint
 		switch c.PublicKeyAlgorithm {
 		case x509.RSA:
 			pubkey := c.PublicKey.(*rsa.PublicKey)
-			id = fmt.Sprintf("%X", packet.NewRSAPublicKey(c.NotBefore, pubkey).Fingerprint)
+			id = packet.NewRSAPublicKey(c.NotBefore, pubkey).Fingerprint
 		default:
 			fmt.Println("Error public key algorithm not supported")
 			return false

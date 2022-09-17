@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
@@ -55,8 +56,8 @@ func NewClient(account *Account) (*Client, error) {
 }
 
 // TODO: make sure your really connecting to the correct user
-func DownloadFriend(ctx context.Context, account *Account, address, fingerprint string, after time.Time, client *Client) error {
-	followed := path.Join(account.path, fingerprint)
+func DownloadFriend(ctx context.Context, account *Account, address string, fingerprint Fingerprint, after time.Time, client *Client) error {
+	followed := path.Join(account.path, fingerprint.String())
 	if _, err := os.Stat(followed); err != nil {
 		return ErrFriendNotFollowed
 	}
@@ -83,20 +84,20 @@ func DownloadFriend(ctx context.Context, account *Account, address, fingerprint 
 		return err
 	}
 
-	utc, err := time.LoadLocation("UTC")
+	req.Header.Add("If-Modified-Since", after.UTC().Format(http.TimeFormat))
+
+	resp, err := client.httpClient.Do(req)
+	body, _ := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
 
-	req.Header.Add("If-Modified-Since", after.In(utc).Format(http.TimeFormat))
-
-	resp, err := client.httpClient.Do(req)
-	if err != nil {
-		return err
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Peer responded with error: %s %s", resp.Status, string(body))
 	}
 
 	var list []FileListItem
-	err = json.NewDecoder(resp.Body).Decode(&list)
+	err = json.NewDecoder(bytes.NewBuffer(body)).Decode(&list)
 	resp.Body.Close()
 	if err != nil {
 		return err
@@ -119,8 +120,8 @@ func DownloadFriend(ctx context.Context, account *Account, address, fingerprint 
 }
 
 // TODO: make sure your really connecting to the correct user
-func DownloadFile(ctx context.Context, account *Account, address, fingerprint string, file *FileListItem, client *Client) error {
-	fpath := path.Join(account.path, fingerprint, file.Name)
+func DownloadFile(ctx context.Context, account *Account, address string, fingerprint Fingerprint, file *FileListItem, client *Client) error {
+	fpath := path.Join(account.path, fingerprint.String(), file.Name)
 
 	f := File{
 		Path:    fpath,
@@ -181,7 +182,7 @@ func DownloadFile(ctx context.Context, account *Account, address, fingerprint st
 	return nil
 }
 
-func findFriend(ctx context.Context, fingerprint string, addresses chan<- string) error {
+func findFriend(ctx context.Context, fingerprint Fingerprint, addresses chan<- string) error {
 	defer close(addresses)
 
 	name := fmt.Sprintf("%s.%s.%s.", fingerprint, MDNSServiceName, MDNSDomain)

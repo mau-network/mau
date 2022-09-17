@@ -110,7 +110,10 @@ func main() {
 		friends, err := ListFriends(account)
 		raise(err)
 
-		friend := friends.FindByFingerprint(*fingerprint)
+		fpr, err := ParseFingerprint(*fingerprint)
+		raise(err)
+
+		friend := friends.FindByFingerprint(fpr)
 		if friend == nil {
 			log.Fatal("Can't find friend with fingerprint ", *fingerprint)
 		}
@@ -129,7 +132,10 @@ func main() {
 		friends, err := ListFriends(account)
 		raise(err)
 
-		friend := friends.FindByFingerprint(*fingerprint)
+		fpr, err := ParseFingerprint(*fingerprint)
+		raise(err)
+
+		friend := friends.FindByFingerprint(fpr)
 		if friend == nil {
 			log.Fatal("Can't find friend with fingerprint ", *fingerprint)
 		}
@@ -148,7 +154,10 @@ func main() {
 		friends, err := ListFriends(account)
 		raise(err)
 
-		friend := friends.FindByFingerprint(*fingerprint)
+		fpr, err := ParseFingerprint(*fingerprint)
+		raise(err)
+
+		friend := friends.FindByFingerprint(fpr)
 		if friend == nil {
 			log.Fatal("Can't find friend with fingerprint ", *fingerprint)
 		}
@@ -183,10 +192,15 @@ func main() {
 
 		fprs := strings.Split(*fingerprints, ",")
 		friends := []*Friend{}
-		for _, fpr := range fprs {
+		for _, fprStr := range fprs {
+			fpr, err := ParseFingerprint(fprStr)
+			if err != nil {
+				raise(fmt.Errorf("Can't parse %s as fingerprint", fprStr))
+			}
+
 			f := allFrields.FindByFingerprint(fpr)
 			if f == nil {
-				raise(fmt.Errorf("Can't find friend %s", fpr))
+				raise(fmt.Errorf("Can't find friend %s", fprStr))
 			}
 
 			friends = append(friends, f)
@@ -202,13 +216,18 @@ func main() {
 		filesCmd.Parse(os.Args[2:])
 
 		account := getAccount()
+		var fpr Fingerprint
 
 		if *fingerprint == "" {
-			*fingerprint = account.Fingerprint()
+			fpr = account.Fingerprint()
+		} else {
+			var err error
+			fpr, err = ParseFingerprint(*fingerprint)
+			raise(err)
 		}
 
 		after := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
-		files := ListFiles(account, *fingerprint, after, 0)
+		files := ListFiles(account, fpr, after, 0)
 		for _, f := range files {
 			if f.Deleted(account) {
 				continue
@@ -234,12 +253,17 @@ func main() {
 		openCmd.Parse(os.Args[2:])
 
 		account := getAccount()
+		var fpr Fingerprint
 
 		if *fingerprint == "" {
-			*fingerprint = account.Fingerprint()
+			fpr = account.Fingerprint()
+		} else {
+			var err error
+			fpr, err = ParseFingerprint(*fingerprint)
+			raise(err)
 		}
 
-		f, err := GetFile(account, *fingerprint, *file)
+		f, err := GetFile(account, fpr, *file)
 		raise(err)
 
 		r, err := f.Reader(account)
@@ -280,7 +304,7 @@ func main() {
 
 	case "sync":
 		syncCmd := flag.NewFlagSet("sync", flag.ExitOnError)
-		fpr := syncCmd.String("fingerprint", "", "user fingerprint to sync files")
+		fprStr := syncCmd.String("fingerprint", "", "user fingerprint to sync files")
 		address := syncCmd.String("address", "", "source address to sync from")
 		syncCmd.Parse(os.Args[2:])
 
@@ -288,11 +312,15 @@ func main() {
 		client, err := NewClient(account)
 		raise(err)
 
+		var fpr Fingerprint
+		fpr, err = ParseFingerprint(*fprStr)
+		raise(err)
+
 		// TODO get the latest synced file date
 		t := time.Date(2000, 1, 1, 1, 1, 1, 1, time.UTC)
 
 		ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
-		err = DownloadFriend(ctx, account, *address, *fpr, t, client)
+		err = DownloadFriend(ctx, account, *address, fpr, t, client)
 		raise(err)
 
 	default:

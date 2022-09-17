@@ -17,7 +17,7 @@ func TestFollow(t *testing.T) {
 
 	err := Follow(account, friend)
 	ASSERT_ERROR(t, nil, err)
-	ASSERT_DIR_EXISTS(t, path.Join(dir, friend_account.Fingerprint()))
+	ASSERT_DIR_EXISTS(t, path.Join(dir, friend_account.Fingerprint().String()))
 }
 
 func TestUnfollow(t *testing.T) {
@@ -32,7 +32,7 @@ func TestUnfollow(t *testing.T) {
 	Follow(account, friend)
 	err := Unfollow(account, friend)
 	ASSERT_ERROR(t, nil, err)
-	ASSERT_DIR_EXISTS(t, path.Join(dir, "."+friend_account.Fingerprint()))
+	ASSERT_DIR_EXISTS(t, path.Join(dir, "."+friend_account.Fingerprint().String()))
 }
 
 func TestListFollows(t *testing.T) {

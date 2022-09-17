@@ -162,9 +162,9 @@ func GetVersion(account *Account, fpr, name, version string) (*File, error) {
 	return &File{Path: filepath, version: true}, nil
 }
 
-func GetFile(account *Account, fpr, name string) (*File, error) {
-	followedPath := path.Join(account.path, fpr, name)
-	unfollowedPath := path.Join(account.path, "."+fpr, name)
+func GetFile(account *Account, fpr Fingerprint, name string) (*File, error) {
+	followedPath := path.Join(account.path, fpr.String(), name)
+	unfollowedPath := path.Join(account.path, "."+fpr.String(), name)
 	var filepath string
 
 	if _, err := os.Stat(followedPath); err == nil {
@@ -183,7 +183,7 @@ func AddFile(account *Account, r io.Reader, name string, recipients []*Friend) (
 		name += ".pgp"
 	}
 
-	fpr := account.Fingerprint()
+	fpr := account.Fingerprint().String()
 
 	if err := os.MkdirAll(path.Join(account.path, fpr), dirPerm); err != nil {
 		return nil, err
@@ -238,9 +238,9 @@ func RemoveFile(account *Account, file *File) error {
 	return err
 }
 
-func ListFiles(account *Account, fingerprint string, after time.Time, limit uint) []*File {
-	followedPath := path.Join(account.path, fingerprint)
-	unfollowedPath := path.Join(account.path, "."+fingerprint)
+func ListFiles(account *Account, fingerprint Fingerprint, after time.Time, limit uint) []*File {
+	followedPath := path.Join(account.path, fingerprint.String())
+	unfollowedPath := path.Join(account.path, "."+fingerprint.String())
 	var dirpath string
 
 	if _, err := os.Stat(followedPath); err == nil {

@@ -14,7 +14,7 @@ func TestFile(t *testing.T) {
 
 	file, err := AddFile(account, strings.NewReader("hello world"), "hello.txt", []*Friend{})
 	ASSERT_ERROR(t, nil, err)
-	ASSERT_EQUAL(t, path.Join(account_dir, account.Fingerprint(), "hello.txt.pgp"), file.Path)
+	ASSERT_EQUAL(t, path.Join(account_dir, account.Fingerprint().String(), "hello.txt.pgp"), file.Path)
 
 	versions := file.Versions()
 	ASSERT_EQUAL(t, 0, len(versions))
@@ -95,6 +95,7 @@ func TestListFiles(t *testing.T) {
 	files = ListFiles(account, account.Fingerprint(), time.Now().Add(time.Second), 10)
 	ASSERT_EQUAL(t, 0, len(files))
 
-	files = ListFiles(account, "unknown fingerprint", time.Now().Add(-10*time.Second), 10)
+	unknownFpr, _ := ParseFingerprint("01234567891234567890")
+	files = ListFiles(account, unknownFpr, time.Now().Add(-time.Second), 10)
 	ASSERT_EQUAL(t, 0, len(files))
 }

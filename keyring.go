@@ -17,7 +17,7 @@ func (k *KeyRing) Name() string {
 }
 
 func (k *KeyRing) FriendsSet() []*Friend {
-	friends := map[string]*Friend{}
+	friends := map[Fingerprint]*Friend{}
 	for _, f := range k.Friends {
 		friends[f.Fingerprint()] = f
 	}
@@ -36,7 +36,7 @@ func (k *KeyRing) FriendsSet() []*Friend {
 	return set
 }
 
-func (k *KeyRing) FindByFingerprint(fingerprint string) *Friend {
+func (k *KeyRing) FindByFingerprint(fingerprint Fingerprint) *Friend {
 	for _, friend := range k.Friends {
 		if friend.Fingerprint() == fingerprint {
 			return friend
@@ -53,6 +53,28 @@ func (k *KeyRing) FindByFingerprint(fingerprint string) *Friend {
 	return nil
 }
 
+func (k *KeyRing) FriendById(id uint64) *Friend {
+	for _, f := range k.Friends {
+		if f.entity.PrimaryKey.KeyId == id {
+			return f
+		}
+		for _, sk := range f.entity.Subkeys {
+			if sk.PublicKey.KeyId == id {
+				return f
+			}
+		}
+	}
+
+	for _, sk := range k.KeyRings {
+		f := sk.FriendById(id)
+		if f != nil {
+			return f
+		}
+	}
+
+	return nil
+}
+
 func (k *KeyRing) read() error {
 	files, err := os.ReadDir(k.Path)
 	if err != nil {
@@ -60,7 +82,7 @@ func (k *KeyRing) read() error {
 	}
 
 	for _, file := range files {
-		if file.Name() == "account.pgp" {
+		if file.Name() == accountKeyFilename {
 			continue
 		}
 
@@ -88,28 +110,6 @@ func (k *KeyRing) read() error {
 		}
 
 		k.Friends = append(k.Friends, friend)
-	}
-
-	return nil
-}
-
-func (k *KeyRing) FriendById(id uint64) *Friend {
-	for _, f := range k.Friends {
-		if f.entity.PrimaryKey.KeyId == id {
-			return f
-		}
-		for _, sk := range f.entity.Subkeys {
-			if sk.PublicKey.KeyId == id {
-				return f
-			}
-		}
-	}
-
-	for _, sk := range k.KeyRings {
-		f := sk.FriendById(id)
-		if f != nil {
-			return f
-		}
 	}
 
 	return nil

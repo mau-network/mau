@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/keybase/go-crypto/openpgp"
@@ -39,8 +40,8 @@ func (f *Friend) Email() string {
 	return ""
 }
 
-func (f *Friend) Fingerprint() string {
-	return fmt.Sprintf("%X", f.entity.PrimaryKey.Fingerprint)
+func (f *Friend) Fingerprint() Fingerprint {
+	return f.entity.PrimaryKey.Fingerprint
 }
 
 func readFriend(reader io.Reader) (*Friend, error) {
@@ -64,7 +65,10 @@ func AddFriend(account *Account, reader io.Reader) (*Friend, error) {
 		return nil, err
 	}
 
-	f, err := os.Create(fmt.Sprintf("%s/%X.pgp", mauDir(account.path), entity.PrimaryKey.Fingerprint))
+	fpr := Fingerprint(entity.PrimaryKey.Fingerprint).String()
+
+	filePath := path.Join(mauDir(account.path), fpr+".pgp")
+	f, err := os.Create(filePath)
 	if err != nil {
 		return nil, err
 	}

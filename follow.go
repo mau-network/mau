@@ -19,7 +19,12 @@ func ListFollows(account *Account) ([]*Friend, error) {
 	follows := []*Friend{}
 	for _, file := range files {
 		if file.IsDir() && file.Name()[0] != '.' {
-			friend := keyring.FindByFingerprint(file.Name())
+			fpr, err := ParseFingerprint(file.Name())
+			if err != nil {
+				continue
+			}
+
+			friend := keyring.FindByFingerprint(fpr)
 			if friend != nil {
 				follows = append(follows, friend)
 			}
@@ -30,8 +35,9 @@ func ListFollows(account *Account) ([]*Friend, error) {
 }
 
 func Follow(account *Account, friend *Friend) error {
-	unfollowed := path.Join(account.path, "."+friend.Fingerprint())
-	followed := path.Join(account.path, friend.Fingerprint())
+	fpr := friend.Fingerprint().String()
+	unfollowed := path.Join(account.path, "."+fpr)
+	followed := path.Join(account.path, fpr)
 
 	if _, err := os.Stat(followed); err == nil {
 		return nil
@@ -45,8 +51,9 @@ func Follow(account *Account, friend *Friend) error {
 }
 
 func Unfollow(account *Account, friend *Friend) error {
-	unfollowed := path.Join(account.path, "."+friend.Fingerprint())
-	followed := path.Join(account.path, friend.Fingerprint())
+	fpr := friend.Fingerprint().String()
+	unfollowed := path.Join(account.path, "."+fpr)
+	followed := path.Join(account.path, fpr)
 
 	if _, err := os.Stat(followed); err == nil {
 		return os.Rename(followed, unfollowed)

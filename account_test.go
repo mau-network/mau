@@ -25,7 +25,7 @@ func TestNewAccount(t *testing.T) {
 
 		t.Run("Creates the correct file structure", func(t T) {
 			ASSERT_DIR_EXISTS(t, path.Join(dir, ".mau"))
-			ASSERT_FILE_EXISTS(t, path.Join(dir, ".mau", "account.pgp"))
+			ASSERT_FILE_EXISTS(t, path.Join(dir, ".mau", accountKeyFilename))
 		})
 	})
 

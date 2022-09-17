@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"math/big"
 	"os"
 	"path"
@@ -140,8 +139,8 @@ func (a *Account) Email() string {
 	return ""
 }
 
-func (a *Account) Fingerprint() string {
-	return fmt.Sprintf("%X", a.entity.PrimaryKey.Fingerprint)
+func (a *Account) Fingerprint() Fingerprint {
+	return a.entity.PrimaryKey.Fingerprint
 }
 
 func (a *Account) Export() ([]byte, error) {

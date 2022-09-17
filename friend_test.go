@@ -16,7 +16,7 @@ func TestAddFriend(t *testing.T) {
 	friend_account_pub, _ := friend_account.Export()
 	friend, err := AddFriend(account, bytes.NewBuffer(friend_account_pub))
 	ASSERT_ERROR(t, nil, err)
-	ASSERT_FILE_EXISTS(t, path.Join(dir, ".mau", fingerprint+".pgp"))
+	ASSERT_FILE_EXISTS(t, path.Join(dir, ".mau", fingerprint.String()+".pgp"))
 
 	t.Run("Email", func(t T) {
 		ASSERT_EQUAL(t, "mohamed@example.com", friend.Email())
@@ -50,7 +50,7 @@ func TestRemoveFriend(t *testing.T) {
 
 	err := RemoveFriend(account, friend)
 	ASSERT_ERROR(t, nil, err)
-	REFUTE_FILE_EXISTS(t, path.Join(dir, ".mau", fingerprint+".pgp"))
+	REFUTE_FILE_EXISTS(t, path.Join(dir, ".mau", fingerprint.String()+".pgp"))
 }
 
 func TestListFriends(t *testing.T) {

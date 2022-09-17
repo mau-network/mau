@@ -57,22 +57,22 @@ func TestDownloadFriend(t *testing.T) {
 		aFriend, _ := AddFriend(friend, bytes.NewBuffer(account_key))
 		_, err := AddFile(friend, strings.NewReader("Hello world!"), "hello world.txt", []*Friend{aFriend})
 		ASSERT_ERROR(t, nil, err)
-		ASSERT_FILE_EXISTS(t, path.Join(friend_dir, friend.Fingerprint(), "hello world.txt.pgp"))
+		ASSERT_FILE_EXISTS(t, path.Join(friend_dir, friend.Fingerprint().String(), "hello world.txt.pgp"))
 
 		// and download it to the account
 		err = DownloadFriend(Timeout(time.Second), account, address, friend.Fingerprint(), time.Now().Add(-time.Second), client)
 		ASSERT_ERROR(t, nil, err)
-		ASSERT_FILE_EXISTS(t, path.Join(account_dir, friend.Fingerprint(), "hello world.txt.pgp"))
+		ASSERT_FILE_EXISTS(t, path.Join(account_dir, friend.Fingerprint().String(), "hello world.txt.pgp"))
 	})
 
 	t.Run("When private file exists", func(t T) {
 		_, err := AddFile(friend, strings.NewReader("Private social security number"), "private.txt", []*Friend{})
 		ASSERT_ERROR(t, nil, err)
-		ASSERT_FILE_EXISTS(t, path.Join(friend_dir, friend.Fingerprint(), "private.txt.pgp"))
+		ASSERT_FILE_EXISTS(t, path.Join(friend_dir, friend.Fingerprint().String(), "private.txt.pgp"))
 
 		err = DownloadFriend(Timeout(time.Second), account, address, friend.Fingerprint(), time.Now().Add(-time.Second), client)
 		ASSERT_ERROR(t, nil, err)
-		REFUTE_FILE_EXISTS(t, path.Join(account_dir, friend.Fingerprint(), "private.txt.pgp"))
+		REFUTE_FILE_EXISTS(t, path.Join(account_dir, friend.Fingerprint().String(), "private.txt.pgp"))
 	})
 
 	t.Run("When no address is provided it find the user on the local network", func(t T) {

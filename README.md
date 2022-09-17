@@ -223,7 +223,7 @@ We have three entities in our system:
 * **Content version**: Identified by the content hash
 
 * **Users**:
-  * Users identified by their public key fingerprint `FPR`
+  * Users identified by their public key fingerprint `FPR` downcase characters
   * Users will be addressed by the address `/p2p/<user-FPR>`
 * **Content**
   * The user has the freedom to name his content files as he wishes we'll refer to it by `filename`
@@ -231,7 +231,7 @@ We have three entities in our system:
 * **Content versions**:
   * When editing a content file the old version should be kept on the disk.
   * Addressing a version should be scoped by the user and the content `/p2p/<user-FPR>/file/<filename>/version/<version-hash>`
-  * Version hash is a SHA256 sum of the content.
+  * Version hash is a SHA256 sum of the content downcase characters.
 
 ### Directory structure
 
