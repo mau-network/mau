@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"testing"
 )
 
@@ -23,6 +24,13 @@ func TestParseFingerprint(t *testing.T) {
 		fprStr := "76e5a610cdcbd84aa81cf8331713dfe3163681d6777"
 		fpr, err := ParseFingerprint(fprStr)
 		ASSERT_ERROR(t, ErrIncorrectFingerprinLength, err)
+		ASSERT_EQUAL(t, Fingerprint{}, fpr)
+	})
+
+	t.Run("With incorrect value fingerprint", func(t T) {
+		fprStr := "76g5a610cdcbd84aa81cf8331713dfe3163681d6" // it has "g"
+		fpr, err := ParseFingerprint(fprStr)
+		ASSERT_EQUAL(t, hex.InvalidByteError('g').Error(), err.Error())
 		ASSERT_EQUAL(t, Fingerprint{}, fpr)
 	})
 }
