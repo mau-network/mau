@@ -17,7 +17,7 @@ func (f Fingerprint) String() string {
 func ParseFingerprint(s string) (fpr Fingerprint, err error) {
 	decodeLen := hex.DecodedLen(len(s))
 	if decodeLen != cap(fpr) {
-		err = fmt.Errorf("%w : provided: %s (%d)", ErrIncorrectFingerprinLength, s, decodeLen)
+		err = fmt.Errorf("%w : provided: %d", ErrIncorrectFingerprinLength, decodeLen)
 		return
 	}
 
