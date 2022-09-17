@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"io"
 	"path"
 	"strings"
@@ -41,6 +42,27 @@ func TestFile(t *testing.T) {
 	friends, err := file.Recipients(account)
 	ASSERT_ERROR(t, nil, err)
 	ASSERT_EQUAL(t, 0, len(friends))
+
+	t.Run("Versions", func(t T) {
+		file, err := AddFile(account, strings.NewReader("hello there"), "hello.txt", []*Friend{})
+		ASSERT_ERROR(t, nil, err)
+		ASSERT_EQUAL(t, path.Join(account_dir, account.Fingerprint().String(), "hello.txt.pgp"), file.Path)
+
+		versions := file.Versions()
+		ASSERT_EQUAL(t, 1, len(versions))
+		ASSERT_DIR_EXISTS(t, path.Join(account_dir, account.Fingerprint().String(), "hello.txt.pgp.versions"))
+
+		version := versions[0]
+		ASSERT_FILE_EXISTS(t, path.Join(account_dir, account.Fingerprint().String(), "hello.txt.pgp.versions", version.Name()))
+
+		reader, err := version.Reader(account)
+		content, err := io.ReadAll(reader)
+		ASSERT_EQUAL(t, "hello world", string(content))
+
+		nameInbytes, err := hex.DecodeString(version.Name())
+		ASSERT_ERROR(t, nil, err)
+		ASSERT_EQUAL(t, 32, len(nameInbytes))
+	})
 }
 
 func TestGetFile(t *testing.T) {
