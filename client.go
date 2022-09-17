@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
@@ -46,6 +45,8 @@ func NewClient(account *Account) (*Client, error) {
 						tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
 						tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
 						tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+						tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 					},
 				},
 			},
@@ -87,17 +88,16 @@ func DownloadFriend(ctx context.Context, account *Account, address string, finge
 	req.Header.Add("If-Modified-Since", after.UTC().Format(http.TimeFormat))
 
 	resp, err := client.httpClient.Do(req)
-	body, _ := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Peer responded with error: %s %s", resp.Status, string(body))
+		return fmt.Errorf("Peer responded with error: %s", resp.Status)
 	}
 
 	var list []FileListItem
-	err = json.NewDecoder(bytes.NewBuffer(body)).Decode(&list)
+	err = json.NewDecoder(resp.Body).Decode(&list)
 	resp.Body.Close()
 	if err != nil {
 		return err
@@ -183,8 +183,6 @@ func DownloadFile(ctx context.Context, account *Account, address string, fingerp
 }
 
 func findFriend(ctx context.Context, fingerprint Fingerprint, addresses chan<- string) error {
-	defer close(addresses)
-
 	name := fmt.Sprintf("%s.%s.%s.", fingerprint, MDNSServiceName, MDNSDomain)
 	entriesCh := make(chan *mdns.ServiceEntry, cap(addresses))
 
