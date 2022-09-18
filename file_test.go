@@ -14,7 +14,7 @@ func TestFile(t *testing.T) {
 	account, _ := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "password value")
 
 	file, err := account.AddFile(strings.NewReader("hello world"), "hello.txt", []*Friend{})
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 	ASSERT_EQUAL(t, path.Join(account_dir, account.Fingerprint().String(), "hello.txt.pgp"), file.Path)
 
 	versions := file.Versions()
@@ -24,28 +24,28 @@ func TestFile(t *testing.T) {
 	ASSERT_EQUAL(t, false, file.Deleted(account))
 
 	size, err := file.Size()
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 	ASSERT(t, size > 0, "Size should not be zero")
 
 	hash, err := file.Hash()
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 	REFUTE_EQUAL(t, "", hash)
 
 	reader, err := file.Reader(account)
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 
 	content, err := io.ReadAll(reader)
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 
 	ASSERT_EQUAL(t, "hello world", string(content))
 
 	friends, err := file.Recipients(account)
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 	ASSERT_EQUAL(t, 0, len(friends))
 
 	t.Run("Versions", func(t T) {
 		file, err := account.AddFile(strings.NewReader("hello there"), "hello.txt", []*Friend{})
-		ASSERT_ERROR(t, nil, err)
+		ASSERT_NO_ERROR(t, err)
 		ASSERT_EQUAL(t, path.Join(account_dir, account.Fingerprint().String(), "hello.txt.pgp"), file.Path)
 
 		versions := file.Versions()
@@ -60,7 +60,7 @@ func TestFile(t *testing.T) {
 		ASSERT_EQUAL(t, "hello world", string(content))
 
 		nameInbytes, err := hex.DecodeString(version.Name())
-		ASSERT_ERROR(t, nil, err)
+		ASSERT_NO_ERROR(t, err)
 		ASSERT_EQUAL(t, 32, len(nameInbytes))
 	})
 }
@@ -97,7 +97,7 @@ func TestRemoveFile(t *testing.T) {
 	ASSERT(t, !file.Deleted(account), "File should exist (not deleted)")
 
 	err := account.RemoveFile(file)
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 
 	ASSERT(t, file.Deleted(account), "File should be deleted")
 

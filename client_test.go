@@ -15,7 +15,7 @@ func TestNewClient(t *testing.T) {
 	account, err := NewAccount(t.TempDir(), "Ahmed Mohamed", "ahmed@example.com", "strong password")
 
 	client, err := NewClient(account)
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 	REFUTE_EQUAL(t, nil, client)
 }
 
@@ -49,36 +49,36 @@ func TestDownloadFriend(t *testing.T) {
 		account.Follow(f)
 
 		err := account.DownloadFriend(Timeout(time.Second), address, friend.Fingerprint(), time.Now(), client)
-		ASSERT_ERROR(t, nil, err)
+		ASSERT_NO_ERROR(t, err)
 	})
 
 	t.Run("When a file is encrypted for friend", func(t T) {
 		// Create a file in the friend account
 		aFriend, _ := friend.AddFriend(bytes.NewBuffer(account_key))
 		_, err := friend.AddFile(strings.NewReader("Hello world!"), "hello world.txt", []*Friend{aFriend})
-		ASSERT_ERROR(t, nil, err)
+		ASSERT_NO_ERROR(t, err)
 		ASSERT_FILE_EXISTS(t, path.Join(friend_dir, friend.Fingerprint().String(), "hello world.txt.pgp"))
 
 		// and download it to the account
 		err = account.DownloadFriend(Timeout(time.Second), address, friend.Fingerprint(), time.Now().Add(-time.Second), client)
-		ASSERT_ERROR(t, nil, err)
+		ASSERT_NO_ERROR(t, err)
 		ASSERT_FILE_EXISTS(t, path.Join(account_dir, friend.Fingerprint().String(), "hello world.txt.pgp"))
 	})
 
 	t.Run("When private file exists", func(t T) {
 		_, err := friend.AddFile(strings.NewReader("Private social security number"), "private.txt", []*Friend{})
-		ASSERT_ERROR(t, nil, err)
+		ASSERT_NO_ERROR(t, err)
 		ASSERT_FILE_EXISTS(t, path.Join(friend_dir, friend.Fingerprint().String(), "private.txt.pgp"))
 
 		err = account.DownloadFriend(Timeout(time.Second), address, friend.Fingerprint(), time.Now().Add(-time.Second), client)
-		ASSERT_ERROR(t, nil, err)
+		ASSERT_NO_ERROR(t, err)
 		REFUTE_FILE_EXISTS(t, path.Join(account_dir, friend.Fingerprint().String(), "private.txt.pgp"))
 	})
 
 	t.Run("When no address is provided it find the user on the local network", func(t T) {
 		ctx := Timeout(10 * time.Second)
 		err := account.DownloadFriend(ctx, "", friend.Fingerprint(), time.Now().Add(-time.Second), client)
-		ASSERT_ERROR(t, nil, err)
+		ASSERT_NO_ERROR(t, err)
 	})
 }
 

@@ -15,27 +15,27 @@ import (
 func TestServer(t *testing.T) {
 	dir := t.TempDir()
 	account, err := NewAccount(dir, "Ahmed Mohamed", "ahmed@example.com", "password")
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 	REFUTE_EQUAL(t, nil, account)
 
 	friendAccount, err := NewAccount(t.TempDir(), "Friend of Ahmed", "friend@example.com", "password")
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 	REFUTE_EQUAL(t, nil, friendAccount)
 
 	friendPub, err := friendAccount.Export()
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 	friend, err := account.AddFriend(bytes.NewBuffer(friendPub))
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 
 	server, err := NewServer(account)
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 	REFUTE_EQUAL(t, nil, server)
 
 	listener, address := TempListener()
 
 	go func() {
 		err := server.Serve(*listener)
-		ASSERT_ERROR(t, nil, err)
+		ASSERT_NO_ERROR(t, err)
 	}()
 
 	list_account_files_url := fmt.Sprintf("%s/p2p/%s", address, account.Fingerprint())
@@ -49,45 +49,45 @@ func TestServer(t *testing.T) {
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, "[]", string(body))
 			})
 
 			t.Run("With one private file", func(t T) {
 				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{})
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				defer os.Remove(file.Path)
 
 				req, _ := http.NewRequest("GET", list_account_files_url, nil)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, "[]", string(body))
 			})
 
 			t.Run("With one shared file", func(t T) {
 				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{friend})
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				defer os.Remove(file.Path)
 
 				req, _ := http.NewRequest("GET", list_account_files_url, nil)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, "[]", string(body))
 			})
 		})
@@ -95,7 +95,7 @@ func TestServer(t *testing.T) {
 		t.Run("With client cert not a friend", func(t T) {
 			anotherAccount, _ := NewAccount(t.TempDir(), "Unknown", "unknown@example.com", "password")
 			cert, err := anotherAccount.Certificate()
-			ASSERT_ERROR(t, nil, err)
+			ASSERT_NO_ERROR(t, err)
 
 			oldTransport := http.DefaultClient.Transport
 			defer func() { http.DefaultClient.Transport = oldTransport }()
@@ -118,52 +118,52 @@ func TestServer(t *testing.T) {
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, "[]", string(body))
 			})
 
 			t.Run("With one private file", func(t T) {
 				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{})
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				defer os.Remove(file.Path)
 
 				req, _ := http.NewRequest("GET", list_account_files_url, nil)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, "[]", string(body))
 			})
 
 			t.Run("With one shared file", func(t T) {
 				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{friend})
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				defer os.Remove(file.Path)
 
 				req, _ := http.NewRequest("GET", list_account_files_url, nil)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, "[]", string(body))
 			})
 		})
 
 		t.Run("With client cert of a friend", func(t T) {
 			cert, err := friendAccount.Certificate()
-			ASSERT_ERROR(t, nil, err)
+			ASSERT_NO_ERROR(t, err)
 
 			oldTransport := http.DefaultClient.Transport
 			defer func() { http.DefaultClient.Transport = oldTransport }()
@@ -186,45 +186,45 @@ func TestServer(t *testing.T) {
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, "[]", string(body))
 			})
 
 			t.Run("With one private file", func(t T) {
 				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{})
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				defer os.Remove(file.Path)
 
 				req, _ := http.NewRequest("GET", list_account_files_url, nil)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, "[]", string(body))
 			})
 
 			t.Run("With one shared file", func(t T) {
 				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{friend})
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				defer os.Remove(file.Path)
 
 				req, _ := http.NewRequest("GET", list_account_files_url, nil)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
-				ASSERT_ERROR(t, nil, err)
+				ASSERT_NO_ERROR(t, err)
 				ASSERT(t, strings.Contains(string(body), "hello.txt.pgp"), "hello.txt.pgp not found in the response, Response: %s", body)
 			})
 

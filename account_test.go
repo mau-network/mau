@@ -60,7 +60,7 @@ func TestOpenAccount(t *testing.T) {
 
 	t.Run("Using same password", func(t T) {
 		opened, err := OpenAccount(dir, "strong password")
-		ASSERT_ERROR(t, nil, err)
+		ASSERT_NO_ERROR(t, err)
 		ASSERT_EQUAL(t, "ahmed@example.com", opened.Email())
 		ASSERT_EQUAL(t, "Ahmed Mohamed", opened.Name())
 		ASSERT_EQUAL(t, account.Fingerprint(), opened.Fingerprint())

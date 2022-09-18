@@ -16,7 +16,7 @@ func TestAddFriend(t *testing.T) {
 	fingerprint := friend_account.Fingerprint()
 	friend_account_pub, _ := friend_account.Export()
 	friend, err := account.AddFriend(bytes.NewBuffer(friend_account_pub))
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 	ASSERT_FILE_EXISTS(t, path.Join(dir, ".mau", fingerprint.String()+".pgp"))
 
 	t.Run("Email", func(t T) {
@@ -34,7 +34,7 @@ func TestAddFriend(t *testing.T) {
 	t.Run("Identity", func(t T) {
 		friend_account_identity, _ := friend_account.Identity()
 		friend_identity, err := friend.Identity()
-		ASSERT_ERROR(t, nil, err)
+		ASSERT_NO_ERROR(t, err)
 		ASSERT_EQUAL(t, friend_account_identity, friend_identity)
 	})
 
@@ -62,7 +62,7 @@ func TestRemoveFriend(t *testing.T) {
 	friend, _ := account.AddFriend(bytes.NewBuffer(friend_account_pub))
 
 	err := account.RemoveFriend(friend)
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 	REFUTE_FILE_EXISTS(t, path.Join(dir, ".mau", fingerprint.String()+".pgp"))
 }
 
@@ -76,7 +76,7 @@ func TestListFriends(t *testing.T) {
 	friend, _ := account.AddFriend(bytes.NewBuffer(friend_account_pub))
 
 	keyring, err := account.ListFriends()
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 	REFUTE_EQUAL(t, nil, keyring)
 	ASSERT_EQUAL(t, path.Join(dir, ".mau"), keyring.Path)
 	ASSERT_EQUAL(t, 1, len(keyring.Friends))
@@ -85,7 +85,7 @@ func TestListFriends(t *testing.T) {
 	err = account.RemoveFriend(friend)
 
 	keyring, err = account.ListFriends()
-	ASSERT_ERROR(t, nil, err)
+	ASSERT_NO_ERROR(t, err)
 	REFUTE_EQUAL(t, nil, keyring)
 	ASSERT_EQUAL(t, path.Join(dir, ".mau"), keyring.Path)
 	ASSERT_EQUAL(t, 0, len(keyring.Friends))

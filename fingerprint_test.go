@@ -9,7 +9,7 @@ func TestParseFingerprint(t *testing.T) {
 	t.Run("With correct fingerprint", func(t T) {
 		fprStr := "76e5a610cdcbd84aa81cf8331713dfe3163681d6"
 		fpr, err := ParseFingerprint(fprStr)
-		ASSERT_ERROR(t, nil, err)
+		ASSERT_NO_ERROR(t, err)
 		ASSERT_EQUAL(t, Fingerprint{118, 229, 166, 16, 205, 203, 216, 74, 168, 28, 248, 51, 23, 19, 223, 227, 22, 54, 129, 214}, fpr)
 	})
 

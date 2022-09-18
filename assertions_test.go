@@ -50,7 +50,7 @@ func ASSERT_FILE_EXISTS(t T, file string) {
 		parent := path.Dir(file)
 		siblings := []string{}
 		entries, err := os.ReadDir(parent)
-		ASSERT_ERROR(t, nil, err)
+		ASSERT_NO_ERROR(t, err)
 		for _, entry := range entries {
 			siblings = append(siblings, entry.Name())
 		}
@@ -78,6 +78,11 @@ func ASSERT_EQUAL[Param comparable](t T, expected, actual Param) {
 func ASSERT_ERROR(t T, expected, actual error) {
 	t.Helper()
 	ASSERT(t, errors.Is(actual, expected), "Error: %s is not a: %s", actual, expected)
+}
+
+func ASSERT_NO_ERROR(t T, actual error) {
+	t.Helper()
+	ASSERT(t, actual == nil, "Expected no error found: %s", actual)
 }
 
 func REFUTE_EQUAL[Param comparable](t T, expected, actual Param) {
