@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	. "github.com/mau-network/mau"
 	"golang.org/x/term"
 )
 

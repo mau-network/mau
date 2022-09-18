@@ -35,6 +35,7 @@
     - [TODOs](#todos)
     - [FAQ](#faq)
         - [Why are keys written in binary format?](#why-are-keys-written-in-binary-format)
+        - [Why are friends keys encrypted?](#why-are-friends-keys-encrypted)
 
 <!-- markdown-toc end -->
 
@@ -360,7 +361,7 @@ The following is a minimum list of modules that is needed to make up the core fu
 
 ## PROJECT STATUS
 
-The project is between refining the concept and writing the Proof of concept phases.
+The project is between refining the concept and writing the Proof of concept phases. This repository includes a proof of concept Go package that can be imported. Also a CLI tool under `cmd/mau` to provide basic interface for the package.
 
 |      State         |  Badge  |
 |---------------|--------------------------------------------------------------------------------------------------------------------------------------------|

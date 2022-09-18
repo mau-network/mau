@@ -1,4 +1,4 @@
-package main
+package mau
 
 var (
 	rsaKeyLength = 4096
