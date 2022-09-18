@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"os"
 	"path"
 	"testing"
 )
@@ -35,6 +36,18 @@ func TestAddFriend(t *testing.T) {
 		friend_identity, err := friend.Identity()
 		ASSERT_ERROR(t, nil, err)
 		ASSERT_EQUAL(t, friend_account_identity, friend_identity)
+	})
+
+	t.Run("File should be encrypted for this account", func(t T) {
+		anotherDir := t.TempDir()
+		anotherAccount, _ := NewAccount(anotherDir, "Unknown account", "unknow@example.com", "password")
+
+		file_content, _ := os.ReadFile(path.Join(dir, ".mau", fingerprint.String()+".pgp"))
+		os.WriteFile(path.Join(anotherDir, ".mau", fingerprint.String()+".pgp"), file_content, 0700)
+
+		friends, err := ListFriends(anotherAccount)
+		ASSERT(t, err != nil, "ListFriends should fail to decrypt a friend")
+		ASSERT_EQUAL(t, nil, friends)
 	})
 }
 

@@ -75,10 +75,10 @@ func (k *KeyRing) FriendById(id uint64) *Friend {
 	return nil
 }
 
-func (k *KeyRing) read() error {
+func (k *KeyRing) read(account *Account) error {
 	files, err := os.ReadDir(k.Path)
 	if err != nil {
-		return err
+		return fmt.Errorf("Can't read dir: %w", err)
 	}
 
 	for _, file := range files {
@@ -89,7 +89,7 @@ func (k *KeyRing) read() error {
 		if file.IsDir() {
 			keyring := KeyRing{Path: fmt.Sprintf("%s/%s", k.Path, file.Name())}
 
-			err := keyring.read()
+			err := keyring.read(account)
 			if err != nil {
 				return err
 			}
@@ -103,10 +103,10 @@ func (k *KeyRing) read() error {
 			return err
 		}
 
-		friend, err := readFriend(reader)
+		friend, err := readFriend(account, reader)
 		reader.Close()
 		if err != nil {
-			return err
+			return fmt.Errorf("Error reading friend: %w", err)
 		}
 
 		k.Friends = append(k.Friends, friend)

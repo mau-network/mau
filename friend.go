@@ -44,8 +44,15 @@ func (f *Friend) Fingerprint() Fingerprint {
 	return f.entity.PrimaryKey.Fingerprint
 }
 
-func readFriend(reader io.Reader) (*Friend, error) {
-	entity, err := openpgp.ReadEntity(packet.NewReader(reader))
+func readFriend(account *Account, reader io.Reader) (*Friend, error) {
+	keyring := openpgp.EntityList{account.entity}
+
+	decryptedFile, err := openpgp.ReadMessage(reader, keyring, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	entity, err := openpgp.ReadEntity(packet.NewReader(decryptedFile.UnverifiedBody))
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +60,6 @@ func readFriend(reader io.Reader) (*Friend, error) {
 	return &Friend{entity: entity}, nil
 }
 
-// TODO Encrypt the friends public key to hide identities
 func AddFriend(account *Account, reader io.Reader) (*Friend, error) {
 	block, err := armor.Decode(reader)
 	if err != nil {
@@ -66,17 +72,21 @@ func AddFriend(account *Account, reader io.Reader) (*Friend, error) {
 	}
 
 	fpr := Fingerprint(entity.PrimaryKey.Fingerprint).String()
+	entities := []*openpgp.Entity{account.entity}
 
 	filePath := path.Join(mauDir(account.path), fpr+".pgp")
-	f, err := os.Create(filePath)
+	file, err := os.Create(filePath)
 	if err != nil {
 		return nil, err
 	}
 
-	err = entity.Serialize(f)
+	w, err := openpgp.Encrypt(file, entities, account.entity, nil, nil)
 	if err != nil {
 		return nil, err
 	}
+
+	entity.Serialize(w)
+	w.Close()
 
 	friend := Friend{
 		entity: entity,
@@ -112,7 +122,7 @@ func RemoveFriend(account *Account, friend *Friend) error {
 func ListFriends(account *Account) (*KeyRing, error) {
 	friends := KeyRing{Path: mauDir(account.path)}
 
-	err := friends.read()
+	err := friends.read(account)
 	if err != nil {
 		return nil, err
 	}

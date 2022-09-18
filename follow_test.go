@@ -51,7 +51,8 @@ func TestListFollows(t *testing.T) {
 
 	t.Run("After following a friend", func(t T) {
 		Follow(account, friend)
-		follows, _ := ListFollows(account)
+		follows, err := ListFollows(account)
+		ASSERT_ERROR(t, nil, err)
 		ASSERT_EQUAL(t, 1, len(follows))
 	})
 

@@ -268,7 +268,7 @@ friend2-FPR:
 
 * Directories prefixed with `.` are ignored by the application that downloads new content. can be used to unfollow a friend while keeping his old information. or keep posts that are shared by your friends from users that you don't want to follow.
 
-* `.mau` directory is reserved for friends public key files. saved as `.pgp` in binary format <sup>[?](#why-keys-are-written-in-binary-format)</sup>. each directory file should represent a group of friends. keys can be duplicate (one friend is work and close friend at the same time). account secret/pub key must be named `account.pgp` to make it easy to find among all other keys. `account.pgp` should be the private key export of the PGP identity with subkeys and signatures then symmetrically encrypted with a password of the user choice.
+* `.mau` directory is reserved for friends public key files. saved as `.pgp` in binary format <sup>[?](#why-keys-are-written-in-binary-format)</sup>. each directory file should represent a group of friends. keys can be duplicate (one friend can belong to work and close friend at the same time). account secret/pub key must be named `account.pgp` to make it easy to find among all other keys. `account.pgp` should be the private key export of the PGP identity with subkeys and signatures then symmetrically encrypted with a password of the user choice. All friends public keys should be encrypted with the account key[?](#why-are-friends-keys-encrypted)
 
 * Files are written in [OpenPGP message format](https://tools.ietf.org/html/rfc4880) which is supported by any OpenPGP implementation.
 
@@ -391,3 +391,7 @@ So `.pgp` was prefered as sole format because of these benefits:
 - `.mau` directory will be consistent
 - It saves disk space which is better for limited resources machines such as IOT devices.
 - Takes less processing power to deal with the binary format as it doesn't need decoding like ASCII armored. so it'll be better when dealing with thousands of key files.
+
+### Why are friends keys encrypted?
+
+To make sure the friend public key is added by the account instead of a malicious program. If the public key is written in plain format it means adding a friend is not an authenticated operation any program can do it without the user permission

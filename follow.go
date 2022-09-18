@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path"
 )
@@ -13,7 +14,7 @@ func ListFollows(account *Account) ([]*Friend, error) {
 
 	keyring, err := ListFriends(account)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error listing friends: %w", err)
 	}
 
 	follows := []*Friend{}
@@ -21,7 +22,7 @@ func ListFollows(account *Account) ([]*Friend, error) {
 		if file.IsDir() && file.Name()[0] != '.' {
 			fpr, err := ParseFingerprint(file.Name())
 			if err != nil {
-				continue
+				return follows, fmt.Errorf("Error parsing fingerprint: %w", err)
 			}
 
 			friend := keyring.FindByFingerprint(fpr)
