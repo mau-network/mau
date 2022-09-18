@@ -62,7 +62,7 @@ func (f *File) Recipients(account *Account) ([]*Friend, error) {
 	}
 	defer r.Close()
 
-	k, err := ListFriends(account)
+	k, err := account.ListFriends()
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func (f *File) Deleted(account *Account) bool {
 	return err != nil
 }
 
-func GetVersion(account *Account, fpr, name, version string) (*File, error) {
+func (account *Account) GetFileVersion(fpr, name, version string) (*File, error) {
 	followedPath := path.Join(account.path, fpr, name+".versions", version)
 	unfollowedPath := path.Join(account.path, "."+fpr, name+".versions", version)
 	var filepath string
@@ -162,7 +162,7 @@ func GetVersion(account *Account, fpr, name, version string) (*File, error) {
 	return &File{Path: filepath, version: true}, nil
 }
 
-func GetFile(account *Account, fpr Fingerprint, name string) (*File, error) {
+func (account *Account) GetFile(fpr Fingerprint, name string) (*File, error) {
 	followedPath := path.Join(account.path, fpr.String(), name)
 	unfollowedPath := path.Join(account.path, "."+fpr.String(), name)
 	var filepath string
@@ -178,7 +178,7 @@ func GetFile(account *Account, fpr Fingerprint, name string) (*File, error) {
 	return &File{Path: filepath}, nil
 }
 
-func AddFile(account *Account, r io.Reader, name string, recipients []*Friend) (*File, error) {
+func (account *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File, error) {
 	if path.Ext(name) != ".pgp" {
 		name += ".pgp"
 	}
@@ -228,17 +228,17 @@ func AddFile(account *Account, r io.Reader, name string, recipients []*Friend) (
 	return &File{Path: p}, nil
 }
 
-func RemoveFile(account *Account, file *File) error {
+func (account *Account) RemoveFile(file *File) error {
 	rs, err := file.Recipients(account)
 	if err != nil {
 		return err
 	}
 
-	_, err = AddFile(account, bytes.NewReader([]byte{}), file.Name(), rs)
+	_, err = account.AddFile(bytes.NewReader([]byte{}), file.Name(), rs)
 	return err
 }
 
-func ListFiles(account *Account, fingerprint Fingerprint, after time.Time, limit uint) []*File {
+func (account *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint) []*File {
 	followedPath := path.Join(account.path, fingerprint.String())
 	unfollowedPath := path.Join(account.path, "."+fingerprint.String())
 	var dirpath string

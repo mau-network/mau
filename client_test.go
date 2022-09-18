@@ -39,14 +39,14 @@ func TestDownloadFriend(t *testing.T) {
 	})
 
 	t.Run("When friend but not followed", func(t T) {
-		AddFriend(account, bytes.NewBuffer(friend_key))
+		account.AddFriend(bytes.NewBuffer(friend_key))
 		err := DownloadFriend(context.Background(), account, address, friend.Fingerprint(), time.Now(), client)
 		ASSERT_ERROR(t, ErrFriendNotFollowed, err)
 	})
 
 	t.Run("When friend and followed", func(t T) {
-		f, _ := AddFriend(account, bytes.NewBuffer(friend_key))
-		Follow(account, f)
+		f, _ := account.AddFriend(bytes.NewBuffer(friend_key))
+		account.Follow(f)
 
 		err := DownloadFriend(Timeout(time.Second), account, address, friend.Fingerprint(), time.Now(), client)
 		ASSERT_ERROR(t, nil, err)
@@ -54,8 +54,8 @@ func TestDownloadFriend(t *testing.T) {
 
 	t.Run("When a file is encrypted for friend", func(t T) {
 		// Create a file in the friend account
-		aFriend, _ := AddFriend(friend, bytes.NewBuffer(account_key))
-		_, err := AddFile(friend, strings.NewReader("Hello world!"), "hello world.txt", []*Friend{aFriend})
+		aFriend, _ := friend.AddFriend(bytes.NewBuffer(account_key))
+		_, err := friend.AddFile(strings.NewReader("Hello world!"), "hello world.txt", []*Friend{aFriend})
 		ASSERT_ERROR(t, nil, err)
 		ASSERT_FILE_EXISTS(t, path.Join(friend_dir, friend.Fingerprint().String(), "hello world.txt.pgp"))
 
@@ -66,7 +66,7 @@ func TestDownloadFriend(t *testing.T) {
 	})
 
 	t.Run("When private file exists", func(t T) {
-		_, err := AddFile(friend, strings.NewReader("Private social security number"), "private.txt", []*Friend{})
+		_, err := friend.AddFile(strings.NewReader("Private social security number"), "private.txt", []*Friend{})
 		ASSERT_ERROR(t, nil, err)
 		ASSERT_FILE_EXISTS(t, path.Join(friend_dir, friend.Fingerprint().String(), "private.txt.pgp"))
 

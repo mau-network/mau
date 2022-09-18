@@ -15,7 +15,7 @@ func TestAddFriend(t *testing.T) {
 	friend_account, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
 	fingerprint := friend_account.Fingerprint()
 	friend_account_pub, _ := friend_account.Export()
-	friend, err := AddFriend(account, bytes.NewBuffer(friend_account_pub))
+	friend, err := account.AddFriend(bytes.NewBuffer(friend_account_pub))
 	ASSERT_ERROR(t, nil, err)
 	ASSERT_FILE_EXISTS(t, path.Join(dir, ".mau", fingerprint.String()+".pgp"))
 
@@ -45,7 +45,7 @@ func TestAddFriend(t *testing.T) {
 		file_content, _ := os.ReadFile(path.Join(dir, ".mau", fingerprint.String()+".pgp"))
 		os.WriteFile(path.Join(anotherDir, ".mau", fingerprint.String()+".pgp"), file_content, 0700)
 
-		friends, err := ListFriends(anotherAccount)
+		friends, err := anotherAccount.ListFriends()
 		ASSERT(t, err != nil, "ListFriends should fail to decrypt a friend")
 		ASSERT_EQUAL(t, nil, friends)
 	})
@@ -59,9 +59,9 @@ func TestRemoveFriend(t *testing.T) {
 	friend_account, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
 	friend_account_pub, _ := friend_account.Export()
 	fingerprint := friend_account.Fingerprint()
-	friend, _ := AddFriend(account, bytes.NewBuffer(friend_account_pub))
+	friend, _ := account.AddFriend(bytes.NewBuffer(friend_account_pub))
 
-	err := RemoveFriend(account, friend)
+	err := account.RemoveFriend(friend)
 	ASSERT_ERROR(t, nil, err)
 	REFUTE_FILE_EXISTS(t, path.Join(dir, ".mau", fingerprint.String()+".pgp"))
 }
@@ -73,18 +73,18 @@ func TestListFriends(t *testing.T) {
 	friend_dir := t.TempDir()
 	friend_account, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
 	friend_account_pub, _ := friend_account.Export()
-	friend, _ := AddFriend(account, bytes.NewBuffer(friend_account_pub))
+	friend, _ := account.AddFriend(bytes.NewBuffer(friend_account_pub))
 
-	keyring, err := ListFriends(account)
+	keyring, err := account.ListFriends()
 	ASSERT_ERROR(t, nil, err)
 	REFUTE_EQUAL(t, nil, keyring)
 	ASSERT_EQUAL(t, path.Join(dir, ".mau"), keyring.Path)
 	ASSERT_EQUAL(t, 1, len(keyring.Friends))
 	ASSERT_EQUAL(t, 0, len(keyring.KeyRings))
 
-	err = RemoveFriend(account, friend)
+	err = account.RemoveFriend(friend)
 
-	keyring, err = ListFriends(account)
+	keyring, err = account.ListFriends()
 	ASSERT_ERROR(t, nil, err)
 	REFUTE_EQUAL(t, nil, keyring)
 	ASSERT_EQUAL(t, path.Join(dir, ".mau"), keyring.Path)

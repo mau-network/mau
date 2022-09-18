@@ -13,9 +13,9 @@ func TestFollow(t *testing.T) {
 	friend_dir := t.TempDir()
 	friend_account, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
 	friend_pub, _ := friend_account.Export()
-	friend, _ := AddFriend(account, bytes.NewBuffer(friend_pub))
+	friend, _ := account.AddFriend(bytes.NewBuffer(friend_pub))
 
-	err := Follow(account, friend)
+	err := account.Follow(friend)
 	ASSERT_ERROR(t, nil, err)
 	ASSERT_DIR_EXISTS(t, path.Join(dir, friend_account.Fingerprint().String()))
 }
@@ -27,10 +27,10 @@ func TestUnfollow(t *testing.T) {
 	friend_dir := t.TempDir()
 	friend_account, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
 	friend_pub, _ := friend_account.Export()
-	friend, _ := AddFriend(account, bytes.NewBuffer(friend_pub))
+	friend, _ := account.AddFriend(bytes.NewBuffer(friend_pub))
 
-	Follow(account, friend)
-	err := Unfollow(account, friend)
+	account.Follow(friend)
+	err := account.Unfollow(friend)
 	ASSERT_ERROR(t, nil, err)
 	ASSERT_DIR_EXISTS(t, path.Join(dir, "."+friend_account.Fingerprint().String()))
 }
@@ -42,23 +42,23 @@ func TestListFollows(t *testing.T) {
 	friend_dir := t.TempDir()
 	friend_account, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
 	friend_pub, _ := friend_account.Export()
-	friend, _ := AddFriend(account, bytes.NewBuffer(friend_pub))
+	friend, _ := account.AddFriend(bytes.NewBuffer(friend_pub))
 
 	t.Run("Before following anyone", func(t T) {
-		follows, _ := ListFollows(account)
+		follows, _ := account.ListFollows()
 		ASSERT_EQUAL(t, 0, len(follows))
 	})
 
 	t.Run("After following a friend", func(t T) {
-		Follow(account, friend)
-		follows, err := ListFollows(account)
+		account.Follow(friend)
+		follows, err := account.ListFollows()
 		ASSERT_ERROR(t, nil, err)
 		ASSERT_EQUAL(t, 1, len(follows))
 	})
 
 	t.Run("After unfollowing the friend", func(t T) {
-		Unfollow(account, friend)
-		follows, _ := ListFollows(account)
+		account.Unfollow(friend)
+		follows, _ := account.ListFollows()
 		ASSERT_EQUAL(t, 0, len(follows))
 	})
 

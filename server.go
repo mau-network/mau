@@ -133,7 +133,7 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	page := ListFiles(s.account, fpr, lastModified, s.limit)
+	page := s.account.ListFiles(fpr, lastModified, s.limit)
 
 	list := make([]FileListItem, 0, len(page))
 	for _, item := range page {
@@ -189,7 +189,7 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, err := GetFile(s.account, fpr, vars["fileID"])
+	file, err := s.account.GetFile(fpr, vars["fileID"])
 	if err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
@@ -223,7 +223,7 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 func (s *Server) version(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
-	file, err := GetVersion(s.account, vars["FPR"], vars["fileID"], vars["versionID"])
+	file, err := s.account.GetFileVersion(vars["FPR"], vars["fileID"], vars["versionID"])
 	if err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return

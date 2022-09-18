@@ -24,7 +24,7 @@ func TestServer(t *testing.T) {
 
 	friendPub, err := friendAccount.Export()
 	ASSERT_ERROR(t, nil, err)
-	friend, err := AddFriend(account, bytes.NewBuffer(friendPub))
+	friend, err := account.AddFriend(bytes.NewBuffer(friendPub))
 	ASSERT_ERROR(t, nil, err)
 
 	server, err := NewServer(account)
@@ -58,7 +58,7 @@ func TestServer(t *testing.T) {
 			})
 
 			t.Run("With one private file", func(t T) {
-				file, err := AddFile(account, strings.NewReader("Hello world"), "hello.txt", []*Friend{})
+				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{})
 				ASSERT_ERROR(t, nil, err)
 				defer os.Remove(file.Path)
 
@@ -75,7 +75,7 @@ func TestServer(t *testing.T) {
 			})
 
 			t.Run("With one shared file", func(t T) {
-				file, err := AddFile(account, strings.NewReader("Hello world"), "hello.txt", []*Friend{friend})
+				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{friend})
 				ASSERT_ERROR(t, nil, err)
 				defer os.Remove(file.Path)
 
@@ -127,7 +127,7 @@ func TestServer(t *testing.T) {
 			})
 
 			t.Run("With one private file", func(t T) {
-				file, err := AddFile(account, strings.NewReader("Hello world"), "hello.txt", []*Friend{})
+				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{})
 				ASSERT_ERROR(t, nil, err)
 				defer os.Remove(file.Path)
 
@@ -144,7 +144,7 @@ func TestServer(t *testing.T) {
 			})
 
 			t.Run("With one shared file", func(t T) {
-				file, err := AddFile(account, strings.NewReader("Hello world"), "hello.txt", []*Friend{friend})
+				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{friend})
 				ASSERT_ERROR(t, nil, err)
 				defer os.Remove(file.Path)
 
@@ -195,7 +195,7 @@ func TestServer(t *testing.T) {
 			})
 
 			t.Run("With one private file", func(t T) {
-				file, err := AddFile(account, strings.NewReader("Hello world"), "hello.txt", []*Friend{})
+				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{})
 				ASSERT_ERROR(t, nil, err)
 				defer os.Remove(file.Path)
 
@@ -212,7 +212,7 @@ func TestServer(t *testing.T) {
 			})
 
 			t.Run("With one shared file", func(t T) {
-				file, err := AddFile(account, strings.NewReader("Hello world"), "hello.txt", []*Friend{friend})
+				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{friend})
 				ASSERT_ERROR(t, nil, err)
 				defer os.Remove(file.Path)
 

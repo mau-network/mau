@@ -13,7 +13,7 @@ func TestFile(t *testing.T) {
 	account_dir := t.TempDir()
 	account, _ := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "password value")
 
-	file, err := AddFile(account, strings.NewReader("hello world"), "hello.txt", []*Friend{})
+	file, err := account.AddFile(strings.NewReader("hello world"), "hello.txt", []*Friend{})
 	ASSERT_ERROR(t, nil, err)
 	ASSERT_EQUAL(t, path.Join(account_dir, account.Fingerprint().String(), "hello.txt.pgp"), file.Path)
 
@@ -44,7 +44,7 @@ func TestFile(t *testing.T) {
 	ASSERT_EQUAL(t, 0, len(friends))
 
 	t.Run("Versions", func(t T) {
-		file, err := AddFile(account, strings.NewReader("hello there"), "hello.txt", []*Friend{})
+		file, err := account.AddFile(strings.NewReader("hello there"), "hello.txt", []*Friend{})
 		ASSERT_ERROR(t, nil, err)
 		ASSERT_EQUAL(t, path.Join(account_dir, account.Fingerprint().String(), "hello.txt.pgp"), file.Path)
 
@@ -69,8 +69,8 @@ func TestGetFile(t *testing.T) {
 	account_dir := t.TempDir()
 	account, _ := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "password value")
 
-	file, _ := AddFile(account, strings.NewReader("hello world"), "hello.txt", []*Friend{})
-	opened, _ := GetFile(account, account.Fingerprint(), "hello.txt.pgp")
+	file, _ := account.AddFile(strings.NewReader("hello world"), "hello.txt", []*Friend{})
+	opened, _ := account.GetFile(account.Fingerprint(), "hello.txt.pgp")
 
 	ASSERT_EQUAL(t, file.Path, opened.Path)
 	ASSERT_EQUAL(t, file.Name(), opened.Name())
@@ -93,10 +93,10 @@ func TestRemoveFile(t *testing.T) {
 	account_dir := t.TempDir()
 	account, _ := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "password value")
 
-	file, _ := AddFile(account, strings.NewReader("hello world"), "hello.txt", []*Friend{})
+	file, _ := account.AddFile(strings.NewReader("hello world"), "hello.txt", []*Friend{})
 	ASSERT(t, !file.Deleted(account), "File should exist (not deleted)")
 
-	err := RemoveFile(account, file)
+	err := account.RemoveFile(file)
 	ASSERT_ERROR(t, nil, err)
 
 	ASSERT(t, file.Deleted(account), "File should be deleted")
@@ -109,21 +109,21 @@ func TestListFiles(t *testing.T) {
 	account_dir := t.TempDir()
 	account, _ := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "password value")
 
-	AddFile(account, strings.NewReader("hello world"), "hello.txt", []*Friend{})
+	account.AddFile(strings.NewReader("hello world"), "hello.txt", []*Friend{})
 
 	t.Run("Asking for 1 second old files", func(t T) {
-		files := ListFiles(account, account.Fingerprint(), time.Now().Add(-time.Second), 10)
+		files := account.ListFiles(account.Fingerprint(), time.Now().Add(-time.Second), 10)
 		ASSERT_EQUAL(t, 1, len(files))
 	})
 
 	t.Run("Asking for 0 seconds old files", func(t T) {
-		files := ListFiles(account, account.Fingerprint(), time.Now().Add(time.Second), 10)
+		files := account.ListFiles(account.Fingerprint(), time.Now().Add(time.Second), 10)
 		ASSERT_EQUAL(t, 0, len(files))
 	})
 
 	t.Run("Asking for a fingerprint other than the account", func(t T) {
 		unknownFpr, _ := ParseFingerprint("01234567891234567890")
-		files := ListFiles(account, unknownFpr, time.Now().Add(-time.Second), 10)
+		files := account.ListFiles(unknownFpr, time.Now().Add(-time.Second), 10)
 		ASSERT_EQUAL(t, 0, len(files))
 	})
 }

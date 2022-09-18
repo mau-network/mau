@@ -60,7 +60,7 @@ func readFriend(account *Account, reader io.Reader) (*Friend, error) {
 	return &Friend{entity: entity}, nil
 }
 
-func AddFriend(account *Account, reader io.Reader) (*Friend, error) {
+func (account *Account) AddFriend(reader io.Reader) (*Friend, error) {
 	block, err := armor.Decode(reader)
 	if err != nil {
 		return nil, err
@@ -95,7 +95,7 @@ func AddFriend(account *Account, reader io.Reader) (*Friend, error) {
 	return &friend, nil
 }
 
-func RemoveFriend(account *Account, friend *Friend) error {
+func (account *Account) RemoveFriend(friend *Friend) error {
 	file := fmt.Sprintf("%s.pgp", friend.Fingerprint())
 	uncategorized := fmt.Sprintf("%s/%s", mauDir(account.path), file)
 	pattern := fmt.Sprintf("%s/**/%s", mauDir(account.path), file)
@@ -116,10 +116,10 @@ func RemoveFriend(account *Account, friend *Friend) error {
 		}
 	}
 
-	return Unfollow(account, friend)
+	return account.Unfollow(friend)
 }
 
-func ListFriends(account *Account) (*KeyRing, error) {
+func (account *Account) ListFriends() (*KeyRing, error) {
 	friends := KeyRing{Path: mauDir(account.path)}
 
 	err := friends.read(account)

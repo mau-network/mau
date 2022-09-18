@@ -88,7 +88,7 @@ func main() {
 		raise(err)
 		defer keyFile.Close()
 
-		friend, err := AddFriend(account, keyFile)
+		friend, err := account.AddFriend(keyFile)
 		raise(err)
 
 		fmt.Println("Friend added: ", friend.Name(), friend.Email(), friend.Fingerprint())
@@ -96,7 +96,7 @@ func main() {
 	case "friends":
 		account := getAccount()
 
-		friends, err := ListFriends(account)
+		friends, err := account.ListFriends()
 		raise(err)
 
 		printKeyRing("", friends)
@@ -108,7 +108,7 @@ func main() {
 
 		account := getAccount()
 
-		friends, err := ListFriends(account)
+		friends, err := account.ListFriends()
 		raise(err)
 
 		fpr, err := ParseFingerprint(*fingerprint)
@@ -120,7 +120,7 @@ func main() {
 		}
 
 		fmt.Println("Removing friend: ", friend.Name(), friend.Email(), "...")
-		raise(RemoveFriend(account, friend))
+		raise(account.RemoveFriend(friend))
 		fmt.Println("Done")
 
 	case "follow":
@@ -130,7 +130,7 @@ func main() {
 
 		account := getAccount()
 
-		friends, err := ListFriends(account)
+		friends, err := account.ListFriends()
 		raise(err)
 
 		fpr, err := ParseFingerprint(*fingerprint)
@@ -142,7 +142,7 @@ func main() {
 		}
 
 		fmt.Println("Following friend: ", friend.Name(), friend.Email(), "...")
-		raise(Follow(account, friend))
+		raise(account.Follow(friend))
 		fmt.Println("Done")
 
 	case "unfollow":
@@ -152,7 +152,7 @@ func main() {
 
 		account := getAccount()
 
-		friends, err := ListFriends(account)
+		friends, err := account.ListFriends()
 		raise(err)
 
 		fpr, err := ParseFingerprint(*fingerprint)
@@ -164,13 +164,13 @@ func main() {
 		}
 
 		fmt.Println("Unfollowing friend: ", friend.Name(), friend.Email(), "...")
-		raise(Unfollow(account, friend))
+		raise(account.Unfollow(friend))
 		fmt.Println("Done")
 
 	case "follows":
 		account := getAccount()
 
-		friends, err := ListFollows(account)
+		friends, err := account.ListFollows()
 		raise(err)
 
 		for _, f := range friends {
@@ -188,7 +188,7 @@ func main() {
 		f, err := os.Open(*file)
 		raise(err)
 
-		allFrields, err := ListFriends(account)
+		allFrields, err := account.ListFriends()
 		raise(err)
 
 		fprs := strings.Split(*fingerprints, ",")
@@ -208,7 +208,7 @@ func main() {
 		}
 
 		name := path.Base(*file)
-		_, err = AddFile(account, f, name, friends)
+		_, err = account.AddFile(f, name, friends)
 		raise(err)
 
 	case "files":
@@ -228,7 +228,7 @@ func main() {
 		}
 
 		after := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
-		files := ListFiles(account, fpr, after, 0)
+		files := account.ListFiles(fpr, after, 0)
 		for _, f := range files {
 			if f.Deleted(account) {
 				continue
@@ -264,7 +264,7 @@ func main() {
 			raise(err)
 		}
 
-		f, err := GetFile(account, fpr, *file)
+		f, err := account.GetFile(fpr, *file)
 		raise(err)
 
 		r, err := f.Reader(account)
@@ -283,10 +283,10 @@ func main() {
 		deleteCmd.Parse(os.Args[2:])
 
 		account := getAccount()
-		f, err := GetFile(account, account.Fingerprint(), *file)
+		f, err := account.GetFile(account.Fingerprint(), *file)
 		raise(err)
 
-		raise(RemoveFile(account, f))
+		raise(account.RemoveFile(f))
 		fmt.Println("Deleted", f.Name())
 
 	case "serve":
