@@ -111,13 +111,19 @@ func TestListFiles(t *testing.T) {
 
 	AddFile(account, strings.NewReader("hello world"), "hello.txt", []*Friend{})
 
-	files := ListFiles(account, account.Fingerprint(), time.Now().Add(-time.Second), 10)
-	ASSERT_EQUAL(t, 1, len(files))
+	t.Run("Asking for 1 second old files", func(t T) {
+		files := ListFiles(account, account.Fingerprint(), time.Now().Add(-time.Second), 10)
+		ASSERT_EQUAL(t, 1, len(files))
+	})
 
-	files = ListFiles(account, account.Fingerprint(), time.Now().Add(time.Second), 10)
-	ASSERT_EQUAL(t, 0, len(files))
+	t.Run("Asking for 0 seconds old files", func(t T) {
+		files := ListFiles(account, account.Fingerprint(), time.Now().Add(time.Second), 10)
+		ASSERT_EQUAL(t, 0, len(files))
+	})
 
-	unknownFpr, _ := ParseFingerprint("01234567891234567890")
-	files = ListFiles(account, unknownFpr, time.Now().Add(-time.Second), 10)
-	ASSERT_EQUAL(t, 0, len(files))
+	t.Run("Asking for a fingerprint other than the account", func(t T) {
+		unknownFpr, _ := ParseFingerprint("01234567891234567890")
+		files := ListFiles(account, unknownFpr, time.Now().Add(-time.Second), 10)
+		ASSERT_EQUAL(t, 0, len(files))
+	})
 }
