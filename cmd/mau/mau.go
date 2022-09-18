@@ -321,7 +321,7 @@ func main() {
 		t := time.Date(2000, 1, 1, 1, 1, 1, 1, time.UTC)
 
 		ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
-		err = DownloadFriend(ctx, account, *address, fpr, t, client)
+		err = account.DownloadFriend(ctx, *address, fpr, t, client)
 		raise(err)
 
 	default:

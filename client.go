@@ -57,7 +57,7 @@ func NewClient(account *Account) (*Client, error) {
 }
 
 // TODO: make sure your really connecting to the correct user
-func DownloadFriend(ctx context.Context, account *Account, address string, fingerprint Fingerprint, after time.Time, client *Client) error {
+func (account *Account) DownloadFriend(ctx context.Context, address string, fingerprint Fingerprint, after time.Time, client *Client) error {
 	followed := path.Join(account.path, fingerprint.String())
 	if _, err := os.Stat(followed); err != nil {
 		return ErrFriendNotFollowed
@@ -109,7 +109,7 @@ func DownloadFriend(ctx context.Context, account *Account, address string, finge
 		case <-ctx.Done():
 			return nil
 		default:
-			err = DownloadFile(ctx, account, address, fingerprint, &list[i], client)
+			err = account.DownloadFile(ctx, address, fingerprint, &list[i], client)
 			if err != nil {
 				log.Printf("Error: Downloading File %s\n\t%s", url, err)
 			}
@@ -120,7 +120,7 @@ func DownloadFriend(ctx context.Context, account *Account, address string, finge
 }
 
 // TODO: make sure your really connecting to the correct user
-func DownloadFile(ctx context.Context, account *Account, address string, fingerprint Fingerprint, file *FileListItem, client *Client) error {
+func (account *Account) DownloadFile(ctx context.Context, address string, fingerprint Fingerprint, file *FileListItem, client *Client) error {
 	fpath := path.Join(account.path, fingerprint.String(), file.Name)
 
 	f := File{
