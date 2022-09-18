@@ -308,11 +308,11 @@ func main() {
 		syncCmd.Parse(os.Args[2:])
 
 		account := getAccount()
-		client, err := NewClient(account)
+		var fpr Fingerprint
+		fpr, err := ParseFingerprint(*fprStr)
 		raise(err)
 
-		var fpr Fingerprint
-		fpr, err = ParseFingerprint(*fprStr)
+		client, err := NewClient(account, fpr)
 		raise(err)
 
 		// TODO get the latest synced file date

@@ -2,8 +2,10 @@ package mau
 
 import (
 	"context"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,11 +17,13 @@ import (
 	"time"
 
 	"github.com/hashicorp/mdns"
+	"golang.org/x/crypto/openpgp/packet"
 )
 
 var (
-	ErrFriendNotFollowed = errors.New("Friend is not being followed.")
-	ErrCantFindFriend    = errors.New("Couldn't find friend.")
+	ErrFriendNotFollowed        = errors.New("Friend is not being followed.")
+	ErrCantFindFriend           = errors.New("Couldn't find friend.")
+	ErrIncorrectPeerCertificate = errors.New("Incorrect Peer certificate.")
 )
 
 type Client struct {
@@ -27,7 +31,7 @@ type Client struct {
 	httpClient *http.Client
 }
 
-func NewClient(account *Account) (*Client, error) {
+func NewClient(account *Account, peer Fingerprint) (*Client, error) {
 	cert, err := account.Certificate()
 	if err != nil {
 		return nil, err
@@ -36,10 +40,37 @@ func NewClient(account *Account) (*Client, error) {
 	c := Client{
 		account: account,
 		httpClient: &http.Client{
+			// Prevent Redirects
+			CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
 					Certificates:       []tls.Certificate{cert},
 					InsecureSkipVerify: true,
+					VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
+						for _, rawcert := range rawCerts {
+							certs, err := x509.ParseCertificates(rawcert)
+							if err != nil {
+								continue
+							}
+
+							var id Fingerprint
+
+							for _, c := range certs {
+								switch c.PublicKeyAlgorithm {
+								case x509.RSA:
+									pubkey := c.PublicKey.(*rsa.PublicKey)
+									id = packet.NewRSAPublicKey(c.NotBefore, pubkey).Fingerprint
+									if id == peer {
+										return nil
+									}
+								default:
+									return x509.ErrUnsupportedAlgorithm
+								}
+							}
+						}
+
+						return ErrIncorrectPeerCertificate
+					},
 					CipherSuites: []uint16{
 						tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
 						tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
@@ -56,7 +87,6 @@ func NewClient(account *Account) (*Client, error) {
 	return &c, nil
 }
 
-// TODO: make sure your really connecting to the correct user
 func (account *Account) DownloadFriend(ctx context.Context, address string, fingerprint Fingerprint, after time.Time, client *Client) error {
 	followed := path.Join(account.path, fingerprint.String())
 	if _, err := os.Stat(followed); err != nil {
@@ -119,7 +149,6 @@ func (account *Account) DownloadFriend(ctx context.Context, address string, fing
 	return nil
 }
 
-// TODO: make sure your really connecting to the correct user
 func (account *Account) DownloadFile(ctx context.Context, address string, fingerprint Fingerprint, file *FileListItem, client *Client) error {
 	fpath := path.Join(account.path, fingerprint.String(), file.Name)
 
