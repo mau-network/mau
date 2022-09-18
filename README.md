@@ -356,6 +356,8 @@ The following is a minimum list of modules that is needed to make up the core fu
 
 * **Deletion**: Deletion of a file happens by overwriting the file with empty content and moving the old content to the `.versions` directory. Simply overwriting the file content with empty content will not prove the authenticity of the operation so the file content has to be signed by the author and encrypted to the same users who had access to the file. This means the deleted file size will not be 0 bytes. this means by listing files with the HTTP endpoint the deleted files can't be detected from the size. it has to be downloaded as any other file. and while viewing the files then we'll know that this file is a mark of deletion after decryption which consumes CPU and memory for each deleted file. This also means to delete a file you need to decrypt the file and make sure it's not already deleted otherwise you'll delete a deleted file alredy. I was hoping to know about the deleted files from the files listing HTTP endpoint by its size.
 
+* **mDNS-SD identity proof**: When the user announces his presence on the local network there is no proof the announcement is coming from the account owner.
+
 ## PROJECT STATUS
 
 The project is between refining the concept and writing the Proof of concept phases.
