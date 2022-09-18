@@ -86,13 +86,13 @@ The solution we are aiming for should:
 
 ## CORE CONCEPT
 
-The following section will describe what we think of as the corner stone of a concept that allow building a P2P web2 application. that we can refer to it initially by **[Mau](https://en.wikipedia.org/wiki/Egyptian_Mau)**.
+The following section will describe what we think of as the corner stone of a concept that allow building a P2P web2 application. that we can refer to it initially by **[𓃠 Mau](https://en.wikipedia.org/wiki/Egyptian_Mau)**.
 
 ### Use the file system
 
 Extending the Unix approach [everything is a file](https://en.wikipedia.org/wiki/Unix_philosophy) to the web2 applications will make any web2 application implementation a mere application that reads files from the user machine.
 
-So we'll present each piece of content on **Mau** as a file in the user file system.
+So we'll present each piece of content on **𓃠 Mau** as a file in the user file system.
 
 This will lead to interesting properties:
 
@@ -118,8 +118,8 @@ This will lead to the following benefits:
 
 - Content attributes can have single value or multiple values for each language/locale
 - Specialized clients can extend the vocabulary for their special uses while other clients will ignore types that are not supported.
-- Websites that uses JSON+LD will have content that's already understandable by **Mau** clients leading to natural intercommunication between **Mau** clients and the existing web.
-- Any website can be extended with JSON+LD data that represent the content of the website itself as a social profile on **Mau** clients.
+- Websites that uses JSON+LD will have content that's already understandable by **𓃠 Mau** clients leading to natural intercommunication between **𓃠 Mau** clients and the existing web.
+- Any website can be extended with JSON+LD data that represent the content of the website itself as a social profile on **𓃠 Mau** clients.
 - Other Vocabulary can be supported gradually like ActivityPub or others. while old clients can ignore these new vocabulary.
 - All activities can be presented as Schema.org type such as SocialMediaPosting, API Reference, Book, FollowAction, LikeAction, DislikeAction...etc
 
@@ -336,7 +336,7 @@ The program is responsible for allowing the user to receive connections from out
 
 ## ROADMAP
 
-The following is a minimum list of modules that is needed to make up the core functionality of **Mau**:
+The following is a minimum list of modules that is needed to make up the core functionality of **𓃠 Mau**:
 
 * [x] **account**: An interface to create and manage file system structure and keyrings.
 * [x] **editor**: An interface that creates and edits encrypted JSON+LD (schema.org) files for existing user and friends.
