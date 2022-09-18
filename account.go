@@ -115,35 +115,35 @@ type Account struct {
 	entity *openpgp.Entity
 }
 
-func (a *Account) Identity() (string, error) {
-	for _, i := range a.entity.Identities {
+func (account *Account) Identity() (string, error) {
+	for _, i := range account.entity.Identities {
 		return i.Name, nil
 	}
 
 	return "", ErrNoIdentity
 }
 
-func (a *Account) Name() string {
-	for _, i := range a.entity.Identities {
+func (account *Account) Name() string {
+	for _, i := range account.entity.Identities {
 		return i.UserId.Name
 	}
 
 	return ""
 }
 
-func (a *Account) Email() string {
-	for _, i := range a.entity.Identities {
+func (account *Account) Email() string {
+	for _, i := range account.entity.Identities {
 		return i.UserId.Email
 	}
 
 	return ""
 }
 
-func (a *Account) Fingerprint() Fingerprint {
-	return a.entity.PrimaryKey.Fingerprint
+func (account *Account) Fingerprint() Fingerprint {
+	return account.entity.PrimaryKey.Fingerprint
 }
 
-func (a *Account) Export() ([]byte, error) {
+func (account *Account) Export() ([]byte, error) {
 	w := bytes.NewBuffer([]byte{})
 
 	armored, err := armor.Encode(w, openpgp.PublicKeyType, map[string]string{})
@@ -151,7 +151,7 @@ func (a *Account) Export() ([]byte, error) {
 		return nil, err
 	}
 
-	err = a.entity.Serialize(armored)
+	err = account.entity.Serialize(armored)
 	armored.Close()
 	if err != nil {
 		return nil, nil
@@ -162,12 +162,12 @@ func (a *Account) Export() ([]byte, error) {
 
 // TODO should we test this or make it internal. it's useful if someone want to
 // provide an HTTP server implementation
-func (a *Account) Certificate() (*tls.Certificate, error) {
+func (account *Account) Certificate() (*tls.Certificate, error) {
 	template := x509.Certificate{
 		Version:      3,
 		SerialNumber: big.NewInt(1),
-		NotBefore:    a.entity.PrimaryKey.CreationTime,
-		NotAfter:     a.entity.PrimaryKey.CreationTime.AddDate(100, 0, 0),
+		NotBefore:    account.entity.PrimaryKey.CreationTime,
+		NotAfter:     account.entity.PrimaryKey.CreationTime.AddDate(100, 0, 0),
 		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{
 			x509.ExtKeyUsageServerAuth,
@@ -176,12 +176,12 @@ func (a *Account) Certificate() (*tls.Certificate, error) {
 		BasicConstraintsValid: true,
 	}
 
-	privkey, ok := a.entity.PrivateKey.PrivateKey.(*keybasersa.PrivateKey)
+	privkey, ok := account.entity.PrivateKey.PrivateKey.(*keybasersa.PrivateKey)
 	if !ok {
 		return nil, errors.New("Can't convert private key")
 	}
 
-	pubkey, ok := a.entity.PrimaryKey.PublicKey.(*keybasersa.PublicKey)
+	pubkey, ok := account.entity.PrimaryKey.PublicKey.(*keybasersa.PublicKey)
 	if !ok {
 		return nil, errors.New("Can't convert public key")
 	}
