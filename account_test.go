@@ -1,6 +1,7 @@
 package mau
 
 import (
+	"bytes"
 	"path"
 	"testing"
 )
@@ -15,12 +16,13 @@ func TestNewAccount(t *testing.T) {
 
 		t.Run("Include correct information", func(t T) {
 			identity, _ := account.Identity()
-			pgpkey, _ := account.Export()
+			var pgpkey bytes.Buffer
+			account.Export(&pgpkey)
 
 			ASSERT_EQUAL(t, "ahmed@example.com", account.Email())
 			ASSERT_EQUAL(t, "Ahmed Mohamed", account.Name())
 			ASSERT_EQUAL(t, "Ahmed Mohamed <ahmed@example.com>", identity)
-			REFUTE_EQUAL(t, 0, len(pgpkey))
+			REFUTE_EQUAL(t, 0, len(pgpkey.Bytes()))
 		})
 
 		t.Run("Creates the correct file structure", func(t T) {

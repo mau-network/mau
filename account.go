@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"io"
 	"math/big"
 	"os"
 	"path"
@@ -143,24 +144,22 @@ func (account *Account) Fingerprint() Fingerprint {
 	return account.entity.PrimaryKey.Fingerprint
 }
 
-func (account *Account) Export() ([]byte, error) {
-	w := bytes.NewBuffer([]byte{})
-
+func (account *Account) Export(w io.Writer) error {
 	armored, err := armor.Encode(w, openpgp.PublicKeyType, map[string]string{})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = account.entity.Serialize(armored)
 	armored.Close()
 	if err != nil {
-		return nil, nil
+		return nil
 	}
 
-	return w.Bytes(), nil
+	return nil
 }
 
-func (account *Account) Certificate() (*tls.Certificate, error) {
+func (account *Account) Certificate() (cert tls.Certificate, err error) {
 	template := x509.Certificate{
 		Version:      3,
 		SerialNumber: big.NewInt(1),
@@ -176,12 +175,14 @@ func (account *Account) Certificate() (*tls.Certificate, error) {
 
 	privkey, ok := account.entity.PrivateKey.PrivateKey.(*keybasersa.PrivateKey)
 	if !ok {
-		return nil, errors.New("Can't convert private key")
+		err = errors.New("Can't convert private key")
+		return
 	}
 
 	pubkey, ok := account.entity.PrimaryKey.PublicKey.(*keybasersa.PublicKey)
 	if !ok {
-		return nil, errors.New("Can't convert public key")
+		err = errors.New("Can't convert public key")
+		return
 	}
 
 	crtvalues := []rsa.CRTValue{}
@@ -204,24 +205,20 @@ func (account *Account) Certificate() (*tls.Certificate, error) {
 		},
 	}
 
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &rsakey.PublicKey, &rsakey)
+	var derBytes []byte
+	derBytes, err = x509.CreateCertificate(rand.Reader, &template, &template, &rsakey.PublicKey, &rsakey)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	keyPem := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(&rsakey)}
 	certPem := &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}
 
-	keyPemBytes := bytes.NewBuffer([]byte{})
-	pem.Encode(keyPemBytes, keyPem)
+	var keyPemBytes bytes.Buffer
+	pem.Encode(&keyPemBytes, keyPem)
 
-	certPemBytes := bytes.NewBuffer([]byte{})
-	pem.Encode(certPemBytes, certPem)
+	var certPemBytes bytes.Buffer
+	pem.Encode(&certPemBytes, certPem)
 
-	cert, err := tls.X509KeyPair(certPemBytes.Bytes(), keyPemBytes.Bytes())
-	if err != nil {
-		return nil, err
-	}
-
-	return &cert, nil
+	return tls.X509KeyPair(certPemBytes.Bytes(), keyPemBytes.Bytes())
 }

@@ -43,7 +43,7 @@ func NewServer(account *Account) (*Server, error) {
 		httpServer: http.Server{
 			Handler: router,
 			TLSConfig: &tls.Config{
-				Certificates:       []tls.Certificate{*cert},
+				Certificates:       []tls.Certificate{cert},
 				InsecureSkipVerify: true,
 				ClientAuth:         tls.RequestClientCert,
 				CipherSuites: []uint16{

@@ -68,14 +68,12 @@ func main() {
 
 		account := getAccount()
 
-		key, err := account.Export()
-		raise(err)
-
 		out, err := os.OpenFile(*output, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
 		raise(err)
 		defer out.Close()
 
-		fmt.Fprintln(out, string(key))
+		err = account.Export(out)
+		raise(err)
 
 	case "friend":
 		friendCmd := flag.NewFlagSet("friend", flag.ExitOnError)

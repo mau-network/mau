@@ -22,9 +22,10 @@ func TestServer(t *testing.T) {
 	ASSERT_NO_ERROR(t, err)
 	REFUTE_EQUAL(t, nil, friendAccount)
 
-	friendPub, err := friendAccount.Export()
+	var friendPub bytes.Buffer
+	err = friendAccount.Export(&friendPub)
 	ASSERT_NO_ERROR(t, err)
-	friend, err := account.AddFriend(bytes.NewBuffer(friendPub))
+	friend, err := account.AddFriend(&friendPub)
 	ASSERT_NO_ERROR(t, err)
 
 	server, err := NewServer(account)
@@ -102,7 +103,7 @@ func TestServer(t *testing.T) {
 
 			http.DefaultClient.Transport = &http.Transport{
 				TLSClientConfig: &tls.Config{
-					Certificates:       []tls.Certificate{*cert},
+					Certificates:       []tls.Certificate{cert},
 					InsecureSkipVerify: true,
 					CipherSuites: []uint16{
 						tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
@@ -170,7 +171,7 @@ func TestServer(t *testing.T) {
 
 			http.DefaultClient.Transport = &http.Transport{
 				TLSClientConfig: &tls.Config{
-					Certificates:       []tls.Certificate{*cert},
+					Certificates:       []tls.Certificate{cert},
 					InsecureSkipVerify: true,
 					CipherSuites: []uint16{
 						tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,

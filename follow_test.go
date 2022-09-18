@@ -12,8 +12,9 @@ func TestFollow(t *testing.T) {
 
 	friend_dir := t.TempDir()
 	friend_account, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
-	friend_pub, _ := friend_account.Export()
-	friend, _ := account.AddFriend(bytes.NewBuffer(friend_pub))
+	var friend_pub bytes.Buffer
+	friend_account.Export(&friend_pub)
+	friend, _ := account.AddFriend(&friend_pub)
 
 	err := account.Follow(friend)
 	ASSERT_NO_ERROR(t, err)
@@ -26,8 +27,9 @@ func TestUnfollow(t *testing.T) {
 
 	friend_dir := t.TempDir()
 	friend_account, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
-	friend_pub, _ := friend_account.Export()
-	friend, _ := account.AddFriend(bytes.NewBuffer(friend_pub))
+	var friend_pub bytes.Buffer
+	friend_account.Export(&friend_pub)
+	friend, _ := account.AddFriend(&friend_pub)
 
 	account.Follow(friend)
 	err := account.Unfollow(friend)
@@ -41,8 +43,9 @@ func TestListFollows(t *testing.T) {
 
 	friend_dir := t.TempDir()
 	friend_account, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
-	friend_pub, _ := friend_account.Export()
-	friend, _ := account.AddFriend(bytes.NewBuffer(friend_pub))
+	var friend_pub bytes.Buffer
+	friend_account.Export(&friend_pub)
+	friend, _ := account.AddFriend(&friend_pub)
 
 	t.Run("Before following anyone", func(t T) {
 		follows, _ := account.ListFollows()

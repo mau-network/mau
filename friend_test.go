@@ -14,8 +14,9 @@ func TestAddFriend(t *testing.T) {
 	friend_dir := t.TempDir()
 	friend_account, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
 	fingerprint := friend_account.Fingerprint()
-	friend_account_pub, _ := friend_account.Export()
-	friend, err := account.AddFriend(bytes.NewBuffer(friend_account_pub))
+	var friend_account_pub bytes.Buffer
+	friend_account.Export(&friend_account_pub)
+	friend, err := account.AddFriend(&friend_account_pub)
 	ASSERT_NO_ERROR(t, err)
 	ASSERT_FILE_EXISTS(t, path.Join(dir, ".mau", fingerprint.String()+".pgp"))
 
@@ -57,9 +58,10 @@ func TestRemoveFriend(t *testing.T) {
 
 	friend_dir := t.TempDir()
 	friend_account, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
-	friend_account_pub, _ := friend_account.Export()
+	var friend_account_pub bytes.Buffer
+	friend_account.Export(&friend_account_pub)
 	fingerprint := friend_account.Fingerprint()
-	friend, _ := account.AddFriend(bytes.NewBuffer(friend_account_pub))
+	friend, _ := account.AddFriend(&friend_account_pub)
 
 	err := account.RemoveFriend(friend)
 	ASSERT_NO_ERROR(t, err)
@@ -72,8 +74,9 @@ func TestListFriends(t *testing.T) {
 
 	friend_dir := t.TempDir()
 	friend_account, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
-	friend_account_pub, _ := friend_account.Export()
-	friend, _ := account.AddFriend(bytes.NewBuffer(friend_account_pub))
+	var friend_account_pub bytes.Buffer
+	friend_account.Export(&friend_account_pub)
+	friend, _ := account.AddFriend(&friend_account_pub)
 
 	keyring, err := account.ListFriends()
 	ASSERT_NO_ERROR(t, err)

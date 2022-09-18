@@ -38,7 +38,7 @@ func NewClient(account *Account) (*Client, error) {
 		httpClient: &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
-					Certificates:       []tls.Certificate{*cert},
+					Certificates:       []tls.Certificate{cert},
 					InsecureSkipVerify: true,
 					CipherSuites: []uint16{
 						tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
