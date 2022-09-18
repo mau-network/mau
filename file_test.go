@@ -62,6 +62,11 @@ func TestFile(t *testing.T) {
 		nameInbytes, err := hex.DecodeString(version.Name())
 		ASSERT_NO_ERROR(t, err)
 		ASSERT_EQUAL(t, 32, len(nameInbytes))
+
+		gotVersion, err := account.GetFileVersion(account.Fingerprint(), "hello.txt.pgp", version.Name())
+		ASSERT_NO_ERROR(t, err)
+		ASSERT_EQUAL(t, version.Name(), gotVersion.Name())
+		ASSERT_EQUAL(t, *version, *gotVersion)
 	})
 }
 

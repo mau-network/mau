@@ -223,7 +223,13 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 func (s *Server) version(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
-	file, err := s.account.GetFileVersion(vars["FPR"], vars["fileID"], vars["versionID"])
+	fpr, err := ParseFingerprint(vars["FPR"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	file, err := s.account.GetFileVersion(fpr, vars["fileID"], vars["versionID"])
 	if err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return

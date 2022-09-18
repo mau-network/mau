@@ -146,9 +146,9 @@ func (f *File) Deleted(account *Account) bool {
 	return err != nil
 }
 
-func (account *Account) GetFileVersion(fpr, name, version string) (*File, error) {
-	followedPath := path.Join(account.path, fpr, name+".versions", version)
-	unfollowedPath := path.Join(account.path, "."+fpr, name+".versions", version)
+func (account *Account) GetFileVersion(fpr Fingerprint, name, version string) (*File, error) {
+	followedPath := path.Join(account.path, fpr.String(), name+".versions", version)
+	unfollowedPath := path.Join(account.path, "."+fpr.String(), name+".versions", version)
 	var filepath string
 
 	if _, err := os.Stat(followedPath); err == nil {
