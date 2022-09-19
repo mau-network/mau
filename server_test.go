@@ -28,7 +28,7 @@ func TestServer(t *testing.T) {
 	friend, err := account.AddFriend(&friendPub)
 	ASSERT_NO_ERROR(t, err)
 
-	server, err := NewServer(account)
+	server, err := account.Server()
 	ASSERT_NO_ERROR(t, err)
 	REFUTE_EQUAL(t, nil, server)
 
@@ -95,7 +95,7 @@ func TestServer(t *testing.T) {
 
 		t.Run("With client cert not a friend", func(t T) {
 			anotherAccount, _ := NewAccount(t.TempDir(), "Unknown", "unknown@example.com", "password")
-			cert, err := anotherAccount.Certificate()
+			cert, err := anotherAccount.certificate()
 			ASSERT_NO_ERROR(t, err)
 
 			oldTransport := http.DefaultClient.Transport
@@ -163,7 +163,7 @@ func TestServer(t *testing.T) {
 		})
 
 		t.Run("With client cert of a friend", func(t T) {
-			cert, err := friendAccount.Certificate()
+			cert, err := friendAccount.certificate()
 			ASSERT_NO_ERROR(t, err)
 
 			oldTransport := http.DefaultClient.Transport

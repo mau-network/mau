@@ -289,7 +289,7 @@ func main() {
 
 	case "serve":
 		account := getAccount()
-		server, err := NewServer(account)
+		server, err := account.Server()
 		raise(err)
 
 		listener, err := net.Listen("tcp", ":0")
@@ -312,14 +312,14 @@ func main() {
 		fpr, err := ParseFingerprint(*fprStr)
 		raise(err)
 
-		client, err := NewClient(account, fpr)
+		client, err := account.Client(fpr)
 		raise(err)
 
 		// TODO get the latest synced file date
 		t := time.Date(2000, 1, 1, 1, 1, 1, 1, time.UTC)
 
 		ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
-		err = account.DownloadFriend(ctx, *address, fpr, t, client)
+		err = client.DownloadFriend(ctx, *address, fpr, t)
 		raise(err)
 
 	default:

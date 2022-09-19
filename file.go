@@ -146,9 +146,9 @@ func (f *File) Deleted(account *Account) bool {
 	return err != nil
 }
 
-func (account *Account) GetFileVersion(fpr Fingerprint, name, version string) (*File, error) {
-	followedPath := path.Join(account.path, fpr.String(), name+".versions", version)
-	unfollowedPath := path.Join(account.path, "."+fpr.String(), name+".versions", version)
+func (a *Account) GetFileVersion(fpr Fingerprint, name, version string) (*File, error) {
+	followedPath := path.Join(a.path, fpr.String(), name+".versions", version)
+	unfollowedPath := path.Join(a.path, "."+fpr.String(), name+".versions", version)
 	var filepath string
 
 	if _, err := os.Stat(followedPath); err == nil {
@@ -162,9 +162,9 @@ func (account *Account) GetFileVersion(fpr Fingerprint, name, version string) (*
 	return &File{Path: filepath, version: true}, nil
 }
 
-func (account *Account) GetFile(fpr Fingerprint, name string) (*File, error) {
-	followedPath := path.Join(account.path, fpr.String(), name)
-	unfollowedPath := path.Join(account.path, "."+fpr.String(), name)
+func (a *Account) GetFile(fpr Fingerprint, name string) (*File, error) {
+	followedPath := path.Join(a.path, fpr.String(), name)
+	unfollowedPath := path.Join(a.path, "."+fpr.String(), name)
 	var filepath string
 
 	if _, err := os.Stat(followedPath); err == nil {
@@ -178,18 +178,18 @@ func (account *Account) GetFile(fpr Fingerprint, name string) (*File, error) {
 	return &File{Path: filepath}, nil
 }
 
-func (account *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File, error) {
+func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File, error) {
 	if path.Ext(name) != ".pgp" {
 		name += ".pgp"
 	}
 
-	fpr := account.Fingerprint().String()
+	fpr := a.Fingerprint().String()
 
-	if err := os.MkdirAll(path.Join(account.path, fpr), dirPerm); err != nil {
+	if err := os.MkdirAll(path.Join(a.path, fpr), dirPerm); err != nil {
 		return nil, err
 	}
 
-	p := path.Join(account.path, fpr, name)
+	p := path.Join(a.path, fpr, name)
 	if _, err := os.Stat(p); err == nil {
 		file := File{Path: p}
 		np, err := file.Hash()
@@ -206,7 +206,7 @@ func (account *Account) AddFile(r io.Reader, name string, recipients []*Friend) 
 		}
 	}
 
-	entities := []*openpgp.Entity{account.entity}
+	entities := []*openpgp.Entity{a.entity}
 	for _, f := range recipients {
 		entities = append(entities, f.entity)
 	}
@@ -217,7 +217,7 @@ func (account *Account) AddFile(r io.Reader, name string, recipients []*Friend) 
 	}
 	defer file.Close()
 
-	w, err := openpgp.Encrypt(file, entities, account.entity, nil, nil)
+	w, err := openpgp.Encrypt(file, entities, a.entity, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -228,19 +228,19 @@ func (account *Account) AddFile(r io.Reader, name string, recipients []*Friend) 
 	return &File{Path: p}, nil
 }
 
-func (account *Account) RemoveFile(file *File) error {
-	rs, err := file.Recipients(account)
+func (a *Account) RemoveFile(file *File) error {
+	rs, err := file.Recipients(a)
 	if err != nil {
 		return err
 	}
 
-	_, err = account.AddFile(bytes.NewReader([]byte{}), file.Name(), rs)
+	_, err = a.AddFile(bytes.NewReader([]byte{}), file.Name(), rs)
 	return err
 }
 
-func (account *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint) []*File {
-	followedPath := path.Join(account.path, fingerprint.String())
-	unfollowedPath := path.Join(account.path, "."+fingerprint.String())
+func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint) []*File {
+	followedPath := path.Join(a.path, fingerprint.String())
+	unfollowedPath := path.Join(a.path, "."+fingerprint.String())
 	var dirpath string
 
 	if _, err := os.Stat(followedPath); err == nil {

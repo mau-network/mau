@@ -5,10 +5,10 @@ var (
 )
 
 const (
-	MDNSServiceName    = "_mau._tcp"
+	mDNSServiceName    = "_mau._tcp"
 	mauDirName         = ".mau"
 	accountKeyFilename = "account.pgp"
 	dirPerm            = 0700
-	URIProtocolName    = "https"
-	MDNSDomain         = "local"
+	uriProtocolName    = "https"
+	mDNSDomain         = "local"
 )

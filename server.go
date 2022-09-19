@@ -30,15 +30,15 @@ type FileListItem struct {
 }
 
 // TODO: Change it to UDP over QUIC protocol
-func NewServer(account *Account) (*Server, error) {
-	cert, err := account.Certificate()
+func (a *Account) Server() (*Server, error) {
+	cert, err := a.certificate()
 	if err != nil {
 		return nil, err
 	}
 
 	router := mux.NewRouter()
 	s := Server{
-		account: account,
+		account: a,
 		limit:   100,
 		httpServer: http.Server{
 			Handler: router,
@@ -81,7 +81,7 @@ func (s *Server) Serve(l net.Listener) error {
 func (s *Server) serveMDNS(port int) error {
 	fingerprint := s.account.Fingerprint().String()
 
-	service, err := mdns.NewMDNSService(fingerprint, MDNSServiceName, "", "", port, nil, []string{})
+	service, err := mdns.NewMDNSService(fingerprint, mDNSServiceName, "", "", port, nil, []string{})
 	if err != nil {
 		return err
 	}

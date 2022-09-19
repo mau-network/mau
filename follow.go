@@ -6,13 +6,13 @@ import (
 	"path"
 )
 
-func (account *Account) ListFollows() ([]*Friend, error) {
-	files, err := os.ReadDir(account.path)
+func (a *Account) ListFollows() ([]*Friend, error) {
+	files, err := os.ReadDir(a.path)
 	if err != nil {
 		return nil, err
 	}
 
-	keyring, err := account.ListFriends()
+	keyring, err := a.ListFriends()
 	if err != nil {
 		return nil, fmt.Errorf("Error listing friends: %w", err)
 	}
@@ -35,10 +35,10 @@ func (account *Account) ListFollows() ([]*Friend, error) {
 	return follows, nil
 }
 
-func (account *Account) Follow(friend *Friend) error {
+func (a *Account) Follow(friend *Friend) error {
 	fpr := friend.Fingerprint().String()
-	unfollowed := path.Join(account.path, "."+fpr)
-	followed := path.Join(account.path, fpr)
+	unfollowed := path.Join(a.path, "."+fpr)
+	followed := path.Join(a.path, fpr)
 
 	if _, err := os.Stat(followed); err == nil {
 		return nil
@@ -51,10 +51,10 @@ func (account *Account) Follow(friend *Friend) error {
 	return os.Mkdir(followed, 0700)
 }
 
-func (account *Account) Unfollow(friend *Friend) error {
+func (a *Account) Unfollow(friend *Friend) error {
 	fpr := friend.Fingerprint().String()
-	unfollowed := path.Join(account.path, "."+fpr)
-	followed := path.Join(account.path, fpr)
+	unfollowed := path.Join(a.path, "."+fpr)
+	followed := path.Join(a.path, fpr)
 
 	if _, err := os.Stat(followed); err == nil {
 		return os.Rename(followed, unfollowed)

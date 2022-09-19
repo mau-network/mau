@@ -60,7 +60,7 @@ func readFriend(account *Account, reader io.Reader) (*Friend, error) {
 	return &Friend{entity: entity}, nil
 }
 
-func (account *Account) AddFriend(reader io.Reader) (*Friend, error) {
+func (a *Account) AddFriend(reader io.Reader) (*Friend, error) {
 	block, err := armor.Decode(reader)
 	if err != nil {
 		return nil, err
@@ -72,15 +72,15 @@ func (account *Account) AddFriend(reader io.Reader) (*Friend, error) {
 	}
 
 	fpr := Fingerprint(entity.PrimaryKey.Fingerprint).String()
-	entities := []*openpgp.Entity{account.entity}
+	entities := []*openpgp.Entity{a.entity}
 
-	filePath := path.Join(mauDir(account.path), fpr+".pgp")
+	filePath := path.Join(mauDir(a.path), fpr+".pgp")
 	file, err := os.Create(filePath)
 	if err != nil {
 		return nil, err
 	}
 
-	w, err := openpgp.Encrypt(file, entities, account.entity, nil, nil)
+	w, err := openpgp.Encrypt(file, entities, a.entity, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -95,10 +95,10 @@ func (account *Account) AddFriend(reader io.Reader) (*Friend, error) {
 	return &friend, nil
 }
 
-func (account *Account) RemoveFriend(friend *Friend) error {
+func (a *Account) RemoveFriend(friend *Friend) error {
 	file := fmt.Sprintf("%s.pgp", friend.Fingerprint())
-	uncategorized := fmt.Sprintf("%s/%s", mauDir(account.path), file)
-	pattern := fmt.Sprintf("%s/**/%s", mauDir(account.path), file)
+	uncategorized := fmt.Sprintf("%s/%s", mauDir(a.path), file)
+	pattern := fmt.Sprintf("%s/**/%s", mauDir(a.path), file)
 
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
@@ -116,13 +116,13 @@ func (account *Account) RemoveFriend(friend *Friend) error {
 		}
 	}
 
-	return account.Unfollow(friend)
+	return a.Unfollow(friend)
 }
 
-func (account *Account) ListFriends() (*KeyRing, error) {
-	friends := KeyRing{Path: mauDir(account.path)}
+func (a *Account) ListFriends() (*KeyRing, error) {
+	friends := KeyRing{Path: mauDir(a.path)}
 
-	err := friends.read(account)
+	err := friends.read(a)
 	if err != nil {
 		return nil, err
 	}

@@ -11,10 +11,10 @@ import (
 	"time"
 )
 
-func TestNewClient(t *testing.T) {
+func TestClient(t *testing.T) {
 	account, err := NewAccount(t.TempDir(), "Ahmed Mohamed", "ahmed@example.com", "strong password")
 
-	client, err := NewClient(account, account.Fingerprint())
+	client, err := account.Client(account.Fingerprint())
 	ASSERT_NO_ERROR(t, err)
 	REFUTE_EQUAL(t, nil, client)
 }
@@ -29,21 +29,21 @@ func TestDownloadFriend(t *testing.T) {
 	friend, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
 	var friend_key bytes.Buffer
 	friend.Export(&friend_key)
-	server, _ := NewServer(friend)
+	server, _ := friend.Server()
 
 	listener, address := TempListener()
 	go server.Serve(*listener)
 
-	client, _ := NewClient(account, friend.Fingerprint())
+	client, _ := account.Client(friend.Fingerprint())
 
 	t.Run("When the fingerprint is not a friend", func(t T) {
-		err := account.DownloadFriend(context.Background(), address, friend.Fingerprint(), time.Now(), client)
+		err := client.DownloadFriend(context.Background(), address, friend.Fingerprint(), time.Now())
 		ASSERT_ERROR(t, ErrFriendNotFollowed, err)
 	})
 
 	t.Run("When friend but not followed", func(t T) {
 		account.AddFriend(bytes.NewReader(friend_key.Bytes()))
-		err := account.DownloadFriend(context.Background(), address, friend.Fingerprint(), time.Now(), client)
+		err := client.DownloadFriend(context.Background(), address, friend.Fingerprint(), time.Now())
 		ASSERT_ERROR(t, ErrFriendNotFollowed, err)
 	})
 
@@ -52,7 +52,7 @@ func TestDownloadFriend(t *testing.T) {
 		ASSERT_NO_ERROR(t, err)
 		account.Follow(f)
 
-		err = account.DownloadFriend(Timeout(time.Second), address, friend.Fingerprint(), time.Now(), client)
+		err = client.DownloadFriend(Timeout(time.Second), address, friend.Fingerprint(), time.Now())
 		ASSERT_NO_ERROR(t, err)
 	})
 
@@ -64,7 +64,7 @@ func TestDownloadFriend(t *testing.T) {
 		ASSERT_FILE_EXISTS(t, path.Join(friend_dir, friend.Fingerprint().String(), "hello world.txt.pgp"))
 
 		// and download it to the account
-		err = account.DownloadFriend(Timeout(time.Second), address, friend.Fingerprint(), time.Now().Add(-time.Second), client)
+		err = client.DownloadFriend(Timeout(time.Second), address, friend.Fingerprint(), time.Now().Add(-time.Second))
 		ASSERT_NO_ERROR(t, err)
 		ASSERT_FILE_EXISTS(t, path.Join(account_dir, friend.Fingerprint().String(), "hello world.txt.pgp"))
 	})
@@ -74,22 +74,22 @@ func TestDownloadFriend(t *testing.T) {
 		ASSERT_NO_ERROR(t, err)
 		ASSERT_FILE_EXISTS(t, path.Join(friend_dir, friend.Fingerprint().String(), "private.txt.pgp"))
 
-		err = account.DownloadFriend(Timeout(time.Second), address, friend.Fingerprint(), time.Now().Add(-time.Second), client)
+		err = client.DownloadFriend(Timeout(time.Second), address, friend.Fingerprint(), time.Now().Add(-time.Second))
 		ASSERT_NO_ERROR(t, err)
 		REFUTE_FILE_EXISTS(t, path.Join(account_dir, friend.Fingerprint().String(), "private.txt.pgp"))
 	})
 
 	t.Run("When no address is provided it find the user on the local network", func(t T) {
 		ctx := Timeout(10 * time.Second)
-		err := account.DownloadFriend(ctx, "", friend.Fingerprint(), time.Now().Add(-time.Second), client)
+		err := client.DownloadFriend(ctx, "", friend.Fingerprint(), time.Now().Add(-time.Second))
 		ASSERT_NO_ERROR(t, err)
 	})
 
 	t.Run("Connecting to an account with wrong peer ID", func(t T) {
 		anotherFriend, _ := NewAccount(t.TempDir(), "Another person", "another@example.com", "password")
-		client, _ := NewClient(account, anotherFriend.Fingerprint())
+		client, _ := account.Client(anotherFriend.Fingerprint())
 		ctx := Timeout(10 * time.Second)
-		err := account.DownloadFriend(ctx, "", friend.Fingerprint(), time.Now().Add(-time.Second), client)
+		err := client.DownloadFriend(ctx, "", friend.Fingerprint(), time.Now().Add(-time.Second))
 		ASSERT_ERROR(t, ErrIncorrectPeerCertificate, err)
 	})
 }

@@ -16,14 +16,14 @@ func TestParseFingerprint(t *testing.T) {
 	t.Run("With short fingerprint", func(t T) {
 		fprStr := "76e5a610cdcbd84aa81cf8331713dfe3"
 		fpr, err := ParseFingerprint(fprStr)
-		ASSERT_ERROR(t, ErrIncorrectFingerprinLength, err)
+		ASSERT_ERROR(t, ErrIncorrectFingerprintLength, err)
 		ASSERT_EQUAL(t, Fingerprint{}, fpr)
 	})
 
 	t.Run("With long fingerprint", func(t T) {
 		fprStr := "76e5a610cdcbd84aa81cf8331713dfe3163681d6777"
 		fpr, err := ParseFingerprint(fprStr)
-		ASSERT_ERROR(t, ErrIncorrectFingerprinLength, err)
+		ASSERT_ERROR(t, ErrIncorrectFingerprintLength, err)
 		ASSERT_EQUAL(t, Fingerprint{}, fpr)
 	})
 

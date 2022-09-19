@@ -28,67 +28,47 @@ var (
 
 type Client struct {
 	account    *Account
+	peer       Fingerprint
 	httpClient *http.Client
 }
 
-func NewClient(account *Account, peer Fingerprint) (*Client, error) {
-	cert, err := account.Certificate()
+// TODO(maybe) Cache clients map[Fingerprint]*Client
+func (a *Account) Client(peer Fingerprint) (*Client, error) {
+	cert, err := a.certificate()
 	if err != nil {
 		return nil, err
 	}
 
-	c := Client{
-		account: account,
-		httpClient: &http.Client{
-			// Prevent Redirects
-			CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					Certificates:       []tls.Certificate{cert},
-					InsecureSkipVerify: true,
-					VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
-						for _, rawcert := range rawCerts {
-							certs, err := x509.ParseCertificates(rawcert)
-							if err != nil {
-								continue
-							}
+	c := &Client{
+		account: a,
+		peer:    peer,
+	}
 
-							var id Fingerprint
-
-							for _, c := range certs {
-								switch c.PublicKeyAlgorithm {
-								case x509.RSA:
-									pubkey := c.PublicKey.(*rsa.PublicKey)
-									id = packet.NewRSAPublicKey(c.NotBefore, pubkey).Fingerprint
-									if id == peer {
-										return nil
-									}
-								default:
-									return x509.ErrUnsupportedAlgorithm
-								}
-							}
-						}
-
-						return ErrIncorrectPeerCertificate
-					},
-					CipherSuites: []uint16{
-						tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-						tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-						tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-						tls.TLS_RSA_WITH_AES_256_CBC_SHA,
-						tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-						tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-					},
+	c.httpClient = &http.Client{
+		// Prevent Redirects
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				Certificates:          []tls.Certificate{cert},
+				InsecureSkipVerify:    true,
+				VerifyPeerCertificate: c.verifyPeerCertificate,
+				CipherSuites: []uint16{
+					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+					tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+					tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+					tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+					tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+					tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 				},
 			},
 		},
 	}
 
-	return &c, nil
+	return c, nil
 }
 
-func (account *Account) DownloadFriend(ctx context.Context, address string, fingerprint Fingerprint, after time.Time, client *Client) error {
-	followed := path.Join(account.path, fingerprint.String())
+func (c *Client) DownloadFriend(ctx context.Context, address string, fingerprint Fingerprint, after time.Time) error {
+	followed := path.Join(c.account.path, fingerprint.String())
 	if _, err := os.Stat(followed); err != nil {
 		return ErrFriendNotFollowed
 	}
@@ -117,7 +97,7 @@ func (account *Account) DownloadFriend(ctx context.Context, address string, fing
 
 	req.Header.Add("If-Modified-Since", after.UTC().Format(http.TimeFormat))
 
-	resp, err := client.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -139,7 +119,7 @@ func (account *Account) DownloadFriend(ctx context.Context, address string, fing
 		case <-ctx.Done():
 			return nil
 		default:
-			err = account.DownloadFile(ctx, address, fingerprint, &list[i], client)
+			err = c.DownloadFile(ctx, address, fingerprint, &list[i])
 			if err != nil {
 				log.Printf("Error: Downloading File %s\n\t%s", url, err)
 			}
@@ -149,8 +129,8 @@ func (account *Account) DownloadFriend(ctx context.Context, address string, fing
 	return nil
 }
 
-func (account *Account) DownloadFile(ctx context.Context, address string, fingerprint Fingerprint, file *FileListItem, client *Client) error {
-	fpath := path.Join(account.path, fingerprint.String(), file.Name)
+func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint Fingerprint, file *FileListItem) error {
+	fpath := path.Join(c.account.path, fingerprint.String(), file.Name)
 
 	f := File{
 		Path:    fpath,
@@ -174,7 +154,7 @@ func (account *Account) DownloadFile(ctx context.Context, address string, finger
 		return err
 	}
 
-	resp, err := client.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -211,11 +191,35 @@ func (account *Account) DownloadFile(ctx context.Context, address string, finger
 	return nil
 }
 
+func (c *Client) verifyPeerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
+	for _, rawcert := range rawCerts {
+		certs, err := x509.ParseCertificates(rawcert)
+		if err != nil {
+			continue
+		}
+
+		for _, cert := range certs {
+			switch cert.PublicKeyAlgorithm {
+			case x509.RSA:
+				pubkey := cert.PublicKey.(*rsa.PublicKey)
+				var id Fingerprint = packet.NewRSAPublicKey(cert.NotBefore, pubkey).Fingerprint
+				if id == c.peer {
+					return nil
+				}
+			default:
+				return x509.ErrUnsupportedAlgorithm
+			}
+		}
+	}
+
+	return ErrIncorrectPeerCertificate
+}
+
 func findFriend(ctx context.Context, fingerprint Fingerprint, addresses chan<- string) error {
-	name := fmt.Sprintf("%s.%s.%s.", fingerprint, MDNSServiceName, MDNSDomain)
+	name := fmt.Sprintf("%s.%s.%s.", fingerprint, mDNSServiceName, mDNSDomain)
 	entriesCh := make(chan *mdns.ServiceEntry, cap(addresses))
 
-	err := mdns.Lookup(MDNSServiceName, entriesCh)
+	err := mdns.Lookup(mDNSServiceName, entriesCh)
 	if err != nil {
 		return err
 	}
@@ -224,7 +228,7 @@ func findFriend(ctx context.Context, fingerprint Fingerprint, addresses chan<- s
 		select {
 		case entry := <-entriesCh:
 			if entry.Name == name {
-				addresses <- fmt.Sprintf("%s://%s:%d", URIProtocolName, entry.AddrV4, entry.Port)
+				addresses <- fmt.Sprintf("%s://%s:%d", uriProtocolName, entry.AddrV4, entry.Port)
 			}
 		case <-ctx.Done():
 			return nil

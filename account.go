@@ -116,41 +116,41 @@ type Account struct {
 	entity *openpgp.Entity
 }
 
-func (account *Account) Identity() (string, error) {
-	for _, i := range account.entity.Identities {
+func (a *Account) Identity() (string, error) {
+	for _, i := range a.entity.Identities {
 		return i.Name, nil
 	}
 
 	return "", ErrNoIdentity
 }
 
-func (account *Account) Name() string {
-	for _, i := range account.entity.Identities {
+func (a *Account) Name() string {
+	for _, i := range a.entity.Identities {
 		return i.UserId.Name
 	}
 
 	return ""
 }
 
-func (account *Account) Email() string {
-	for _, i := range account.entity.Identities {
+func (a *Account) Email() string {
+	for _, i := range a.entity.Identities {
 		return i.UserId.Email
 	}
 
 	return ""
 }
 
-func (account *Account) Fingerprint() Fingerprint {
-	return account.entity.PrimaryKey.Fingerprint
+func (a *Account) Fingerprint() Fingerprint {
+	return a.entity.PrimaryKey.Fingerprint
 }
 
-func (account *Account) Export(w io.Writer) error {
+func (a *Account) Export(w io.Writer) error {
 	armored, err := armor.Encode(w, openpgp.PublicKeyType, map[string]string{})
 	if err != nil {
 		return err
 	}
 
-	err = account.entity.Serialize(armored)
+	err = a.entity.Serialize(armored)
 	armored.Close()
 	if err != nil {
 		return nil
@@ -159,12 +159,12 @@ func (account *Account) Export(w io.Writer) error {
 	return nil
 }
 
-func (account *Account) Certificate() (cert tls.Certificate, err error) {
+func (a *Account) certificate() (cert tls.Certificate, err error) {
 	template := x509.Certificate{
 		Version:      3,
 		SerialNumber: big.NewInt(1),
-		NotBefore:    account.entity.PrimaryKey.CreationTime,
-		NotAfter:     account.entity.PrimaryKey.CreationTime.AddDate(100, 0, 0),
+		NotBefore:    a.entity.PrimaryKey.CreationTime,
+		NotAfter:     a.entity.PrimaryKey.CreationTime.AddDate(100, 0, 0),
 		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{
 			x509.ExtKeyUsageServerAuth,
@@ -173,13 +173,13 @@ func (account *Account) Certificate() (cert tls.Certificate, err error) {
 		BasicConstraintsValid: true,
 	}
 
-	privkey, ok := account.entity.PrivateKey.PrivateKey.(*keybasersa.PrivateKey)
+	privkey, ok := a.entity.PrivateKey.PrivateKey.(*keybasersa.PrivateKey)
 	if !ok {
 		err = errors.New("Can't convert private key")
 		return
 	}
 
-	pubkey, ok := account.entity.PrimaryKey.PublicKey.(*keybasersa.PublicKey)
+	pubkey, ok := a.entity.PrimaryKey.PublicKey.(*keybasersa.PublicKey)
 	if !ok {
 		err = errors.New("Can't convert public key")
 		return
