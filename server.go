@@ -29,7 +29,6 @@ type FileListItem struct {
 	Sum  string `json:"sum"`
 }
 
-// TODO: Change it to UDP over QUIC protocol
 func (a *Account) Server() (*Server, error) {
 	cert, err := a.certificate()
 	if err != nil {

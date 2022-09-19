@@ -305,7 +305,7 @@ Authentication should happen in the security layer with both peers doing a TLS1.
 
 [Libp2p](https://github.com/libp2p/) team has made a great deal of libraries that's modular. Using them will allows replacing it's parts with other implementations in the future if the need arises. Using libp2p stack as follows should build a Kademlia-DHT network for peer discovery, routing and a secure connection for content exchange.
 
-* **Transport protocol**: QUIC/UDP
+* **Transport protocol**: HTTP2/TCP
 * **Discovery/Routing**: mDNS, Kademlia-DHT, DNS (for existing websites interoperability)
 
 The previous stack should allow peers discovery over the same network. or with S/Kademlia-DHT routing if not on the same network.
@@ -321,7 +321,7 @@ If local network is desired the service may announce itself on the network using
 
 - Fingerprint: corresponds to the instance user public key fingerprint
 - app: corresponds to the application name
-- protocol: tcp or udp (if QUIC then udp)
+- protocol: tcp
 - domain: should be always "local"
 
 #### Listening on internet requests
