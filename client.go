@@ -2,7 +2,6 @@ package mau
 
 import (
 	"context"
-	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
@@ -17,7 +16,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/mdns"
-	"golang.org/x/crypto/openpgp/packet"
 )
 
 var (
@@ -192,27 +190,7 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 }
 
 func (c *Client) verifyPeerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
-	for _, rawcert := range rawCerts {
-		certs, err := x509.ParseCertificates(rawcert)
-		if err != nil {
-			continue
-		}
-
-		for _, cert := range certs {
-			switch cert.PublicKeyAlgorithm {
-			case x509.RSA:
-				pubkey := cert.PublicKey.(*rsa.PublicKey)
-				var id Fingerprint = packet.NewRSAPublicKey(cert.NotBefore, pubkey).Fingerprint
-				if id == c.peer {
-					return nil
-				}
-			default:
-				return x509.ErrUnsupportedAlgorithm
-			}
-		}
-	}
-
-	return ErrIncorrectPeerCertificate
+	return certIncludes(rawCerts, c.peer)
 }
 
 func findFriend(ctx context.Context, fingerprint Fingerprint, addresses chan<- string) error {

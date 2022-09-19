@@ -1,4 +1,4 @@
-package main
+package mau
 
 import (
 	"bytes"
@@ -12,8 +12,7 @@ import (
 )
 
 const (
-	DHT_Key_Length      = 160 / 8 // bytes
-	DHT_K               = 20      // number of buckets
+	DHT_K               = 20 // number of buckets
 	DHT_PING_PATH       = "/kad/ping"
 	DHT_STORE_PATH      = "/kad/store"
 	DHT_FIND_NODE_PATH  = "/kad/find_node"
@@ -24,9 +23,8 @@ var (
 	ErrPeerNodeCertIncorrect = errors.New("Peer Certificate didn't match expected Identity.")
 )
 
-type DHTKey [DHT_Key_Length]byte
 type DHTNode struct {
-	Key     DHTKey
+	Key     Fingerprint
 	Address string
 }
 type Bucket struct {
@@ -34,7 +32,7 @@ type Bucket struct {
 }
 
 type DHTRPC struct {
-	StoreStorage map[DHTKey]*DHTNode
+	StoreStorage map[Fingerprint]*DHTNode
 }
 
 // Kademlia: A Peer-to-Peer Information System Based on the XOR Metric (2.3)
@@ -43,8 +41,7 @@ type DHTRPC struct {
 func (d *DHTRPC) SendPING(node *DHTNode) bool {
 	resp, err := http.Get(node.Address + DHT_PING_PATH)
 	return err == nil &&
-		resp.StatusCode == http.StatusOK &&
-		!IsNodeCert(node.Key, resp.TLS)
+		resp.StatusCode == http.StatusOK
 }
 
 // Kademlia: A Peer-to-Peer Information System Based on the XOR Metric (2.3)
@@ -68,10 +65,6 @@ func (d *DHTRPC) SendSTORE(node *DHTNode, value *DHTNode) error {
 		return fmt.Errorf("Response from peer: %s", resp.Status)
 	}
 
-	if !IsNodeCert(node.Key, resp.TLS) {
-		return ErrPeerNodeCertIncorrect
-	}
-
 	return nil
 }
 
@@ -91,15 +84,15 @@ func (d *DHTRPC) RecieveSTORE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Whoever asks us for STORE needs to have the identity in the value
-	if !IsNodeCert(node.Key, r.TLS) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
+	// if !IsNodeCert(node.Key, r.TLS) {
+	// 	w.WriteHeader(http.StatusUnauthorized)
+	// 	return
+	// }
 
 	d.StoreStorage[node.Key] = &node
 }
 
-func (d *DHTRPC) SendFIND_NODE(node *DHTNode, key DHTKey) ([]DHTNode, error) {
+func (d *DHTRPC) SendFIND_NODE(node *DHTNode, key Fingerprint) ([]DHTNode, error) {
 	resp, err := http.Post(node.Address+DHT_STORE_PATH, "application/octet-stream", bytes.NewBuffer(key[:]))
 	if err != nil {
 		return nil, err
@@ -108,10 +101,6 @@ func (d *DHTRPC) SendFIND_NODE(node *DHTNode, key DHTKey) ([]DHTNode, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("Response from peer: %s", resp.Status)
-	}
-
-	if !IsNodeCert(node.Key, resp.TLS) {
-		return nil, ErrPeerNodeCertIncorrect
 	}
 
 	var nodes []DHTNode
@@ -128,11 +117,11 @@ func (d *DHTRPC) SendFIND_NODE(node *DHTNode, key DHTKey) ([]DHTNode, error) {
 }
 
 func (d *DHTRPC) ReciveFIND_NODE(w http.ResponseWriter, r *http.Request) {
-	key, err := io.ReadAll(r.Body)
-	defer r.Body.Close()
-	if err != nil {
+	// key, err := io.ReadAll(r.Body)
+	// defer r.Body.Close()
+	// if err != nil {
 
-	}
+	// }
 }
 
 func (d *DHTRPC) SendFIND_VALUE(node *DHTNode) {
@@ -190,7 +179,7 @@ func PrefixLen(a []byte) int {
 }
 
 // SortByDistance sorts ids by descending XOR distance with respect to id.
-func SortByDistance(id DHTKey, ids []DHTNode) []DHTNode {
+func SortByDistance(id Fingerprint, ids []DHTNode) []DHTNode {
 	sort.Slice(ids, func(i, j int) bool {
 		return bytes.Compare(XOR(ids[i].Key[:], id[:]), XOR(ids[j].Key[:], id[:])) == -1
 	})
