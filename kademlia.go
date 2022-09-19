@@ -3,7 +3,6 @@ package mau
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math/bits"
@@ -19,19 +18,17 @@ const (
 	DHT_FIND_VALUE_PATH = "/kad/find_value"
 )
 
-var (
-	ErrPeerNodeCertIncorrect = errors.New("Peer Certificate didn't match expected Identity.")
-)
-
 type DHTNode struct {
-	Key     Fingerprint
-	Address string
+	client      *Client
+	fingerprint Fingerprint
+	Address     string
 }
 type Bucket struct {
 	Nodes []DHTNode
 }
 
 type DHTRPC struct {
+	account      *Account
 	StoreStorage map[Fingerprint]*DHTNode
 }
 
@@ -39,7 +36,7 @@ type DHTRPC struct {
 // TODO When sending requests make sure we're connecting to the correct user by
 // checking the TLS peer cert
 func (d *DHTRPC) SendPING(node *DHTNode) bool {
-	resp, err := http.Get(node.Address + DHT_PING_PATH)
+	resp, err := node.client.Get(node.Address + DHT_PING_PATH)
 	return err == nil &&
 		resp.StatusCode == http.StatusOK
 }
@@ -56,7 +53,7 @@ func (d *DHTRPC) SendSTORE(node *DHTNode, value *DHTNode) error {
 		return err
 	}
 
-	resp, err := http.Post(node.Address+DHT_STORE_PATH, "application/json", bytes.NewBuffer(body))
+	resp, err := node.client.Post(node.Address+DHT_STORE_PATH, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
@@ -68,55 +65,39 @@ func (d *DHTRPC) SendSTORE(node *DHTNode, value *DHTNode) error {
 	return nil
 }
 
+// RecieveSTORE stories the body of the request node for later Find_VALUE call
+// Instead of asking the client for the identity this call gets if from the TLS certificate
+//
 // Kademlia: A Peer-to-Peer Information System Based on the XOR Metric (2.3)
 func (d *DHTRPC) RecieveSTORE(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	var node DHTNode
-	if err := json.Unmarshal(body, &node); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+	fingerprint, err := certToFingerprint(r.TLS.PeerCertificates)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Whoever asks us for STORE needs to have the identity in the value
-	// if !IsNodeCert(node.Key, r.TLS) {
-	// 	w.WriteHeader(http.StatusUnauthorized)
-	// 	return
-	// }
-
-	d.StoreStorage[node.Key] = &node
-}
-
-func (d *DHTRPC) SendFIND_NODE(node *DHTNode, key Fingerprint) ([]DHTNode, error) {
-	resp, err := http.Post(node.Address+DHT_STORE_PATH, "application/octet-stream", bytes.NewBuffer(key[:]))
+	client, err := d.account.Client(fingerprint)
 	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Response from peer: %s", resp.Status)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
-	var nodes []DHTNode
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+	d.StoreStorage[fingerprint] = &DHTNode{
+		client:      client,
+		fingerprint: fingerprint,
+		Address:     string(body),
 	}
-
-	if err := json.Unmarshal(body, &nodes); err != nil {
-		return nil, err
-	}
-
-	return nodes, nil
 }
 
 func (d *DHTRPC) ReciveFIND_NODE(w http.ResponseWriter, r *http.Request) {
+	// TODO
 	// key, err := io.ReadAll(r.Body)
 	// defer r.Body.Close()
 	// if err != nil {
@@ -125,9 +106,11 @@ func (d *DHTRPC) ReciveFIND_NODE(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *DHTRPC) SendFIND_VALUE(node *DHTNode) {
+	// TODO
 }
 
 func (d *DHTRPC) RecieveFIND_VALUE(w http.ResponseWriter, r *http.Request) {
+	// TODO
 }
 
 // Binary operations
@@ -181,7 +164,7 @@ func PrefixLen(a []byte) int {
 // SortByDistance sorts ids by descending XOR distance with respect to id.
 func SortByDistance(id Fingerprint, ids []DHTNode) []DHTNode {
 	sort.Slice(ids, func(i, j int) bool {
-		return bytes.Compare(XOR(ids[i].Key[:], id[:]), XOR(ids[j].Key[:], id[:])) == -1
+		return bytes.Compare(XOR(ids[i].fingerprint[:], id[:]), XOR(ids[j].fingerprint[:], id[:])) == -1
 	})
 
 	return ids

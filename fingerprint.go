@@ -12,6 +12,7 @@ import (
 )
 
 var ErrIncorrectFingerprintLength = errors.New("Provided fingerprint length is not correct")
+var ErrCantFindFingerprint = errors.New("Can't find fingerprint.")
 
 type Fingerprint [20]byte
 
@@ -66,4 +67,24 @@ func certIncludes(rawCerts [][]byte, fingerprint Fingerprint) error {
 	}
 
 	return ErrIncorrectPeerCertificate
+}
+
+func certToFingerprint(certs []*x509.Certificate) (Fingerprint, error) {
+	for _, cert := range certs {
+		switch cert.PublicKeyAlgorithm {
+		case x509.RSA:
+			if pubkey, ok := cert.PublicKey.(*rsa.PublicKey); ok {
+				return packet.NewRSAPublicKey(cert.NotBefore, pubkey).Fingerprint, nil
+
+			}
+		case x509.ECDSA:
+			if pubkey, ok := cert.PublicKey.(*ecdsa.PublicKey); ok {
+				return packet.NewECDSAPublicKey(cert.NotBefore, pubkey).Fingerprint, nil
+			}
+		default:
+			return Fingerprint{}, x509.ErrUnsupportedAlgorithm
+		}
+	}
+
+	return Fingerprint{}, ErrCantFindFingerprint
 }

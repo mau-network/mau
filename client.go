@@ -25,9 +25,9 @@ var (
 )
 
 type Client struct {
-	account    *Account
-	peer       Fingerprint
-	httpClient *http.Client
+	http.Client
+	account *Account
+	peer    Fingerprint
 }
 
 // TODO(maybe) Cache clients map[Fingerprint]*Client
@@ -42,7 +42,7 @@ func (a *Account) Client(peer Fingerprint) (*Client, error) {
 		peer:    peer,
 	}
 
-	c.httpClient = &http.Client{
+	c.Client = http.Client{
 		// Prevent Redirects
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
 		Transport: &http.Transport{
@@ -95,7 +95,7 @@ func (c *Client) DownloadFriend(ctx context.Context, address string, fingerprint
 
 	req.Header.Add("If-Modified-Since", after.UTC().Format(http.TimeFormat))
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.Do(req)
 	if err != nil {
 		return err
 	}
@@ -152,7 +152,7 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 		return err
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.Do(req)
 	if err != nil {
 		return err
 	}
