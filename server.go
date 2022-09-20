@@ -20,6 +20,7 @@ type Server struct {
 	account    *Account
 	httpServer http.Server
 	mdnsServer *mdns.Server
+	DHTRPC     *DHTRPC
 	limit      uint
 }
 
@@ -39,6 +40,7 @@ func (a *Account) Server() (*Server, error) {
 	s := Server{
 		account: a,
 		limit:   100,
+		DHTRPC:  NewDHTRPC(a),
 		httpServer: http.Server{
 			Handler: router,
 			TLSConfig: &tls.Config{
@@ -63,6 +65,7 @@ func (a *Account) Server() (*Server, error) {
 	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}", s.list).Methods("GET")
 	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}/{fileID}", s.get).Methods("GET")
 	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}/{fileID}/{versionID}", s.version).Methods("GET")
+	router.PathPrefix("/kad/").Handler(s.DHTRPC)
 
 	return &s, nil
 }

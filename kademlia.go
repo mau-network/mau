@@ -19,41 +19,61 @@ const (
 )
 
 type DHTNode struct {
-	client      *Client
-	fingerprint Fingerprint
+	Fingerprint Fingerprint
 	Address     string
 }
-type Bucket struct {
-	Nodes []DHTNode
+
+type bucket struct {
+	nodes []DHTNode
 }
 
 type DHTRPC struct {
+	mux          *http.ServeMux
 	account      *Account
-	StoreStorage map[Fingerprint]*DHTNode
+	buckets      [DHT_K]bucket
+	storeStorage map[Fingerprint]*DHTNode
 }
 
-// Kademlia: A Peer-to-Peer Information System Based on the XOR Metric (2.3)
-// TODO When sending requests make sure we're connecting to the correct user by
-// checking the TLS peer cert
-func (d *DHTRPC) SendPING(node *DHTNode) bool {
-	resp, err := node.client.Get(node.Address + DHT_PING_PATH)
-	return err == nil &&
-		resp.StatusCode == http.StatusOK
+func NewDHTRPC(account *Account) *DHTRPC {
+	d := &DHTRPC{
+		mux:          http.NewServeMux(),
+		account:      account,
+		storeStorage: map[Fingerprint]*DHTNode{},
+	}
+
+	d.mux.HandleFunc(DHT_PING_PATH, d.RecievePING)
+	d.mux.HandleFunc(DHT_STORE_PATH, d.RecieveSTORE)
+	d.mux.HandleFunc(DHT_FIND_NODE_PATH, d.ReciveFIND_NODE)
+	d.mux.HandleFunc(DHT_FIND_VALUE_PATH, d.RecieveFIND_VALUE)
+
+	return d
 }
 
-// Kademlia: A Peer-to-Peer Information System Based on the XOR Metric (2.3)
-func (d *DHTRPC) RecievePING(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
+func (d *DHTRPC) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	d.mux.ServeHTTP(w, r)
 }
 
+// SendPING sends a ping to a node and returns true if the node response status isn't 2xx
+//
 // Kademlia: A Peer-to-Peer Information System Based on the XOR Metric (2.3)
-func (d *DHTRPC) SendSTORE(node *DHTNode, value *DHTNode) error {
+func (d *DHTRPC) SendPING(node *DHTNode, client *Client) bool {
+	_, err := client.Get(node.Address + DHT_PING_PATH)
+	return err == nil
+}
+
+// RecievePING responds with http.StatusOK
+//
+// Kademlia: A Peer-to-Peer Information System Based on the XOR Metric (2.3)
+func (d *DHTRPC) RecievePING(w http.ResponseWriter, r *http.Request) {}
+
+// Kademlia: A Peer-to-Peer Information System Based on the XOR Metric (2.3)
+func (d *DHTRPC) SendSTORE(node *DHTNode, value *DHTNode, client *Client) error {
 	body, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
 
-	resp, err := node.client.Post(node.Address+DHT_STORE_PATH, "application/json", bytes.NewBuffer(body))
+	resp, err := client.Post(node.Address+DHT_STORE_PATH, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
@@ -83,15 +103,8 @@ func (d *DHTRPC) RecieveSTORE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client, err := d.account.Client(fingerprint)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	d.StoreStorage[fingerprint] = &DHTNode{
-		client:      client,
-		fingerprint: fingerprint,
+	d.storeStorage[fingerprint] = &DHTNode{
+		Fingerprint: fingerprint,
 		Address:     string(body),
 	}
 }
@@ -164,7 +177,7 @@ func PrefixLen(a []byte) int {
 // SortByDistance sorts ids by descending XOR distance with respect to id.
 func SortByDistance(id Fingerprint, ids []DHTNode) []DHTNode {
 	sort.Slice(ids, func(i, j int) bool {
-		return bytes.Compare(XOR(ids[i].fingerprint[:], id[:]), XOR(ids[j].fingerprint[:], id[:])) == -1
+		return bytes.Compare(XOR(ids[i].Fingerprint[:], id[:]), XOR(ids[j].Fingerprint[:], id[:])) == -1
 	})
 
 	return ids
