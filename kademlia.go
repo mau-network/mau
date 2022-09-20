@@ -27,15 +27,15 @@ type bucket struct {
 	nodes []DHTNode
 }
 
-type DHTRPC struct {
+type DHTServer struct {
 	mux          *http.ServeMux
 	account      *Account
 	buckets      [DHT_K]bucket
 	storeStorage map[Fingerprint]*DHTNode
 }
 
-func NewDHTRPC(account *Account) *DHTRPC {
-	d := &DHTRPC{
+func NewDHTRPC(account *Account) *DHTServer {
+	d := &DHTServer{
 		mux:          http.NewServeMux(),
 		account:      account,
 		storeStorage: map[Fingerprint]*DHTNode{},
@@ -49,14 +49,14 @@ func NewDHTRPC(account *Account) *DHTRPC {
 	return d
 }
 
-func (d *DHTRPC) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (d *DHTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.mux.ServeHTTP(w, r)
 }
 
 // SendPING sends a ping to a node and returns true if the node response status isn't 2xx
 //
 // Kademlia: A Peer-to-Peer Information System Based on the XOR Metric (2.3)
-func (d *DHTRPC) SendPING(node *DHTNode, client *Client) bool {
+func (d *DHTServer) SendPING(node *DHTNode, client *Client) bool {
 	_, err := client.Get(node.Address + DHT_PING_PATH)
 	return err == nil
 }
@@ -64,10 +64,10 @@ func (d *DHTRPC) SendPING(node *DHTNode, client *Client) bool {
 // RecievePING responds with http.StatusOK
 //
 // Kademlia: A Peer-to-Peer Information System Based on the XOR Metric (2.3)
-func (d *DHTRPC) RecievePING(w http.ResponseWriter, r *http.Request) {}
+func (d *DHTServer) RecievePING(w http.ResponseWriter, r *http.Request) {}
 
 // Kademlia: A Peer-to-Peer Information System Based on the XOR Metric (2.3)
-func (d *DHTRPC) SendSTORE(node *DHTNode, value *DHTNode, client *Client) error {
+func (d *DHTServer) SendSTORE(node *DHTNode, value *DHTNode, client *Client) error {
 	body, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -89,7 +89,7 @@ func (d *DHTRPC) SendSTORE(node *DHTNode, value *DHTNode, client *Client) error 
 // Instead of asking the client for the identity this call gets if from the TLS certificate
 //
 // Kademlia: A Peer-to-Peer Information System Based on the XOR Metric (2.3)
-func (d *DHTRPC) RecieveSTORE(w http.ResponseWriter, r *http.Request) {
+func (d *DHTServer) RecieveSTORE(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
 	if err != nil {
@@ -109,7 +109,7 @@ func (d *DHTRPC) RecieveSTORE(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (d *DHTRPC) ReciveFIND_NODE(w http.ResponseWriter, r *http.Request) {
+func (d *DHTServer) ReciveFIND_NODE(w http.ResponseWriter, r *http.Request) {
 	// TODO
 	// key, err := io.ReadAll(r.Body)
 	// defer r.Body.Close()
@@ -118,11 +118,11 @@ func (d *DHTRPC) ReciveFIND_NODE(w http.ResponseWriter, r *http.Request) {
 	// }
 }
 
-func (d *DHTRPC) SendFIND_VALUE(node *DHTNode) {
+func (d *DHTServer) SendFIND_VALUE(node *DHTNode) {
 	// TODO
 }
 
-func (d *DHTRPC) RecieveFIND_VALUE(w http.ResponseWriter, r *http.Request) {
+func (d *DHTServer) RecieveFIND_VALUE(w http.ResponseWriter, r *http.Request) {
 	// TODO
 }
 
