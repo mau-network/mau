@@ -2,6 +2,7 @@ package mau
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -190,18 +191,77 @@ func (d *DHTServer) RecievePING(w http.ResponseWriter, r *http.Request) {
 	d.addNode(r)
 }
 
-func (d *DHTServer) SendFIND_NODE(node DHTNode) (DHTNode, error) {
-	client, err := d.account.Client(node.Fingerprint)
+func (d *DHTServer) SendFIND_NODE(fingerprint Fingerprint) (DHTNode, error) {
+	client, err := d.account.Client(fingerprint)
 	if err != nil {
 		return DHTNode{}, err
 	}
 
-	url := fmt.Sprintf("%s%s", node.Address(), DHT_PING_PATH)
-	_, err = client.Get(url)
+	var found *DHTNode
+	ctx, cancel := context.WithCancel(context.Background())
+	nodes := d.routingTable.nearest(fingerprint)
+	// TODO make sure you don't duplicate nodes
+	var lock sync.Mutex
+	for i := 0; i < DHT_ALPHA; i++ {
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
 
-	// TODO
+					lock.Lock()
 
-	return DHTNode{}, err
+					if len(nodes) == 0 {
+						lock.Unlock()
+						return
+					}
+
+					node := nodes[len(nodes)-1]
+					nodes = nodes[:len(nodes)-1]
+					lock.Unlock()
+
+					url := fmt.Sprintf("%s%s", node.Address(), DHT_PING_PATH)
+					resp, err := client.Get(url)
+					if err != nil {
+						continue
+					}
+
+					// Add it to the known nodes
+					d.routingTable.addNode(node, d.SendPING)
+
+					foundNodes := []DHTNode{}
+					body, err := io.ReadAll(resp.Body)
+					if err != nil {
+						continue
+					}
+
+					err = json.Unmarshal(body, &foundNodes)
+					if err != nil {
+						continue
+					}
+
+					lock.Lock()
+					for i := len(foundNodes) - 1; i >= 0; i-- {
+						nodes = append(nodes, foundNodes[i])
+						if foundNodes[i].Fingerprint == fingerprint {
+							found = &foundNodes[i]
+							cancel()
+							break
+						}
+					}
+					lock.Unlock()
+				}
+			}
+		}()
+	}
+
+	cancel()
+	if found == nil {
+		return DHTNode{}, io.EOF
+	}
+
+	return *found, err
 }
 
 func (d *DHTServer) RecieveFIND_NODE(w http.ResponseWriter, r *http.Request) {
