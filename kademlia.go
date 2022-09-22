@@ -6,45 +6,162 @@ import (
 	"fmt"
 	"io"
 	"math/bits"
+	"net"
 	"net/http"
 	"sort"
+	"strconv"
+	"sync"
 )
 
 const (
-	DHT_K               = 20 // number of buckets
-	DHT_PING_PATH       = "/kad/ping"
-	DHT_STORE_PATH      = "/kad/store"
-	DHT_FIND_NODE_PATH  = "/kad/find_node"
-	DHT_FIND_VALUE_PATH = "/kad/find_value"
+	DHT_B              = len(Fingerprint{}) * 8 // number of buckets
+	DHT_K              = 20                     // max length of k bucket (replication parameter)
+	DHT_ALPHA          = 3                      // parallelism factor
+	DHT_PING_PATH      = "/kad/ping"
+	DHT_FIND_NODE_PATH = "/kad/find_node"
 )
 
 type DHTNode struct {
 	Fingerprint Fingerprint
-	Address     string
+	IP          net.IP
+	Port        int
 }
 
+func (d *DHTNode) Address() string {
+	return fmt.Sprintf("%s%s:%d", uriProtocolName, d.IP, d.Port)
+}
+
+// [],[],[],[],[],[],[],[]
+// ^--Head (oldest)      ^--Tail (newest)
 type bucket struct {
-	nodes []DHTNode
+	mutex  sync.Mutex
+	values []DHTNode
+}
+
+// moveToTail moves a node that exists in the bucket to the end
+func (b *bucket) moveToTail(node DHTNode) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	newValues := make([]DHTNode, 0, len(b.values))
+	found := false
+	for i := range b.values {
+		if b.values[i].Fingerprint != node.Fingerprint {
+			newValues = append(newValues, b.values[i])
+		} else {
+			found = true
+		}
+	}
+
+	if found {
+		b.values = append(newValues, node)
+	}
+}
+
+// addToTail adds a node to the tail of the bucket
+func (b *bucket) addToTail(node DHTNode) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	b.values = append(b.values, node)
+}
+
+// leastRecentlySeen returns the least recently seen node. if the bucket is
+// empty return io.EOF error
+func (b *bucket) leastRecentlySeen() (DHTNode, error) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if len(b.values) == 0 {
+		return DHTNode{}, io.EOF
+	}
+
+	return b.values[0], nil
+}
+
+// evict removes a node from the bucket
+func (b *bucket) evict(node DHTNode) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	newValues := make([]DHTNode, 0, len(b.values))
+	for i := range b.values {
+		if b.values[i].Fingerprint != node.Fingerprint {
+			newValues = append(newValues, b.values[i])
+		}
+	}
+}
+
+// Get returns a node from the bucket if fingerprint matches
+func (b *bucket) get(node DHTNode) (DHTNode, error) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	for i := range b.values {
+		if b.values[i].Fingerprint == node.Fingerprint {
+			return b.values[i], nil
+		}
+	}
+
+	return DHTNode{}, io.EOF
+}
+
+// isFull returns true if the bucket is full to the limit of K
+func (b *bucket) isFull() bool {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	return len(b.values) < DHT_K
+}
+
+type routingTable [DHT_B]bucket
+
+func (r *routingTable) bucketFor(node DHTNode) *bucket {
+	// TODO
+	return &r[0]
+}
+
+func (r *routingTable) nearest(fingerprint Fingerprint) []DHTNode {
+	// TODO
+	return []DHTNode{}
+}
+
+// addNode adds a note to routing table if it doesn't exist if the bucket is
+// full it pings the first node if the node responded it's discarded. else it
+// removes the first node and adds the new node to the bucket
+func (t *routingTable) addNode(node DHTNode, ping func(DHTNode) error) {
+	bucket := t.bucketFor(node)
+
+	if node, err := bucket.get(node); err != nil {
+		bucket.moveToTail(node)
+	} else if bucket.isFull() {
+		bucket.addToTail(node)
+	} else {
+		replacementNode, err := bucket.leastRecentlySeen()
+		if err == nil && ping(replacementNode) == nil {
+			bucket.moveToTail(replacementNode)
+		} else {
+			bucket.evict(replacementNode)
+			bucket.addToTail(node)
+		}
+	}
 }
 
 type DHTServer struct {
 	mux          *http.ServeMux
 	account      *Account
-	buckets      [DHT_K]bucket
-	storeStorage map[Fingerprint]*DHTNode
+	routingTable routingTable
 }
 
+// KAD = Kademlia: A Peer-to-Peer Information System Based on the XOR Metric
 func NewDHTRPC(account *Account) *DHTServer {
 	d := &DHTServer{
-		mux:          http.NewServeMux(),
-		account:      account,
-		storeStorage: map[Fingerprint]*DHTNode{},
+		mux:     http.NewServeMux(),
+		account: account,
 	}
 
 	d.mux.HandleFunc(DHT_PING_PATH, d.RecievePING)
-	d.mux.HandleFunc(DHT_STORE_PATH, d.RecieveSTORE)
-	d.mux.HandleFunc(DHT_FIND_NODE_PATH, d.ReciveFIND_NODE)
-	d.mux.HandleFunc(DHT_FIND_VALUE_PATH, d.RecieveFIND_VALUE)
+	d.mux.HandleFunc(DHT_FIND_NODE_PATH, d.RecieveFIND_NODE)
 
 	return d
 }
@@ -55,97 +172,90 @@ func (d *DHTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // SendPING sends a ping to a node and returns true if the node response status isn't 2xx
 //
-// Kademlia: A Peer-to-Peer Information System Based on the XOR Metric (2.3)
-func (d *DHTServer) SendPING(node *DHTNode, client *Client) bool {
-	_, err := client.Get(node.Address + DHT_PING_PATH)
-	return err == nil
-}
-
-// RecievePING responds with http.StatusOK
-//
-// Kademlia: A Peer-to-Peer Information System Based on the XOR Metric (2.3)
-func (d *DHTServer) RecievePING(w http.ResponseWriter, r *http.Request) {}
-
-// Kademlia: A Peer-to-Peer Information System Based on the XOR Metric (2.3)
-func (d *DHTServer) SendSTORE(node *DHTNode, value *DHTNode, client *Client) error {
-	body, err := json.Marshal(value)
+// KAD (2.3)
+func (d *DHTServer) SendPING(node DHTNode) error {
+	client, err := d.account.Client(node.Fingerprint)
 	if err != nil {
 		return err
 	}
 
-	resp, err := client.Post(node.Address+DHT_STORE_PATH, "application/json", bytes.NewBuffer(body))
-	if err != nil {
-		return err
-	}
+	url := fmt.Sprintf("%s%s", node.Address(), DHT_PING_PATH)
+	_, err = client.Get(url)
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Response from peer: %s", resp.Status)
-	}
-
-	return nil
+	return err
 }
 
-// RecieveSTORE stories the body of the request node for later Find_VALUE call
-// Instead of asking the client for the identity this call gets if from the TLS certificate
-//
-// Kademlia: A Peer-to-Peer Information System Based on the XOR Metric (2.3)
-func (d *DHTServer) RecieveSTORE(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
-	defer r.Body.Close()
+// RecievePING KAD (2.3) responds with http.StatusOK
+func (d *DHTServer) RecievePING(w http.ResponseWriter, r *http.Request) {
+	d.addNode(r)
+}
+
+func (d *DHTServer) SendFIND_NODE(node DHTNode) (DHTNode, error) {
+	client, err := d.account.Client(node.Fingerprint)
+	if err != nil {
+		return DHTNode{}, err
+	}
+
+	url := fmt.Sprintf("%s%s", node.Address(), DHT_PING_PATH)
+	_, err = client.Get(url)
+
+	// TODO
+
+	return DHTNode{}, err
+}
+
+func (d *DHTServer) RecieveFIND_NODE(w http.ResponseWriter, r *http.Request) {
+	d.addNode(r)
+
+	fingerprintParam := r.FormValue("fingerprint")
+	fingerprint, err := ParseFingerprint(fingerprintParam)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
 	}
 
+	nodes := d.routingTable.nearest(fingerprint)
+	output, err := json.Marshal(nodes)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.Write(output)
+}
+
+func (d *DHTServer) addNode(r *http.Request) {
 	fingerprint, err := certToFingerprint(r.TLS.PeerCertificates)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	d.storeStorage[fingerprint] = &DHTNode{
-		Fingerprint: fingerprint,
-		Address:     string(body),
+	port, err := strconv.Atoi(r.Header.Get("Port"))
+	if err != nil {
+		return
 	}
-}
 
-func (d *DHTServer) ReciveFIND_NODE(w http.ResponseWriter, r *http.Request) {
-	// TODO
-	// key, err := io.ReadAll(r.Body)
-	// defer r.Body.Close()
-	// if err != nil {
+	node := DHTNode{
+		Fingerprint: fingerprint,
+		IP:          net.ParseIP(r.Header.Get("IP")),
+		Port:        port,
+	}
 
-	// }
-}
-
-func (d *DHTServer) SendFIND_VALUE(node *DHTNode) {
-	// TODO
-}
-
-func (d *DHTServer) RecieveFIND_VALUE(w http.ResponseWriter, r *http.Request) {
-	// TODO
+	d.routingTable.addNode(node, d.SendPING)
 }
 
 // Binary operations
 
-// XOR allocates a new byte slice with the computed result of XOR(a, b).
-func XOR(a, b []byte) []byte {
-	if len(a) != len(b) {
-		return a
-	}
-
-	c := make([]byte, len(a))
-
-	for i := 0; i < len(a); i++ {
+// xor two fingerprints
+func xor(a, b Fingerprint) (c Fingerprint) {
+	for i := range a {
 		c[i] = a[i] ^ b[i]
 	}
 
-	return c
+	return
 }
 
-// PrefixDiff counts the number of equal prefixed bits of a and b.
-func PrefixDiff(a, b []byte, n int) int {
-	buf, total := XOR(a, b), 0
+// prefixDiff counts the number of equal prefixed bits of a and b.
+func prefixDiff(a, b Fingerprint, n int) int {
+	buf, total := xor(a, b), 0
 
 	for i, b := range buf {
 		if 8*i >= n {
@@ -163,8 +273,8 @@ func PrefixDiff(a, b []byte, n int) int {
 	return total
 }
 
-// PrefixLen returns the number of prefixed zero bits of a.
-func PrefixLen(a []byte) int {
+// prefixLen returns the number of prefixed zero bits of a.
+func prefixLen(a []byte) int {
 	for i, b := range a {
 		if b != 0 {
 			return i*8 + bits.LeadingZeros8(b)
@@ -174,10 +284,12 @@ func PrefixLen(a []byte) int {
 	return len(a) * 8
 }
 
-// SortByDistance sorts ids by descending XOR distance with respect to id.
-func SortByDistance(id Fingerprint, ids []DHTNode) []DHTNode {
+// sortByDistance sorts ids by descending XOR distance with respect to id.
+func sortByDistance(id Fingerprint, ids []DHTNode) []DHTNode {
 	sort.Slice(ids, func(i, j int) bool {
-		return bytes.Compare(XOR(ids[i].Fingerprint[:], id[:]), XOR(ids[j].Fingerprint[:], id[:])) == -1
+		ixor := xor(ids[i].Fingerprint, id)
+		jxor := xor(ids[j].Fingerprint, id)
+		return bytes.Compare(ixor[:], jxor[:]) == -1
 	})
 
 	return ids
