@@ -104,6 +104,18 @@ func (b *bucket) leastRecentlySeen() (node *DHTNode) {
 	return
 }
 
+// randomNode returns a random node from the bucket
+func (b *bucket) randomNode() *DHTNode {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	if len(b.values) == 0 {
+		return nil
+	}
+
+	return b.values[rand.Intn(len(b.values))]
+}
+
 // isFull returns true if the bucket is full to the limit of K
 func (b *bucket) isFull() bool {
 	b.mutex.RLock()
@@ -121,13 +133,6 @@ func (b *bucket) dup() []*DHTNode {
 	copy(c, b.values)
 
 	return c
-}
-
-func (b *bucket) randomNode() *DHTNode {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
-
-	return b.values[rand.Intn(len(b.values))]
 }
 
 type DHTServer struct {
@@ -337,17 +342,35 @@ func (d *DHTServer) addNodeFromRequest(r *http.Request) error {
 		return err
 	}
 
-	node := DHTNode{
+	d.addNode(&DHTNode{
 		Fingerprint: fingerprint,
 		Address:     address,
-	}
-
-	d.addNode(&node)
+	})
 
 	return nil
 }
 
-// Refresh all buckets
+// addNode adds a note to routing table if it doesn't exist if the bucket is
+// full it pings the first node if the node responded it's discarded. else it
+// removes the first node and adds the new node to the bucket
+func (d *DHTServer) addNode(node *DHTNode) {
+	bucket := &d.buckets[d.bucketFor(node.Fingerprint)]
+
+	if oldNode := bucket.get(node.Fingerprint); oldNode != nil {
+		bucket.moveToTail(oldNode)
+	} else if !bucket.isFull() {
+		bucket.addToTail(node)
+	} else if existing := bucket.leastRecentlySeen(); existing != nil {
+		if d.SendPing(existing) == nil {
+			bucket.moveToTail(existing)
+		} else {
+			bucket.remove(existing)
+			bucket.addToTail(node)
+		}
+	}
+}
+
+// Refresh all stall buckets
 func (d *DHTServer) refreshAllBuckets() {
 	for i := range d.buckets {
 		d.refreshBucket(i)
@@ -431,26 +454,6 @@ func (d *DHTServer) bucketFor(fingerprint Fingerprint) (i int) {
 		i--
 	}
 	return
-}
-
-// addNode adds a note to routing table if it doesn't exist if the bucket is
-// full it pings the first node if the node responded it's discarded. else it
-// removes the first node and adds the new node to the bucket
-func (d *DHTServer) addNode(node *DHTNode) {
-	bucket := &d.buckets[d.bucketFor(node.Fingerprint)]
-
-	if oldNode := bucket.get(node.Fingerprint); oldNode != nil {
-		bucket.moveToTail(oldNode)
-	} else if !bucket.isFull() {
-		bucket.addToTail(node)
-	} else if existing := bucket.leastRecentlySeen(); existing != nil {
-		if d.SendPing(existing) == nil {
-			bucket.moveToTail(existing)
-		} else {
-			bucket.remove(existing)
-			bucket.addToTail(node)
-		}
-	}
 }
 
 // Binary operations
