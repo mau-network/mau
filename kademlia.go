@@ -468,6 +468,7 @@ func xor(a, b Fingerprint) (c Fingerprint) {
 }
 
 // prefixLen returns the number of leading zeros in a.
+// TODO try the log2 approach to get leading zeros
 func prefixLen(a Fingerprint) int {
 	for i, b := range a {
 		if b != 0 {
