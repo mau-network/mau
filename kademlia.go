@@ -131,10 +131,11 @@ func (b *bucket) randomNode() *DHTNode {
 }
 
 type DHTServer struct {
-	mux     *http.ServeMux
-	account *Account
-	address string
-	buckets [DHT_B]bucket
+	mux           *http.ServeMux
+	account       *Account
+	address       string
+	buckets       [DHT_B]bucket
+	cancelRefresh context.CancelFunc
 }
 
 func NewDHTRPC(account *Account, address string) *DHTServer {
@@ -303,19 +304,24 @@ func (d *DHTServer) RecieveFindNode(w http.ResponseWriter, r *http.Request) {
 
 // Join joins the network by adding a bootstrap known nodes to the routing table
 // and querying about itself
-func (d *DHTServer) Join(bootstrap []*DHTNode) error {
+func (d *DHTServer) Join(bootstrap []*DHTNode) {
 	for _, node := range bootstrap {
 		d.addNode(node)
 	}
 
 	d.SendFindNode(d.account.Fingerprint())
-	d.refresh()
-	return nil
+	d.refreshAllBuckets()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	d.refreshStallBuckets(ctx)
+	d.cancelRefresh = cancel
 }
 
 // Leave terminates any background jobs
-func (d *DHTServer) Leave() error {
-	return nil
+func (d *DHTServer) Leave() {
+	if d.cancelRefresh != nil {
+		d.cancelRefresh()
+	}
 }
 
 // addNode: When any node send us a request add it to the contact list
@@ -341,17 +347,57 @@ func (d *DHTServer) addNodeFromRequest(r *http.Request) error {
 	return nil
 }
 
-// Refresh all stall buckets
-func (d *DHTServer) refresh() {
+// Refresh all buckets
+func (d *DHTServer) refreshAllBuckets() {
 	for i := range d.buckets {
-		if time.Since(d.buckets[i].lastLookup) > DHT_STALL_PERIOD {
-			rando := d.buckets[i].randomNode()
-			if rando == nil {
-				continue
+		d.refreshBucket(i)
+	}
+}
+
+// Refresh stall buckets
+func (d *DHTServer) refreshStallBuckets(ctx context.Context) {
+	nextClick := time.Duration(0)
+
+	// refresh the buckets indefinitely
+	for {
+		nextClick = DHT_STALL_PERIOD
+
+		// either the context is done and we exit of the next click trigger refreshing buckets
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(nextClick):
+
+			// we'll go over all buckets and refresh the bucket or exit
+			for i := range d.buckets {
+				// if it's refreshable we'll refresh it
+				if time.Since(d.buckets[i].lastLookup) > DHT_STALL_PERIOD {
+					select {
+					case <-ctx.Done():
+						return
+					default:
+						d.refreshBucket(i)
+					}
+
+				} else {
+					// if it's not refreshable then calculate when it's gonna
+					// need refresh and move next click earlier if needed
+					stallAfter := DHT_STALL_PERIOD - time.Now().Sub(d.buckets[i].lastLookup)
+					if stallAfter < nextClick {
+						nextClick = stallAfter
+					}
+				}
 			}
 
-			d.SendFindNode(rando.Fingerprint)
 		}
+	}
+}
+
+// TODO add context for faster termination
+func (d *DHTServer) refreshBucket(i int) {
+	if rando := d.buckets[i].randomNode(); rando != nil {
+		d.SendFindNode(rando.Fingerprint)
+		d.buckets[i].lastLookup = time.Now()
 	}
 }
 
