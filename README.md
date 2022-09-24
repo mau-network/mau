@@ -42,7 +42,7 @@
 
 ## INTRODUCTION
 
-This document describes a peer to peer (P2P) web2 applications convention. Utilizing the filesystem, PGP primitives and Kademlia DHT for data storage, privacy and peer discovery respectively. With no parallel data structures constraints.
+This document describes a peer to peer (P2P) web2 applications convention. Utilizing the filesystem, PGP primitives and Kademlia protocol for data storage, privacy and peer discovery and routing respectively. With no parallel data structures constraints.
 
 ## PROBLEM
 
@@ -303,10 +303,10 @@ Authentication should happen in the security layer with both peers doing a TLS1.
 
 ### Peer to Peer Stack
 
-[Libp2p](https://github.com/libp2p/) team has made a great deal of libraries that's modular. Using them will allows replacing it's parts with other implementations in the future if the need arises. Using libp2p stack as follows should build a Kademlia-DHT network for peer discovery, routing and a secure connection for content exchange.
+Using a reduced Kademlia routing protocol over TCP/HTTP allows peers to find other peers using their public key fingerprint and authenticate all requests using mutual-TLS allows passing any needed information in the certificate such as IP addresses, DNS names. effectively reusing what the websites already have.
 
 * **Transport protocol**: HTTP2/TCP
-* **Discovery/Routing**: mDNS, Kademlia-DHT, DNS (for existing websites interoperability)
+* **Discovery/Routing**: mDNS, Kademlia routing protocol, DNS (for existing websites interoperability)
 
 The previous stack should allow peers discovery over the same network. or with S/Kademlia-DHT routing if not on the same network.
 
@@ -327,6 +327,26 @@ If local network is desired the service may announce itself on the network using
 #### Listening on internet requests
 
 The program is responsible for allowing the user to receive connections from outside of local network by utilizing NAT traversal protocols such as UPNP, NAT-PMP or Hole punshing.
+
+#### Kademlia Routing
+
+Kademlia protocol specify short list of RPC calls:
+
+- PING: to make sure the node still connected
+- FIND_NODE: to find a list of nodes near a target node. recursively calling the resulting nodes converge on the target node
+- STORE: stores a key and a value in the node
+- FIND_VALUE: looks up a key in the network to find its stored value
+
+Differences with Kademlia:
+
+- In our case we don't need to store values so the last two RPCs are removed from **Mau** needed RPCs, simplifying the requirements to implement the convention.
+- Kademlia node ID was meant to be random 160 bit key. in our case we can use the public key fingerprint which is 160 bits.
+- mutual TLS will allow exchanging the certificate for any two connected nodes. which means both nodes knows each other public keys and fingerprints. including the DNSNames list or IPAddresses in the certificate allows peers to know the address of the node (hostname and port) or (IP and port)
+- Instead of using UDP port we'll reuse the same HTTP server and have the requests/responses uses HTTP protocol with specific paths
+    - `/kad/ping` to ping a node
+    - `/kad/find_node` to ask for the nearest known nodes for a target node fingerprint
+- all requests to the `/kad` routes will have the side effect of adding the requesting node to the serving node contact list.
+
 
 ## ARCHITECTURE DIAGRAM
 
