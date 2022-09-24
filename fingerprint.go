@@ -13,6 +13,7 @@ import (
 
 var ErrIncorrectFingerprintLength = errors.New("Provided fingerprint length is not correct")
 var ErrCantFindFingerprint = errors.New("Can't find fingerprint.")
+var ErrCantFindAddress = errors.New("Can't find address (DNSName) in certificate.")
 
 type Fingerprint [20]byte
 
@@ -87,4 +88,14 @@ func certToFingerprint(certs []*x509.Certificate) (Fingerprint, error) {
 	}
 
 	return Fingerprint{}, ErrCantFindFingerprint
+}
+
+func certToAddress(certs []*x509.Certificate) (string, error) {
+	for _, cert := range certs {
+		for _, name := range cert.DNSNames {
+			return name, nil
+		}
+	}
+
+	return "", ErrCantFindAddress
 }

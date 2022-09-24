@@ -31,8 +31,8 @@ type Client struct {
 }
 
 // TODO(maybe) Cache clients map[Fingerprint]*Client
-func (a *Account) Client(peer Fingerprint) (*Client, error) {
-	cert, err := a.certificate()
+func (a *Account) Client(peer Fingerprint, DNSNames []string) (*Client, error) {
+	cert, err := a.certificate(DNSNames)
 	if err != nil {
 		return nil, err
 	}

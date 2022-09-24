@@ -14,7 +14,7 @@ import (
 func TestClient(t *testing.T) {
 	account, err := NewAccount(t.TempDir(), "Ahmed Mohamed", "ahmed@example.com", "strong password")
 
-	client, err := account.Client(account.Fingerprint())
+	client, err := account.Client(account.Fingerprint(), nil)
 	ASSERT_NO_ERROR(t, err)
 	REFUTE_EQUAL(t, nil, client)
 }
@@ -29,12 +29,12 @@ func TestDownloadFriend(t *testing.T) {
 	friend, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
 	var friend_key bytes.Buffer
 	friend.Export(&friend_key)
-	server, _ := friend.Server()
+	server, _ := friend.Server("")
 
 	listener, address := TempListener()
 	go server.Serve(*listener)
 
-	client, _ := account.Client(friend.Fingerprint())
+	client, _ := account.Client(friend.Fingerprint(), nil)
 
 	t.Run("When the fingerprint is not a friend", func(t T) {
 		err := client.DownloadFriend(context.Background(), address, friend.Fingerprint(), time.Now())
@@ -87,7 +87,7 @@ func TestDownloadFriend(t *testing.T) {
 
 	t.Run("Connecting to an account with wrong peer ID", func(t T) {
 		anotherFriend, _ := NewAccount(t.TempDir(), "Another person", "another@example.com", "password")
-		client, _ := account.Client(anotherFriend.Fingerprint())
+		client, _ := account.Client(anotherFriend.Fingerprint(), nil)
 		ctx := Timeout(10 * time.Second)
 		err := client.DownloadFriend(ctx, "", friend.Fingerprint(), time.Now().Add(-time.Second))
 		ASSERT_ERROR(t, ErrIncorrectPeerCertificate, err)

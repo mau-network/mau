@@ -159,9 +159,10 @@ func (a *Account) Export(w io.Writer) error {
 	return nil
 }
 
-func (a *Account) certificate() (cert tls.Certificate, err error) {
+func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err error) {
 	template := x509.Certificate{
 		Version:      3,
+		DNSNames:     DNSNames,
 		SerialNumber: big.NewInt(1),
 		NotBefore:    a.entity.PrimaryKey.CreationTime,
 		NotAfter:     a.entity.PrimaryKey.CreationTime.AddDate(100, 0, 0),

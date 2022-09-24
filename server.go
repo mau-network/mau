@@ -30,8 +30,8 @@ type FileListItem struct {
 	Sum  string `json:"sum"`
 }
 
-func (a *Account) Server() (*Server, error) {
-	cert, err := a.certificate()
+func (a *Account) Server(externalAddress string) (*Server, error) {
+	cert, err := a.certificate([]string{externalAddress})
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (a *Account) Server() (*Server, error) {
 	s := Server{
 		account:   a,
 		limit:     100,
-		dhtServer: NewDHTRPC(a),
+		dhtServer: NewDHTRPC(a, externalAddress),
 		httpServer: http.Server{
 			Handler: router,
 			TLSConfig: &tls.Config{
