@@ -26,25 +26,14 @@ type UPNPClient interface {
 	)
 }
 
-func UPNPFactory[T UPNPClient](f func() ([]T, []error, error)) func() []UPNPClient {
-	return func() []UPNPClient {
-		r, _, _ := f()
-		cs := make([]UPNPClient, 0, len(r))
-		for _, i := range r {
-			cs = append(cs, i)
-		}
-		return cs
-	}
-}
-
 // TODO This function doesn't return clients if the firewall is enabled. find a way to ask the firewall for port
 func NewUPNPClient(ctx context.Context) (UPNPClient, error) {
 	funcs := []func() []UPNPClient{
-		UPNPFactory(internetgateway2.NewWANIPConnection1Clients),
-		UPNPFactory(internetgateway2.NewWANIPConnection2Clients),
-		UPNPFactory(internetgateway2.NewWANPPPConnection1Clients),
-		UPNPFactory(internetgateway1.NewWANIPConnection1Clients),
-		UPNPFactory(internetgateway1.NewWANPPPConnection1Clients),
+		upnpFactory(internetgateway2.NewWANIPConnection1Clients),
+		upnpFactory(internetgateway2.NewWANIPConnection2Clients),
+		upnpFactory(internetgateway2.NewWANPPPConnection1Clients),
+		upnpFactory(internetgateway1.NewWANIPConnection1Clients),
+		upnpFactory(internetgateway1.NewWANPPPConnection1Clients),
 	}
 
 	for _, f := range funcs {
@@ -56,4 +45,15 @@ func NewUPNPClient(ctx context.Context) (UPNPClient, error) {
 	}
 
 	return nil, errors.New("No services found. Please make sure the firewall is not blocking connections.")
+}
+
+func upnpFactory[T UPNPClient](f func() ([]T, []error, error)) func() []UPNPClient {
+	return func() []UPNPClient {
+		r, _, _ := f()
+		cs := make([]UPNPClient, 0, len(r))
+		for _, i := range r {
+			cs = append(cs, i)
+		}
+		return cs
+	}
 }
