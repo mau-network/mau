@@ -67,6 +67,7 @@ func (b *bucket) remove(peer *Peer) {
 		}
 	}
 
+	b.values = newValues
 	b.mutex.Unlock()
 }
 
@@ -124,7 +125,7 @@ func (b *bucket) isFull() bool {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	return len(b.values) < dht_K
+	return len(b.values) == dht_K
 }
 
 // dup returns a copy of the bucket values
