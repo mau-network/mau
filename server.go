@@ -123,7 +123,7 @@ func (s *Server) serveDHT(port int) error {
 		return err
 	}
 
-	s.dhtServer = newDHTRPC(s.account, fmt.Sprintf("%s:%d", externalAddress, port))
+	s.dhtServer = newDHTServer(s.account, fmt.Sprintf("%s:%d", externalAddress, port))
 	s.dhtServer.Join(s.bootstrapNodes)
 	return nil
 }

@@ -147,7 +147,7 @@ type dhtServer struct {
 	cancelRefresh context.CancelFunc
 }
 
-func newDHTRPC(account *Account, address string) *dhtServer {
+func newDHTServer(account *Account, address string) *dhtServer {
 	d := &dhtServer{
 		mux:     http.NewServeMux(),
 		account: account,
