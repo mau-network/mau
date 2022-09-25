@@ -28,7 +28,7 @@ func TestServer(t *testing.T) {
 	friend, err := account.AddFriend(&friendPub)
 	ASSERT_NO_ERROR(t, err)
 
-	server, err := account.Server("")
+	server, err := account.Server(nil)
 	ASSERT_NO_ERROR(t, err)
 	REFUTE_EQUAL(t, nil, server)
 

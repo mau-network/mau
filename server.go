@@ -1,6 +1,7 @@
 package mau
 
 import (
+	"context"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
@@ -17,11 +18,12 @@ import (
 )
 
 type Server struct {
-	account    *Account
-	httpServer http.Server
-	mdnsServer *mdns.Server
-	dhtServer  *DHTServer
-	limit      uint
+	account        *Account
+	httpServer     http.Server
+	mdnsServer     *mdns.Server
+	dhtServer      *DHTServer
+	bootstrapNodes []*DHTNode
+	resultsLimit   uint
 }
 
 type FileListItem struct {
@@ -30,17 +32,17 @@ type FileListItem struct {
 	Sum  string `json:"sum"`
 }
 
-func (a *Account) Server(externalAddress string) (*Server, error) {
-	cert, err := a.certificate([]string{externalAddress})
+func (a *Account) Server(knownNodes []*DHTNode) (*Server, error) {
+	cert, err := a.certificate(nil)
 	if err != nil {
 		return nil, err
 	}
 
 	router := mux.NewRouter()
 	s := Server{
-		account:   a,
-		limit:     100,
-		dhtServer: NewDHTRPC(a, externalAddress),
+		account:        a,
+		resultsLimit:   100,
+		bootstrapNodes: knownNodes,
 		httpServer: http.Server{
 			Handler: router,
 			TLSConfig: &tls.Config{
@@ -77,6 +79,12 @@ func (s *Server) Serve(l net.Listener) error {
 		return err
 	}
 
+	if len(s.bootstrapNodes) > 0 {
+		if err := s.serveDHT(port); err != nil {
+			return err
+		}
+	}
+
 	return s.httpServer.ServeTLS(l, "", "")
 }
 
@@ -98,11 +106,34 @@ func (s *Server) serveMDNS(port int) error {
 	return nil
 }
 
+// TODO improve this method to take a context and be cancellable along with serveMDNS and serve methods
+func (s *Server) serveDHT(port int) error {
+	upnp, err := NewUPNPClient(context.Background())
+	if err != nil {
+		return err
+	}
+
+	err = upnp.AddPortMapping("", uint16(port), "tcp", uint16(port), "", true, "Mau p2p service", 0)
+	if err != nil {
+		return err
+	}
+
+	externalAddress, err := upnp.GetExternalIPAddress()
+	if err != nil {
+		return err
+	}
+
+	s.dhtServer = NewDHTRPC(s.account, fmt.Sprintf("%s:%d", externalAddress, port))
+	s.dhtServer.Join(s.bootstrapNodes)
+	return nil
+}
+
 func (s *Server) Close() error {
 	// TODO check why the fuck this panics when closing the server?
 	// regardless of the errors I need to try closing all interfaces
 	mdns_err := s.mdnsServer.Shutdown()
 	http_err := s.httpServer.Close()
+	s.dhtServer.Leave()
 
 	if mdns_err != nil {
 		return mdns_err
@@ -135,7 +166,7 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	page := s.account.ListFiles(fpr, lastModified, s.limit)
+	page := s.account.ListFiles(fpr, lastModified, s.resultsLimit)
 
 	list := make([]FileListItem, 0, len(page))
 	for _, item := range page {

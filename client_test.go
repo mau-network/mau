@@ -29,7 +29,7 @@ func TestDownloadFriend(t *testing.T) {
 	friend, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
 	var friend_key bytes.Buffer
 	friend.Export(&friend_key)
-	server, _ := friend.Server("")
+	server, _ := friend.Server(nil)
 
 	listener, address := TempListener()
 	go server.Serve(*listener)
