@@ -164,8 +164,8 @@ func (d *dhtServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.mux.ServeHTTP(w, r)
 }
 
-// SendPing sends a ping to a peer and returns true if the peer response status isn't 2xx
-func (d *dhtServer) SendPing(peer *Peer) error {
+// sendPing sends a ping to a peer and returns true if the peer response status isn't 2xx
+func (d *dhtServer) sendPing(peer *Peer) error {
 	// TODO limit pinging a peer in a period of time, we don't want to ping a
 	// peer multiple times per second for example, it's too much
 	client, err := d.account.Client(peer.Fingerprint, []string{d.address})
@@ -193,7 +193,7 @@ func (d *dhtServer) recievePing(_ http.ResponseWriter, r *http.Request) {
 	d.addPeerFromRequest(r)
 }
 
-func (d *dhtServer) SendFindPeer(fingerprint Fingerprint) (found *Peer) {
+func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
 	peers := d.nearest(fingerprint)
 	fingerprints := map[Fingerprint]bool{}
 	for i := range peers {
@@ -318,7 +318,7 @@ func (d *dhtServer) Join(bootstrap []*Peer) {
 		d.addPeer(peer)
 	}
 
-	d.SendFindPeer(d.account.Fingerprint())
+	d.sendFindPeer(d.account.Fingerprint())
 	d.refreshAllBuckets()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -364,7 +364,7 @@ func (d *dhtServer) addPeer(peer *Peer) {
 	} else if !bucket.isFull() {
 		bucket.addToTail(peer)
 	} else if existing := bucket.leastRecentlySeen(); existing != nil {
-		if d.SendPing(existing) == nil {
+		if d.sendPing(existing) == nil {
 			bucket.moveToTail(existing)
 		} else {
 			bucket.remove(existing)
@@ -422,7 +422,7 @@ func (d *dhtServer) refreshStallBuckets(ctx context.Context) {
 // TODO add context for faster termination
 func (d *dhtServer) refreshBucket(i int) {
 	if rando := d.buckets[i].randomPeer(); rando != nil {
-		d.SendFindPeer(rando.Fingerprint)
+		d.sendFindPeer(rando.Fingerprint)
 		d.buckets[i].lastLookup = time.Now()
 	}
 }
