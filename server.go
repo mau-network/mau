@@ -21,8 +21,8 @@ type Server struct {
 	account        *Account
 	httpServer     http.Server
 	mdnsServer     *mdns.Server
-	dhtServer      *DHTServer
-	bootstrapNodes []*DHTNode
+	dhtServer      *dhtServer
+	bootstrapNodes []*Peer
 	resultsLimit   uint
 }
 
@@ -32,7 +32,7 @@ type FileListItem struct {
 	Sum  string `json:"sum"`
 }
 
-func (a *Account) Server(knownNodes []*DHTNode) (*Server, error) {
+func (a *Account) Server(knownNodes []*Peer) (*Server, error) {
 	cert, err := a.certificate(nil)
 	if err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func (s *Server) serveMDNS(port int) error {
 
 // TODO improve this method to take a context and be cancellable along with serveMDNS and serve methods
 func (s *Server) serveDHT(port int) error {
-	upnp, err := NewUPNPClient(context.Background())
+	upnp, err := newUPNPClient(context.Background())
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func (s *Server) serveDHT(port int) error {
 		return err
 	}
 
-	s.dhtServer = NewDHTRPC(s.account, fmt.Sprintf("%s:%d", externalAddress, port))
+	s.dhtServer = newDHTRPC(s.account, fmt.Sprintf("%s:%d", externalAddress, port))
 	s.dhtServer.Join(s.bootstrapNodes)
 	return nil
 }

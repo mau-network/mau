@@ -7,10 +7,12 @@ import (
 )
 
 func TestUPNPClient(t *testing.T) {
+	t.Skip("This test proven to be slow as it asks the network gateway for a port")
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	client, err := NewUPNPClient(ctx)
+	client, err := newUPNPClient(ctx)
 	ASSERT_NO_ERROR(t, err)
 
 	address, err := client.GetExternalIPAddress()

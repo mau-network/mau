@@ -17,30 +17,33 @@ import (
 // Kademlia: A Peer-to-Peer Information System Based on the XOR Metric
 
 const (
-	DHT_B              = len(Fingerprint{}) * 8 // number of buckets
-	DHT_K              = 20                     // max length of k bucket (replication parameter)
-	DHT_ALPHA          = 3                      // parallelism factor
-	DHT_STALL_PERIOD   = time.Hour
-	DHT_PING_PATH      = "/kad/ping"
-	DHT_FIND_NODE_PATH = "/kad/find_node"
+	dht_B              = len(Fingerprint{}) * 8 // number of buckets
+	dht_K              = 20                     // max length of k bucket (replication parameter)
+	dht_ALPHA          = 3                      // parallelism factor
+	dht_STALL_PERIOD   = time.Hour
+	dht_PING_PATH      = "/kad/ping"
+	dht_FIND_PEER_PATH = "/kad/find_peer"
 )
 
-type DHTNode struct {
+// Peer is a reference to another instance of the program, identified by the
+// address (host:port or ip:port) and Fingerprint of the public key. used for
+// allowing the server to join a P2P network.
+type Peer struct {
 	Fingerprint Fingerprint
 	Address     string
 }
 
-// A list of nodes
+// A list of peers
 // [],[],[],[],[],[],[],[]
 // ^--Head (oldest)      ^--Tail (newest)
 type bucket struct {
 	mutex      sync.RWMutex
-	values     []*DHTNode
+	values     []*Peer
 	lastLookup time.Time
 }
 
-// get returns a node from the bucket by fingerprint
-func (b *bucket) get(fingerprint Fingerprint) *DHTNode {
+// get returns a peer from the bucket by fingerprint
+func (b *bucket) get(fingerprint Fingerprint) *Peer {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
@@ -53,13 +56,13 @@ func (b *bucket) get(fingerprint Fingerprint) *DHTNode {
 	return nil
 }
 
-// remove removes a node from the bucket
-func (b *bucket) remove(node *DHTNode) {
+// remove removes a peer from the bucket
+func (b *bucket) remove(peer *Peer) {
 	b.mutex.Lock()
 
-	newValues := make([]*DHTNode, 0, len(b.values))
+	newValues := make([]*Peer, 0, len(b.values))
 	for i := range b.values {
-		if b.values[i].Fingerprint != node.Fingerprint {
+		if b.values[i].Fingerprint != peer.Fingerprint {
 			newValues = append(newValues, b.values[i])
 		}
 	}
@@ -67,36 +70,36 @@ func (b *bucket) remove(node *DHTNode) {
 	b.mutex.Unlock()
 }
 
-// addToTail adds a node to the tail of the bucket
-func (b *bucket) addToTail(node *DHTNode) {
+// addToTail adds a peer to the tail of the bucket
+func (b *bucket) addToTail(peer *Peer) {
 	b.mutex.Lock()
-	b.values = append(b.values, node)
+	b.values = append(b.values, peer)
 	b.lastLookup = time.Now()
 	b.mutex.Unlock()
 }
 
-// moveToTail moves a node that exists in the bucket to the end
-func (b *bucket) moveToTail(node *DHTNode) {
+// moveToTail moves a peer that exists in the bucket to the end
+func (b *bucket) moveToTail(peer *Peer) {
 	b.mutex.Lock()
 
-	newValues := make([]*DHTNode, 0, len(b.values))
+	newValues := make([]*Peer, 0, len(b.values))
 	for i := range b.values {
-		if b.values[i].Fingerprint != node.Fingerprint {
+		if b.values[i].Fingerprint != peer.Fingerprint {
 			newValues = append(newValues, b.values[i])
 		}
 	}
 
-	b.values = append(newValues, node)
+	b.values = append(newValues, peer)
 	b.lastLookup = time.Now()
 	b.mutex.Unlock()
 }
 
-// leastRecentlySeen returns the least recently seen node
-func (b *bucket) leastRecentlySeen() (node *DHTNode) {
+// leastRecentlySeen returns the least recently seen peer
+func (b *bucket) leastRecentlySeen() (peer *Peer) {
 	b.mutex.RLock()
 
 	if len(b.values) > 0 {
-		node = b.values[0]
+		peer = b.values[0]
 	}
 
 	b.mutex.RUnlock()
@@ -104,8 +107,8 @@ func (b *bucket) leastRecentlySeen() (node *DHTNode) {
 	return
 }
 
-// randomNode returns a random node from the bucket
-func (b *bucket) randomNode() *DHTNode {
+// randomPeer returns a random peer from the bucket
+func (b *bucket) randomPeer() *Peer {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
@@ -121,58 +124,58 @@ func (b *bucket) isFull() bool {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	return len(b.values) < DHT_K
+	return len(b.values) < dht_K
 }
 
 // dup returns a copy of the bucket values
-func (b *bucket) dup() []*DHTNode {
+func (b *bucket) dup() []*Peer {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	c := make([]*DHTNode, len(b.values))
+	c := make([]*Peer, len(b.values))
 	copy(c, b.values)
 
 	return c
 }
 
-type DHTServer struct {
+type dhtServer struct {
 	mux           *http.ServeMux
 	account       *Account
 	address       string
-	buckets       [DHT_B]bucket
+	buckets       [dht_B]bucket
 	cancelRefresh context.CancelFunc
 }
 
-func NewDHTRPC(account *Account, address string) *DHTServer {
-	d := &DHTServer{
+func newDHTRPC(account *Account, address string) *dhtServer {
+	d := &dhtServer{
 		mux:     http.NewServeMux(),
 		account: account,
 		address: address,
 	}
 
-	d.mux.HandleFunc(DHT_PING_PATH, d.RecievePing)
-	d.mux.HandleFunc(DHT_FIND_NODE_PATH, d.RecieveFindNode)
+	d.mux.HandleFunc(dht_PING_PATH, d.recievePing)
+	d.mux.HandleFunc(dht_FIND_PEER_PATH, d.recieveFindPeer)
 
 	return d
 }
 
-func (d *DHTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (d *dhtServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.mux.ServeHTTP(w, r)
 }
 
-// SendPing sends a ping to a node and returns true if the node response status isn't 2xx
-func (d *DHTServer) SendPing(node *DHTNode) error {
-	// TODO limit pinging a node in a period of time, we don't want to ping a
-	// node multiple times per second for example, it's too much
-	client, err := d.account.Client(node.Fingerprint, []string{d.address})
+// SendPing sends a ping to a peer and returns true if the peer response status isn't 2xx
+func (d *dhtServer) SendPing(peer *Peer) error {
+	// TODO limit pinging a peer in a period of time, we don't want to ping a
+	// peer multiple times per second for example, it's too much
+	client, err := d.account.Client(peer.Fingerprint, []string{d.address})
 	if err != nil {
 		return err
 	}
 
 	u := url.URL{
 		Scheme: uriProtocolName,
-		Host:   node.Address,
-		Path:   DHT_PING_PATH,
+		Host:   peer.Address,
+		Path:   dht_PING_PATH,
 	}
 	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
 	if err != nil {
@@ -184,19 +187,19 @@ func (d *DHTServer) SendPing(node *DHTNode) error {
 	return err
 }
 
-// RecievePing responds with http.StatusOK
-func (d *DHTServer) RecievePing(_ http.ResponseWriter, r *http.Request) {
-	d.addNodeFromRequest(r)
+// recievePing responds with http.StatusOK
+func (d *dhtServer) recievePing(_ http.ResponseWriter, r *http.Request) {
+	d.addPeerFromRequest(r)
 }
 
-func (d *DHTServer) SendFindNode(fingerprint Fingerprint) (found *DHTNode) {
-	nodes := d.nearest(fingerprint)
+func (d *dhtServer) SendFindPeer(fingerprint Fingerprint) (found *Peer) {
+	peers := d.nearest(fingerprint)
 	fingerprints := map[Fingerprint]bool{}
-	for i := range nodes {
-		if nodes[i].Fingerprint == fingerprint {
-			return nodes[i]
+	for i := range peers {
+		if peers[i].Fingerprint == fingerprint {
+			return peers[i]
 		}
-		fingerprints[nodes[i].Fingerprint] = true
+		fingerprints[peers[i].Fingerprint] = true
 	}
 
 	var lock sync.Mutex
@@ -214,27 +217,27 @@ func (d *DHTServer) SendFindNode(fingerprint Fingerprint) (found *DHTNode) {
 
 				lock.Lock()
 
-				if len(nodes) == 0 {
+				if len(peers) == 0 {
 					lock.Unlock()
 					return
 				}
 
-				node := nodes[0]
-				nodes = nodes[1:]
+				peer := peers[0]
+				peers = peers[1:]
 
-				delete(fingerprints, node.Fingerprint)
-				asked[node.Fingerprint] = true
+				delete(fingerprints, peer.Fingerprint)
+				asked[peer.Fingerprint] = true
 				lock.Unlock()
 
-				client, err := d.account.Client(node.Fingerprint, []string{d.address})
+				client, err := d.account.Client(peer.Fingerprint, []string{d.address})
 				if err != nil {
 					break
 				}
 
 				u := url.URL{
 					Scheme: uriProtocolName,
-					Host:   node.Address,
-					Path:   DHT_FIND_NODE_PATH,
+					Host:   peer.Address,
+					Path:   dht_FIND_PEER_PATH,
 				}
 
 				req, err := http.NewRequest(http.MethodGet, u.String(), nil)
@@ -247,59 +250,59 @@ func (d *DHTServer) SendFindNode(fingerprint Fingerprint) (found *DHTNode) {
 					continue
 				}
 
-				// Add it to the known nodes
-				d.addNode(node)
+				// Add it to the known peers
+				d.addPeer(peer)
 
-				foundNodes := []DHTNode{}
+				foundPeers := []Peer{}
 				body, err := io.ReadAll(resp.Body)
 				resp.Body.Close()
 				if err != nil {
 					continue
 				}
 
-				if err = json.Unmarshal(body, &foundNodes); err != nil {
+				if err = json.Unmarshal(body, &foundPeers); err != nil {
 					continue
 				}
 
-				// peer should return max K node, if it's more limit it to K
-				if len(foundNodes) > DHT_K {
-					foundNodes = foundNodes[:DHT_K]
+				// peer should return max K peers, if it's more limit it to K
+				if len(foundPeers) > dht_K {
+					foundPeers = foundPeers[:dht_K]
 				}
 
 				lock.Lock()
-				// Add all found nodes that we don't have already and we didn't ask beofre
-				for i := 0; i < len(foundNodes) && !fingerprints[foundNodes[i].Fingerprint] && !asked[node.Fingerprint]; i++ {
-					nodes = append(nodes, &foundNodes[i])
-					fingerprints[foundNodes[i].Fingerprint] = true
-					if foundNodes[i].Fingerprint == fingerprint {
-						found = &foundNodes[i]
+				// Add all found peers that we don't have already and we didn't ask beofre
+				for i := 0; i < len(foundPeers) && !fingerprints[foundPeers[i].Fingerprint] && !asked[peer.Fingerprint]; i++ {
+					peers = append(peers, &foundPeers[i])
+					fingerprints[foundPeers[i].Fingerprint] = true
+					if foundPeers[i].Fingerprint == fingerprint {
+						found = &foundPeers[i]
 						cancel()
 						break
 					}
 				}
-				sortByDistance(fingerprint, nodes)
+				sortByDistance(fingerprint, peers)
 				lock.Unlock()
 			}
 		}
 	}
 
-	for i := 0; i < DHT_ALPHA; i++ {
+	for i := 0; i < dht_ALPHA; i++ {
 		go worker()
 	}
 
 	return
 }
 
-func (d *DHTServer) RecieveFindNode(w http.ResponseWriter, r *http.Request) {
-	d.addNodeFromRequest(r)
+func (d *dhtServer) recieveFindPeer(w http.ResponseWriter, r *http.Request) {
+	d.addPeerFromRequest(r)
 
 	fingerprint, err := ParseFingerprint(r.FormValue("fingerprint"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
-	nodes := d.nearest(fingerprint)
-	output, err := json.Marshal(nodes)
+	peers := d.nearest(fingerprint)
+	output, err := json.Marshal(peers)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -307,14 +310,14 @@ func (d *DHTServer) RecieveFindNode(w http.ResponseWriter, r *http.Request) {
 	w.Write(output)
 }
 
-// Join joins the network by adding a bootstrap known nodes to the routing table
+// Join joins the network by adding a bootstrap known peers to the routing table
 // and querying about itself
-func (d *DHTServer) Join(bootstrap []*DHTNode) {
-	for _, node := range bootstrap {
-		d.addNode(node)
+func (d *dhtServer) Join(bootstrap []*Peer) {
+	for _, peer := range bootstrap {
+		d.addPeer(peer)
 	}
 
-	d.SendFindNode(d.account.Fingerprint())
+	d.SendFindPeer(d.account.Fingerprint())
 	d.refreshAllBuckets()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -323,15 +326,14 @@ func (d *DHTServer) Join(bootstrap []*DHTNode) {
 }
 
 // Leave terminates any background jobs
-func (d *DHTServer) Leave() {
+func (d *dhtServer) Leave() {
 	if d.cancelRefresh != nil {
 		d.cancelRefresh()
 	}
 }
 
-// addNode: When any node send us a request add it to the contact list
-// uses Post and IP headers as the node address.
-func (d *DHTServer) addNodeFromRequest(r *http.Request) error {
+// addPeerFromRequest: When any peers send us a request add it to the contact list
+func (d *dhtServer) addPeerFromRequest(r *http.Request) error {
 	fingerprint, err := certToFingerprint(r.TLS.PeerCertificates)
 	if err != nil {
 		return err
@@ -342,7 +344,7 @@ func (d *DHTServer) addNodeFromRequest(r *http.Request) error {
 		return err
 	}
 
-	d.addNode(&DHTNode{
+	d.addPeer(&Peer{
 		Fingerprint: fingerprint,
 		Address:     address,
 	})
@@ -350,40 +352,40 @@ func (d *DHTServer) addNodeFromRequest(r *http.Request) error {
 	return nil
 }
 
-// addNode adds a note to routing table if it doesn't exist if the bucket is
-// full it pings the first node if the node responded it's discarded. else it
-// removes the first node and adds the new node to the bucket
-func (d *DHTServer) addNode(node *DHTNode) {
-	bucket := &d.buckets[d.bucketFor(node.Fingerprint)]
+// addPeer adds a note to routing table if it doesn't exist if the bucket is
+// full it pings the first peer if the peer responded it's discarded. else it
+// removes the first peer and adds the new peer to the bucket
+func (d *dhtServer) addPeer(peer *Peer) {
+	bucket := &d.buckets[d.bucketFor(peer.Fingerprint)]
 
-	if oldNode := bucket.get(node.Fingerprint); oldNode != nil {
-		bucket.moveToTail(oldNode)
+	if oldPeer := bucket.get(peer.Fingerprint); oldPeer != nil {
+		bucket.moveToTail(oldPeer)
 	} else if !bucket.isFull() {
-		bucket.addToTail(node)
+		bucket.addToTail(peer)
 	} else if existing := bucket.leastRecentlySeen(); existing != nil {
 		if d.SendPing(existing) == nil {
 			bucket.moveToTail(existing)
 		} else {
 			bucket.remove(existing)
-			bucket.addToTail(node)
+			bucket.addToTail(peer)
 		}
 	}
 }
 
 // Refresh all stall buckets
-func (d *DHTServer) refreshAllBuckets() {
+func (d *dhtServer) refreshAllBuckets() {
 	for i := range d.buckets {
 		d.refreshBucket(i)
 	}
 }
 
 // Refresh stall buckets
-func (d *DHTServer) refreshStallBuckets(ctx context.Context) {
+func (d *dhtServer) refreshStallBuckets(ctx context.Context) {
 	nextClick := time.Duration(0)
 
 	// refresh the buckets indefinitely
 	for {
-		nextClick = DHT_STALL_PERIOD
+		nextClick = dht_STALL_PERIOD
 
 		// either the context is done and we exit of the next click trigger refreshing buckets
 		select {
@@ -394,7 +396,7 @@ func (d *DHTServer) refreshStallBuckets(ctx context.Context) {
 			// we'll go over all buckets and refresh the bucket or exit
 			for i := range d.buckets {
 				// if it's refreshable we'll refresh it
-				if time.Since(d.buckets[i].lastLookup) > DHT_STALL_PERIOD {
+				if time.Since(d.buckets[i].lastLookup) > dht_STALL_PERIOD {
 					select {
 					case <-ctx.Done():
 						return
@@ -405,7 +407,7 @@ func (d *DHTServer) refreshStallBuckets(ctx context.Context) {
 				} else {
 					// if it's not refreshable then calculate when it's gonna
 					// need refresh and move next click earlier if needed
-					stallAfter := DHT_STALL_PERIOD - time.Now().Sub(d.buckets[i].lastLookup)
+					stallAfter := dht_STALL_PERIOD - time.Now().Sub(d.buckets[i].lastLookup)
 					if stallAfter < nextClick {
 						nextClick = stallAfter
 					}
@@ -417,40 +419,40 @@ func (d *DHTServer) refreshStallBuckets(ctx context.Context) {
 }
 
 // TODO add context for faster termination
-func (d *DHTServer) refreshBucket(i int) {
-	if rando := d.buckets[i].randomNode(); rando != nil {
-		d.SendFindNode(rando.Fingerprint)
+func (d *dhtServer) refreshBucket(i int) {
+	if rando := d.buckets[i].randomPeer(); rando != nil {
+		d.SendFindPeer(rando.Fingerprint)
 		d.buckets[i].lastLookup = time.Now()
 	}
 }
 
-// nearest returns list of nodes near fingerprint, limited to DHT_K
-func (d *DHTServer) nearest(fingerprint Fingerprint) []*DHTNode {
+// nearest returns list of peers near fingerprint, limited to DHT_K
+func (d *dhtServer) nearest(fingerprint Fingerprint) []*Peer {
 	b := d.bucketFor(fingerprint) // nearest bucket
-	nodes := d.buckets[b].dup()
+	peers := d.buckets[b].dup()
 
-	for i := 1; len(nodes) < DHT_K && (b-i >= 0 || b+i < DHT_B); i++ {
+	for i := 1; len(peers) < dht_K && (b-i >= 0 || b+i < dht_B); i++ {
 		if b-i >= 0 {
-			nodes = append(nodes, d.buckets[b-i].values...)
+			peers = append(peers, d.buckets[b-i].values...)
 		}
-		if b+i < DHT_B {
-			nodes = append(nodes, d.buckets[b+i].values...)
+		if b+i < dht_B {
+			peers = append(peers, d.buckets[b+i].values...)
 		}
 	}
 
-	sortByDistance(fingerprint, nodes)
+	sortByDistance(fingerprint, peers)
 
-	if len(nodes) > DHT_K {
-		nodes = nodes[:DHT_K]
+	if len(peers) > dht_K {
+		peers = peers[:dht_K]
 	}
 
-	return nodes
+	return peers
 }
 
 // bucketFor returns the Index of the bucket this fingerprint belongs to
-func (d *DHTServer) bucketFor(fingerprint Fingerprint) (i int) {
+func (d *dhtServer) bucketFor(fingerprint Fingerprint) (i int) {
 	i = prefixLen(xor(d.account.Fingerprint(), fingerprint))
-	if i == DHT_B {
+	if i == dht_B {
 		i--
 	}
 	return
@@ -480,10 +482,10 @@ func prefixLen(a Fingerprint) int {
 }
 
 // sortByDistance sorts ids by ascending XOR distance with respect to fingerprint
-func sortByDistance(fingerprint Fingerprint, nodes []*DHTNode) {
-	sort.Slice(nodes, func(i, j int) bool {
-		ixor := xor(nodes[i].Fingerprint, fingerprint)
-		jxor := xor(nodes[j].Fingerprint, fingerprint)
+func sortByDistance(fingerprint Fingerprint, peers []*Peer) {
+	sort.Slice(peers, func(i, j int) bool {
+		ixor := xor(peers[i].Fingerprint, fingerprint)
+		jxor := xor(peers[j].Fingerprint, fingerprint)
 		return bytes.Compare(ixor[:], jxor[:]) == -1
 	})
 }

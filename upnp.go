@@ -8,7 +8,7 @@ import (
 	"github.com/huin/goupnp/dcps/internetgateway2"
 )
 
-type UPNPClient interface {
+type upnpClient interface {
 	AddPortMapping(
 		NewRemoteHost string,
 		NewExternalPort uint16,
@@ -27,8 +27,8 @@ type UPNPClient interface {
 }
 
 // TODO This function doesn't return clients if the firewall is enabled. find a way to ask the firewall for port
-func NewUPNPClient(ctx context.Context) (UPNPClient, error) {
-	funcs := []func() []UPNPClient{
+func newUPNPClient(ctx context.Context) (upnpClient, error) {
+	funcs := []func() []upnpClient{
 		upnpFactory(internetgateway2.NewWANIPConnection1Clients),
 		upnpFactory(internetgateway2.NewWANIPConnection2Clients),
 		upnpFactory(internetgateway2.NewWANPPPConnection1Clients),
@@ -47,10 +47,10 @@ func NewUPNPClient(ctx context.Context) (UPNPClient, error) {
 	return nil, errors.New("No services found. Please make sure the firewall is not blocking connections.")
 }
 
-func upnpFactory[T UPNPClient](f func() ([]T, []error, error)) func() []UPNPClient {
-	return func() []UPNPClient {
+func upnpFactory[T upnpClient](f func() ([]T, []error, error)) func() []upnpClient {
+	return func() []upnpClient {
 		r, _, _ := f()
-		cs := make([]UPNPClient, 0, len(r))
+		cs := make([]upnpClient, 0, len(r))
 		for _, i := range r {
 			cs = append(cs, i)
 		}

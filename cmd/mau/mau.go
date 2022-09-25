@@ -289,7 +289,7 @@ func main() {
 
 	case "serve":
 		account := getAccount()
-		server, err := account.Server()
+		server, err := account.Server(nil)
 		raise(err)
 
 		listener, err := net.Listen("tcp", ":0")
@@ -312,7 +312,7 @@ func main() {
 		fpr, err := ParseFingerprint(*fprStr)
 		raise(err)
 
-		client, err := account.Client(fpr)
+		client, err := account.Client(fpr, nil)
 		raise(err)
 
 		// TODO get the latest synced file date
