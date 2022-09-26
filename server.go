@@ -1,7 +1,6 @@
 package mau
 
 import (
-	"context"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
@@ -72,17 +71,15 @@ func (a *Account) Server(knownNodes []*Peer) (*Server, error) {
 	return &s, nil
 }
 
-func (s *Server) Serve(l net.Listener) error {
+func (s *Server) Serve(l net.Listener, externalAddress string) error {
 	port := l.Addr().(*net.TCPAddr).Port
 
 	if err := s.serveMDNS(port); err != nil {
 		return err
 	}
 
-	if len(s.bootstrapNodes) > 0 {
-		if err := s.serveDHT(port); err != nil {
-			return err
-		}
+	if err := s.serveDHT(externalAddress); err != nil {
+		return err
 	}
 
 	return s.httpServer.ServeTLS(l, "", "")
@@ -107,23 +104,8 @@ func (s *Server) serveMDNS(port int) error {
 }
 
 // TODO improve this method to take a context and be cancellable along with serveMDNS and serve methods
-func (s *Server) serveDHT(port int) error {
-	upnp, err := newUPNPClient(context.Background())
-	if err != nil {
-		return err
-	}
-
-	err = upnp.AddPortMapping("", uint16(port), "tcp", uint16(port), "", true, "Mau p2p service", 0)
-	if err != nil {
-		return err
-	}
-
-	externalAddress, err := upnp.GetExternalIPAddress()
-	if err != nil {
-		return err
-	}
-
-	s.dhtServer = newDHTServer(s.account, fmt.Sprintf("%s:%d", externalAddress, port))
+func (s *Server) serveDHT(externalAddress string) error {
+	s.dhtServer = newDHTServer(s.account, externalAddress)
 	s.dhtServer.Join(s.bootstrapNodes)
 	return nil
 }

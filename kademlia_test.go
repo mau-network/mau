@@ -1,7 +1,9 @@
 package mau
 
 import (
+	"fmt"
 	"testing"
+	"time"
 )
 
 func TestBucket(t *testing.T) {
@@ -43,15 +45,47 @@ func TestBucket(t *testing.T) {
 	ASSERT_EQUAL(t, fpr2, b.leastRecentlySeen().Fingerprint)
 }
 
-func TestNewDHTRPC(t *testing.T) {
-	account, err := NewAccount(t.TempDir(), "Ahmed Mohamed", "ahmed@example.com", "password")
+func TestNewDHTServer(t *testing.T) {
+	bootstrap, err := NewAccount(t.TempDir(), "Main peer", "main@example.com", "password")
+	listener, bootstrap_addr := TempListener()
+	bootstrap_peer := &Peer{bootstrap.Fingerprint(), bootstrap_addr}
+
+	server, err := bootstrap.Server(nil)
 	ASSERT_NO_ERROR(t, err)
-
-	listener, _ := TempListener()
-	server, err := account.Server(nil)
-	go server.Serve(*listener)
-
 	REFUTE_EQUAL(t, nil, server)
+	go server.Serve(*listener, bootstrap_addr)
+	for ; server.dhtServer == nil; time.Sleep(time.Millisecond) {
+	}
+
+	peers := []*Account{}
+	servers := []*Server{}
+	const COUNT = 10
+
+	t.Run("Servers initialization", func(t *testing.T) {
+		for i := 0; i < COUNT; i++ {
+			a, err := NewAccount(t.TempDir(), fmt.Sprintf("Peer %d", i), fmt.Sprintf("peer%d@example.com", i), "password")
+			ASSERT_NO_ERROR(t, err)
+			peers = append(peers, a)
+
+			s, err := bootstrap.Server([]*Peer{bootstrap_peer})
+			ASSERT_NO_ERROR(t, err)
+			REFUTE_EQUAL(t, nil, s)
+			servers = append(servers, s)
+
+			l, addr := TempListener()
+			go s.Serve(*l, addr)
+		}
+	})
+
+	t.Run("Lookup bootstrap peer", func(t *testing.T) {
+		for _, s := range servers {
+			for ; s.dhtServer == nil; time.Sleep(time.Millisecond) {
+			}
+			b := s.dhtServer.sendFindPeer(bootstrap.Fingerprint())
+			ASSERT_EQUAL(t, bootstrap.Fingerprint(), b.Fingerprint)
+		}
+	})
+
 }
 
 func TestXor(t *testing.T) {

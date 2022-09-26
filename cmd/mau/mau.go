@@ -299,7 +299,7 @@ func main() {
 		fmt.Println("Account: ", account.Name(), account.Fingerprint())
 		fmt.Println("Using port:", port)
 
-		server.Serve(listener)
+		server.Serve(listener, "")
 
 	case "sync":
 		syncCmd := flag.NewFlagSet("sync", flag.ExitOnError)

@@ -32,7 +32,7 @@ func TestDownloadFriend(t *testing.T) {
 	server, _ := friend.Server(nil)
 
 	listener, address := TempListener()
-	go server.Serve(*listener)
+	go server.Serve(*listener, "")
 
 	client, _ := account.Client(friend.Fingerprint(), nil)
 

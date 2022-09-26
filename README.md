@@ -28,10 +28,12 @@
         - [Peer to Peer Stack](#peer-to-peer-stack)
             - [MDNS Service discovery](#mdns-service-discovery)
             - [Listening on internet requests](#listening-on-internet-requests)
+            - [Kademlia Routing](#kademlia-routing)
     - [ARCHITECTURE DIAGRAM](#architecture-diagram)
     - [ROADMAP](#roadmap)
     - [CHALLENGES](#challenges)
     - [PROJECT STATUS](#project-status)
+    - [License](#license)
     - [TODOs](#todos)
     - [FAQ](#faq)
         - [Why are keys written in binary format?](#why-are-keys-written-in-binary-format)
@@ -388,6 +390,12 @@ The project is between refining the concept and writing the Proof of concept pha
 | Test Coverage | [![codecov](https://codecov.io/gh/mau-network/mau/branch/master/graph/badge.svg?token=GL1MDCEIVK)](https://codecov.io/gh/mau-network/mau)  |
 | Documentation | [![GoDoc](https://godoc.org/github.com/mau-network/mau?status.svg)](https://godoc.org/github.com/mau-network/mau)                          |
 | Go Card       | [![Go Report Card](https://goreportcard.com/badge/github.com/mau-network/mau)](https://goreportcard.com/report/github.com/mau-network/mau) |
+
+## License
+
+- The project and the implementation is released under GPLv3
+- The license protects the community by preventing [Bait and switch](https://debugagent.com/open-source-bait-and-switch).
+- It maximize freedom with respect to openness preventing corndering the community in the future.
 
 ## TODOs
 

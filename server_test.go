@@ -35,7 +35,7 @@ func TestServer(t *testing.T) {
 	listener, address := TempListener()
 
 	go func() {
-		err := server.Serve(*listener)
+		err := server.Serve(*listener, "")
 		ASSERT_NO_ERROR(t, err)
 	}()
 

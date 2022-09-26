@@ -314,6 +314,10 @@ func (d *dhtServer) recieveFindPeer(w http.ResponseWriter, r *http.Request) {
 // Join joins the network by adding a bootstrap known peers to the routing table
 // and querying about itself
 func (d *dhtServer) Join(bootstrap []*Peer) {
+	if len(bootstrap) == 0 {
+		return
+	}
+
 	for _, peer := range bootstrap {
 		d.addPeer(peer)
 	}
