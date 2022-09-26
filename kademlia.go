@@ -30,7 +30,7 @@ const (
 // allowing the server to join a P2P network.
 type Peer struct {
 	Fingerprint Fingerprint
-	Address     string
+	Address     string // Hostname:Port or IP:Port without the protocol
 }
 
 // A list of peers
