@@ -108,6 +108,63 @@ func (b *bucket) leastRecentlySeen() (peer *Peer) {
 	return
 }
 
+type peerRequestSet struct {
+	mutex        sync.Mutex
+	peers        []*Peer
+	fingerprints map[Fingerprint]bool
+	requested    map[Fingerprint]bool
+}
+
+func newPeerRequestSet(initial []*Peer) *peerRequestSet {
+	peers := peerRequestSet{
+		peers:        []*Peer{},
+		fingerprints: map[Fingerprint]bool{},
+		requested:    map[Fingerprint]bool{},
+	}
+
+	for i := range initial {
+		peers.add(initial[i])
+	}
+
+	return &peers
+}
+
+func (p *peerRequestSet) add(peers ...*Peer) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	for _, n := range peers {
+		if p.fingerprints[n.Fingerprint] || p.requested[n.Fingerprint] {
+			return
+		}
+
+		p.fingerprints[n.Fingerprint] = true
+		p.peers = append(p.peers, n)
+	}
+}
+
+func (p *peerRequestSet) get() *Peer {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	if len(p.peers) == 0 {
+		return nil
+	}
+
+	peer := p.peers[0]
+	p.peers = p.peers[1:]
+	delete(p.fingerprints, peer.Fingerprint)
+	p.requested[peer.Fingerprint] = true
+	return peer
+}
+
+func (p *peerRequestSet) sort(fingerprint Fingerprint) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	sortByDistance(fingerprint, p.peers)
+}
+
 // randomPeer returns a random peer from the bucket
 func (b *bucket) randomPeer() *Peer {
 	b.mutex.RLock()
@@ -192,21 +249,19 @@ func (d *dhtServer) recievePing(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
-	peers := d.nearest(fingerprint)
-	fingerprints := map[Fingerprint]bool{}
-	for i := range peers {
-		if peers[i].Fingerprint == fingerprint {
-			return peers[i]
+	nearest := d.nearest(fingerprint)
+
+	// if we already have it return it
+	for i := range nearest {
+		if nearest[i].Fingerprint == fingerprint {
+			return nearest[i]
 		}
-		fingerprints[peers[i].Fingerprint] = true
 	}
 
-	var lock sync.Mutex
+	peers := newPeerRequestSet(nearest)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	res := make(chan *Peer)
-
-	asked := map[Fingerprint]bool{}
 
 	worker := func() {
 		for {
@@ -215,42 +270,21 @@ func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
 				return
 			default:
 
-				lock.Lock()
-
-				if len(peers) == 0 {
-					lock.Unlock()
+				peer := peers.get()
+				if peer == nil {
 					return
 				}
 
-				peer := peers[0]
-				peers = peers[1:]
-
-				delete(fingerprints, peer.Fingerprint)
-				asked[peer.Fingerprint] = true
-				lock.Unlock()
-
 				foundPeers := d.sendFindPeerRequest(fingerprint, peer)
-
-				lock.Lock()
-				// Add all found peers that we don't have already and we didn't ask beofre
 				for i := range foundPeers {
-					foundBefore := fingerprints[foundPeers[i].Fingerprint]
-					askedBefore := asked[foundPeers[i].Fingerprint]
-					if foundBefore || askedBefore {
-						continue
-					}
-
-					peers = append(peers, &foundPeers[i])
-					fingerprints[foundPeers[i].Fingerprint] = true
 					if foundPeers[i].Fingerprint == fingerprint {
-						res <- &foundPeers[i]
+						res <- foundPeers[i]
 						cancel()
-						break
+						return
 					}
 				}
 
-				sortByDistance(fingerprint, peers)
-				lock.Unlock()
+				peers.add(foundPeers...)
 			}
 		}
 	}
@@ -268,7 +302,7 @@ func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
 	return
 }
 
-func (d *dhtServer) sendFindPeerRequest(fingerprint Fingerprint, peer *Peer) []Peer {
+func (d *dhtServer) sendFindPeerRequest(fingerprint Fingerprint, peer *Peer) []*Peer {
 	client, err := d.account.Client(peer.Fingerprint, []string{d.address})
 	if err != nil {
 		return nil
@@ -291,7 +325,7 @@ func (d *dhtServer) sendFindPeerRequest(fingerprint Fingerprint, peer *Peer) []P
 	// Add it to the known peers
 	d.addPeer(peer)
 
-	var foundPeers []Peer
+	var foundPeers []*Peer
 	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
