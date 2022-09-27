@@ -17,9 +17,9 @@ import (
 // Kademlia: A Peer-to-Peer Information System Based on the XOR Metric
 
 const (
-	dht_B              = len(Fingerprint{}) * 8 // number of buckets
-	dht_K              = 20                     // max length of k bucket (replication parameter)
-	dht_ALPHA          = 3                      // parallelism factor
+	dht_B              = FINGERPRINT_LEN * 8 // number of buckets
+	dht_K              = 20                  // max length of k bucket (replication parameter)
+	dht_ALPHA          = 3                   // parallelism factor
 	dht_STALL_PERIOD   = time.Hour
 	dht_PING_PATH      = "/kad/ping"
 	dht_FIND_PEER_PATH = "/kad/find_peer"
@@ -178,19 +178,17 @@ func (d *dhtServer) sendPing(peer *Peer) error {
 		Host:   peer.Address,
 		Path:   dht_PING_PATH,
 	}
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
-	if err != nil {
-		return err
-	}
-
-	_, err = client.Do(req)
+	_, err = client.Get(u.String())
 
 	return err
 }
 
 // recievePing responds with http.StatusOK
-func (d *dhtServer) recievePing(_ http.ResponseWriter, r *http.Request) {
-	d.addPeerFromRequest(r)
+func (d *dhtServer) recievePing(w http.ResponseWriter, r *http.Request) {
+	err := d.addPeerFromRequest(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
 }
 
 func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
@@ -206,6 +204,7 @@ func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
 	var lock sync.Mutex
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	res := make(chan *Peer)
 
 	asked := map[Fingerprint]bool{}
 
@@ -230,57 +229,26 @@ func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
 				asked[peer.Fingerprint] = true
 				lock.Unlock()
 
-				client, err := d.account.Client(peer.Fingerprint, []string{d.address})
-				if err != nil {
-					break
-				}
-
-				u := url.URL{
-					Scheme: uriProtocolName,
-					Host:   peer.Address,
-					Path:   dht_FIND_PEER_PATH,
-				}
-
-				req, err := http.NewRequest(http.MethodGet, u.String(), nil)
-				if err != nil {
-					continue
-				}
-
-				resp, err := client.Do(req)
-				if err != nil {
-					continue
-				}
-
-				// Add it to the known peers
-				d.addPeer(peer)
-
-				foundPeers := []Peer{}
-				body, err := io.ReadAll(resp.Body)
-				resp.Body.Close()
-				if err != nil {
-					continue
-				}
-
-				if err = json.Unmarshal(body, &foundPeers); err != nil {
-					continue
-				}
-
-				// peer should return max K peers, if it's more limit it to K
-				if len(foundPeers) > dht_K {
-					foundPeers = foundPeers[:dht_K]
-				}
+				foundPeers := d.sendFindPeerRequest(fingerprint, peer)
 
 				lock.Lock()
 				// Add all found peers that we don't have already and we didn't ask beofre
-				for i := 0; i < len(foundPeers) && !fingerprints[foundPeers[i].Fingerprint] && !asked[peer.Fingerprint]; i++ {
+				for i := range foundPeers {
+					foundBefore := fingerprints[foundPeers[i].Fingerprint]
+					askedBefore := asked[foundPeers[i].Fingerprint]
+					if foundBefore || askedBefore {
+						continue
+					}
+
 					peers = append(peers, &foundPeers[i])
 					fingerprints[foundPeers[i].Fingerprint] = true
 					if foundPeers[i].Fingerprint == fingerprint {
-						found = &foundPeers[i]
+						res <- &foundPeers[i]
 						cancel()
 						break
 					}
 				}
+
 				sortByDistance(fingerprint, peers)
 				lock.Unlock()
 			}
@@ -291,7 +259,55 @@ func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
 		go worker()
 	}
 
+	// either find the peer or wait timeout
+	select {
+	case found = <-res:
+	case <-ctx.Done():
+	case <-time.After(time.Second * 10):
+	}
 	return
+}
+
+func (d *dhtServer) sendFindPeerRequest(fingerprint Fingerprint, peer *Peer) []Peer {
+	client, err := d.account.Client(peer.Fingerprint, []string{d.address})
+	if err != nil {
+		return nil
+	}
+
+	params := url.Values{}
+	params.Add("fingerprint", fingerprint.String())
+	u := url.URL{
+		Scheme:   uriProtocolName,
+		Host:     peer.Address,
+		Path:     dht_FIND_PEER_PATH,
+		RawQuery: params.Encode(),
+	}
+
+	resp, err := client.Get(u.String())
+	if err != nil {
+		return nil
+	}
+
+	// Add it to the known peers
+	d.addPeer(peer)
+
+	var foundPeers []Peer
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return nil
+	}
+
+	if err = json.Unmarshal(body, &foundPeers); err != nil {
+		return nil
+	}
+
+	// peer should return max K peers, if it's more limit it to K
+	if len(foundPeers) > dht_K {
+		foundPeers = foundPeers[:dht_K]
+	}
+
+	return foundPeers
 }
 
 func (d *dhtServer) recieveFindPeer(w http.ResponseWriter, r *http.Request) {
@@ -339,6 +355,11 @@ func (d *dhtServer) Leave() {
 
 // addPeerFromRequest: When any peers send us a request add it to the contact list
 func (d *dhtServer) addPeerFromRequest(r *http.Request) error {
+	// this isn't an authenticated request in the first place
+	if r.TLS == nil {
+		return nil
+	}
+
 	fingerprint, err := certToFingerprint(r.TLS.PeerCertificates)
 	if err != nil {
 		return err

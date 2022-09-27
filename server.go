@@ -23,6 +23,7 @@ type Server struct {
 	dhtServer      *dhtServer
 	bootstrapNodes []*Peer
 	resultsLimit   uint
+	router         *mux.Router
 }
 
 type FileListItem struct {
@@ -66,7 +67,7 @@ func (a *Account) Server(knownNodes []*Peer) (*Server, error) {
 	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}", s.list).Methods("GET")
 	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}/{fileID}", s.get).Methods("GET")
 	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}/{fileID}/{versionID}", s.version).Methods("GET")
-	router.PathPrefix("/kad/").Handler(s.dhtServer)
+	s.router = router
 
 	return &s, nil
 }
@@ -106,6 +107,7 @@ func (s *Server) serveMDNS(port int) error {
 // TODO improve this method to take a context and be cancellable along with serveMDNS and serve methods
 func (s *Server) serveDHT(externalAddress string) error {
 	s.dhtServer = newDHTServer(s.account, externalAddress)
+	s.router.PathPrefix("/kad/").Handler(s.dhtServer)
 	s.dhtServer.Join(s.bootstrapNodes)
 	return nil
 }

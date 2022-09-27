@@ -1,6 +1,7 @@
 package mau
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
@@ -15,10 +16,38 @@ var ErrIncorrectFingerprintLength = errors.New("Provided fingerprint length is n
 var ErrCantFindFingerprint = errors.New("Can't find fingerprint.")
 var ErrCantFindAddress = errors.New("Can't find address (DNSName) in certificate.")
 
-type Fingerprint [20]byte
+const FINGERPRINT_LEN = 20
+
+type Fingerprint [FINGERPRINT_LEN]byte
 
 func (f Fingerprint) String() string {
 	return hex.EncodeToString(f[:])
+}
+
+func (f Fingerprint) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, f)), nil
+}
+
+func (f *Fingerprint) UnmarshalJSON(b []byte) error {
+	if bytes.Compare(b, []byte("null")) == 0 {
+		return nil
+	}
+
+	if len(b) != (FINGERPRINT_LEN*2)+2 {
+		return fmt.Errorf("%w %s", ErrIncorrectFingerprintLength, b)
+	}
+
+	v := string(b[1 : len(b)-1])
+	pf, err := ParseFingerprint(v)
+	if err != nil {
+		return err
+	}
+
+	for i := range pf {
+		f[i] = pf[i]
+	}
+
+	return nil
 }
 
 func ParseFingerprint(s string) (fpr Fingerprint, err error) {

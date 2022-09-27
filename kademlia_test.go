@@ -1,7 +1,14 @@
 package mau
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 )
@@ -46,14 +53,82 @@ func TestBucket(t *testing.T) {
 }
 
 func TestNewDHTServer(t *testing.T) {
+	account, _ := NewAccount(t.TempDir(), "Main peer", "main@example.com", "password")
+	s := newDHTServer(account, "localhost:80")
+
+	REFUTE_EQUAL(t, nil, s.mux)
+	ASSERT_EQUAL(t, account, s.account)
+	ASSERT_EQUAL(t, "localhost:80", s.address)
+}
+
+func TestRecievePing(t *testing.T) {
+	account, _ := NewAccount(t.TempDir(), "Main peer", "main@example.com", "password")
+	s := newDHTServer(account, "localhost:80")
+
+	t.Run("without mTLS", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/kad/ping", &bytes.Buffer{})
+		s.recievePing(w, r)
+
+		// TODO: we can change that so that all /kad paths require mTLS
+		ASSERT_EQUAL(t, http.StatusOK, w.Result().StatusCode)
+	})
+
+	t.Run("with mTLS", func(t *testing.T) {
+		listener, bootstrap_addr := TempListener()
+		server, err := account.Server(nil)
+		hostport := strings.TrimPrefix(bootstrap_addr, "https://")
+		go server.Serve(*listener, hostport)
+		for ; server.dhtServer == nil; time.Sleep(time.Millisecond) {
+		}
+
+		peer, _ := NewAccount(t.TempDir(), "Peer", "peer@example.com", "password")
+		ASSERT_NO_ERROR(t, err)
+
+		client, err := peer.Client(account.Fingerprint(), []string{"localhost:90"})
+		ASSERT_NO_ERROR(t, err)
+
+		u := url.URL{
+			Scheme: uriProtocolName,
+			Host:   hostport,
+			Path:   "/kad/ping",
+		}
+		resp, err := client.Get(u.String())
+		ASSERT_NO_ERROR(t, err)
+		ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
+	})
+}
+
+func TestDHTServerAddPeer(t *testing.T) {
+	account, _ := NewAccount(t.TempDir(), "Main peer", "main@example.com", "password")
+	s := newDHTServer(account, "localhost:80")
+
+	peerFpr, err := ParseFingerprint("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")
+	ASSERT_NO_ERROR(t, err)
+
+	peerFpr2, err := ParseFingerprint("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE")
+	ASSERT_NO_ERROR(t, err)
+
+	distance := s.bucketFor(peerFpr)
+	ASSERT_EQUAL(t, 0, len(s.buckets[distance].values))
+
+	s.addPeer(&Peer{peerFpr, "address"})
+	ASSERT_EQUAL(t, 1, len(s.buckets[distance].values))
+
+	s.addPeer(&Peer{peerFpr2, "address"})
+	ASSERT_EQUAL(t, 2, len(s.buckets[distance].values))
+}
+
+func TestDHTServer(t *testing.T) {
 	bootstrap, err := NewAccount(t.TempDir(), "Main peer", "main@example.com", "password")
 	listener, bootstrap_addr := TempListener()
-	bootstrap_peer := &Peer{bootstrap.Fingerprint(), bootstrap_addr}
+	bootstrap_hostport := strings.TrimPrefix(bootstrap_addr, "https://")
+	bootstrap_peer := &Peer{bootstrap.Fingerprint(), bootstrap_hostport}
 
 	server, err := bootstrap.Server(nil)
 	ASSERT_NO_ERROR(t, err)
 	REFUTE_EQUAL(t, nil, server)
-	go server.Serve(*listener, bootstrap_addr)
+	go server.Serve(*listener, bootstrap_hostport)
 	for ; server.dhtServer == nil; time.Sleep(time.Millisecond) {
 	}
 
@@ -67,25 +142,68 @@ func TestNewDHTServer(t *testing.T) {
 			ASSERT_NO_ERROR(t, err)
 			peers = append(peers, a)
 
-			s, err := bootstrap.Server([]*Peer{bootstrap_peer})
+			s, err := a.Server([]*Peer{bootstrap_peer})
 			ASSERT_NO_ERROR(t, err)
 			REFUTE_EQUAL(t, nil, s)
 			servers = append(servers, s)
 
 			l, addr := TempListener()
-			go s.Serve(*l, addr)
+			hostport := strings.TrimPrefix(addr, "https://")
+			go s.Serve(*l, hostport)
 		}
 	})
 
-	t.Run("Lookup bootstrap peer", func(t *testing.T) {
+	t.Run("Lookup bootstrap peer and ping it", func(t *testing.T) {
 		for _, s := range servers {
 			for ; s.dhtServer == nil; time.Sleep(time.Millisecond) {
 			}
 			b := s.dhtServer.sendFindPeer(bootstrap.Fingerprint())
 			ASSERT_EQUAL(t, bootstrap.Fingerprint(), b.Fingerprint)
+			err := s.dhtServer.sendPing(b)
+			ASSERT_NO_ERROR(t, err)
 		}
 	})
 
+	t.Run("Bootstrap contact list", func(t *testing.T) {
+		c, _ := bootstrap.Client(bootstrap_peer.Fingerprint, nil)
+		u := url.URL{
+			Scheme:   uriProtocolName,
+			Path:     dht_FIND_PEER_PATH,
+			Host:     bootstrap_hostport,
+			RawQuery: "fingerprint=" + bootstrap.Fingerprint().String(),
+		}
+
+		resp, err := c.Get(u.String())
+		ASSERT_NO_ERROR(t, err)
+
+		var peers []Peer
+		body, err := io.ReadAll(resp.Body)
+		err = json.Unmarshal(body, &peers)
+		ASSERT_NO_ERROR(t, err)
+		ASSERT_EQUAL(t, COUNT, len(peers))
+	})
+
+	t.Run("Lookup each other", func(t *testing.T) {
+		for _, s := range servers {
+			for _, p := range peers {
+				if p.Fingerprint() == s.account.Fingerprint() {
+					continue
+				}
+
+				b := s.dhtServer.sendFindPeer(p.Fingerprint())
+				REFUTE_EQUAL(t, nil, b)
+				ASSERT_EQUAL(t, p.Fingerprint(), b.Fingerprint)
+			}
+		}
+	})
+
+	t.Run("Doesn't find an unknown fingerprint", func(t *testing.T) {
+		for _, s := range servers {
+			b := s.dhtServer.sendFindPeer(ParseFPRIgnoreErr("0000000000000000000000000000000000000F0F"))
+			ASSERT_EQUAL(t, nil, b)
+			break
+		}
+	})
 }
 
 func TestXor(t *testing.T) {
