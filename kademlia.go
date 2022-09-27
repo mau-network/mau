@@ -251,6 +251,10 @@ func (d *dhtServer) recievePing(w http.ResponseWriter, r *http.Request) {
 func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
 	nearest := d.nearest(fingerprint)
 
+	if len(nearest) == 0 {
+		return nil
+	}
+
 	// if we already have it return it
 	for i := range nearest {
 		if nearest[i].Fingerprint == fingerprint {
@@ -264,6 +268,8 @@ func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
 	res := make(chan *Peer)
 
 	worker := func() {
+		defer cancel()
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -279,7 +285,6 @@ func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
 				for i := range foundPeers {
 					if foundPeers[i].Fingerprint == fingerprint {
 						res <- foundPeers[i]
-						cancel()
 						return
 					}
 				}
@@ -289,7 +294,7 @@ func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
 		}
 	}
 
-	for i := 0; i < dht_ALPHA; i++ {
+	for i := 0; i < dht_ALPHA && i < len(nearest); i++ {
 		go worker()
 	}
 
