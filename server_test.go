@@ -54,6 +54,7 @@ func TestServer(t *testing.T) {
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
+				resp.Body.Close()
 				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, "[]", string(body))
 			})
@@ -71,6 +72,7 @@ func TestServer(t *testing.T) {
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
+				resp.Body.Close()
 				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, "[]", string(body))
 			})
@@ -88,6 +90,7 @@ func TestServer(t *testing.T) {
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
+				resp.Body.Close()
 				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, "[]", string(body))
 			})
@@ -123,6 +126,7 @@ func TestServer(t *testing.T) {
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
+				resp.Body.Close()
 				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, "[]", string(body))
 			})
@@ -140,6 +144,7 @@ func TestServer(t *testing.T) {
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
+				resp.Body.Close()
 				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, "[]", string(body))
 			})
@@ -157,6 +162,7 @@ func TestServer(t *testing.T) {
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
+				resp.Body.Close()
 				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, "[]", string(body))
 			})
@@ -191,6 +197,7 @@ func TestServer(t *testing.T) {
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
+				resp.Body.Close()
 				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, "[]", string(body))
 			})
@@ -208,6 +215,7 @@ func TestServer(t *testing.T) {
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
+				resp.Body.Close()
 				ASSERT_NO_ERROR(t, err)
 				ASSERT_EQUAL(t, "[]", string(body))
 			})
@@ -225,6 +233,7 @@ func TestServer(t *testing.T) {
 				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
+				resp.Body.Close()
 				ASSERT_NO_ERROR(t, err)
 				ASSERT(t, strings.Contains(string(body), "hello.txt.pgp"), "hello.txt.pgp not found in the response, Response: %s", body)
 			})

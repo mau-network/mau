@@ -178,6 +178,7 @@ func TestDHTServer(t *testing.T) {
 
 		var peers []Peer
 		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
 		err = json.Unmarshal(body, &peers)
 		ASSERT_NO_ERROR(t, err)
 		ASSERT_EQUAL(t, COUNT, len(peers))
@@ -194,6 +195,29 @@ func TestDHTServer(t *testing.T) {
 				REFUTE_EQUAL(t, nil, b)
 				ASSERT_EQUAL(t, p.Fingerprint(), b.Fingerprint)
 			}
+		}
+	})
+
+	t.Run("looking up unknown peer", func(t *testing.T) {
+		for _, s := range servers {
+			s.dhtServer.refreshAllBuckets()
+			c, _ := bootstrap.Client(s.account.Fingerprint(), nil)
+			u := url.URL{
+				Scheme:   uriProtocolName,
+				Path:     dht_FIND_PEER_PATH,
+				Host:     s.dhtServer.address,
+				RawQuery: "fingerprint=0000000000000000000000000000000000000F0F",
+			}
+
+			resp, err := c.Get(u.String())
+			ASSERT_NO_ERROR(t, err)
+
+			var peers []Peer
+			body, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			err = json.Unmarshal(body, &peers)
+			ASSERT_NO_ERROR(t, err)
+			ASSERT_EQUAL(t, 1, len(peers)) // TODO review the logic of this part, the previous test asserts that peers know each other but now it returns only one peer, what's going on here?
 		}
 	})
 

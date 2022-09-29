@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log"
 	"math/bits"
 	"math/rand"
 	"net/http"
@@ -59,6 +60,7 @@ func (b *bucket) get(fingerprint Fingerprint) *Peer {
 // remove removes a peer from the bucket
 func (b *bucket) remove(peer *Peer) {
 	b.mutex.Lock()
+	defer b.mutex.Unlock()
 
 	newValues := make([]*Peer, 0, len(b.values))
 	for i := range b.values {
@@ -68,20 +70,21 @@ func (b *bucket) remove(peer *Peer) {
 	}
 
 	b.values = newValues
-	b.mutex.Unlock()
 }
 
 // addToTail adds a peer to the tail of the bucket
 func (b *bucket) addToTail(peer *Peer) {
 	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
 	b.values = append(b.values, peer)
 	b.lastLookup = time.Now()
-	b.mutex.Unlock()
 }
 
 // moveToTail moves a peer that exists in the bucket to the end
 func (b *bucket) moveToTail(peer *Peer) {
 	b.mutex.Lock()
+	defer b.mutex.Unlock()
 
 	newValues := make([]*Peer, 0, len(b.values))
 	for i := range b.values {
@@ -92,77 +95,18 @@ func (b *bucket) moveToTail(peer *Peer) {
 
 	b.values = append(newValues, peer)
 	b.lastLookup = time.Now()
-	b.mutex.Unlock()
 }
 
 // leastRecentlySeen returns the least recently seen peer
 func (b *bucket) leastRecentlySeen() (peer *Peer) {
 	b.mutex.RLock()
+	defer b.mutex.RUnlock()
 
 	if len(b.values) > 0 {
 		peer = b.values[0]
 	}
 
-	b.mutex.RUnlock()
-
 	return
-}
-
-type peerRequestSet struct {
-	mutex        sync.Mutex
-	peers        []*Peer
-	fingerprints map[Fingerprint]bool
-	requested    map[Fingerprint]bool
-}
-
-func newPeerRequestSet(initial []*Peer) *peerRequestSet {
-	peers := peerRequestSet{
-		peers:        []*Peer{},
-		fingerprints: map[Fingerprint]bool{},
-		requested:    map[Fingerprint]bool{},
-	}
-
-	for i := range initial {
-		peers.add(initial[i])
-	}
-
-	return &peers
-}
-
-func (p *peerRequestSet) add(peers ...*Peer) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-
-	for _, n := range peers {
-		if p.fingerprints[n.Fingerprint] || p.requested[n.Fingerprint] {
-			return
-		}
-
-		p.fingerprints[n.Fingerprint] = true
-		p.peers = append(p.peers, n)
-	}
-}
-
-func (p *peerRequestSet) get() *Peer {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-
-	if len(p.peers) == 0 {
-		return nil
-	}
-
-	peer := p.peers[0]
-	p.peers = p.peers[1:]
-	delete(p.fingerprints, peer.Fingerprint)
-	p.requested[peer.Fingerprint] = true
-	return peer
-}
-
-func (p *peerRequestSet) sort(fingerprint Fingerprint) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-
-	sortByDistance(fingerprint, p.peers)
 }
 
 // randomPeer returns a random peer from the bucket
@@ -248,69 +192,52 @@ func (d *dhtServer) recievePing(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Lookup a peer by fingerprint
 func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
-	nearest := d.nearest(fingerprint)
+	nearest := d.nearest(fingerprint, dht_ALPHA)
+	nearest_count := len(nearest)
 
-	if len(nearest) == 0 {
+	if nearest_count == 0 {
 		return nil
 	}
 
 	// if we already have it return it
-	for i := range nearest {
-		if nearest[i].Fingerprint == fingerprint {
-			return nearest[i]
+	for _, n := range nearest {
+		if n.Fingerprint == fingerprint {
+			return n
 		}
 	}
 
-	peers := newPeerRequestSet(nearest)
+	peers := newPeerRequestSet(fingerprint, nearest)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	res := make(chan *Peer)
 
-	worker := func() {
-		defer cancel()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-
-				peer := peers.get()
-				if peer == nil {
-					return
-				}
-
-				foundPeers := d.sendFindPeerRequest(fingerprint, peer)
-				for i := range foundPeers {
-					if foundPeers[i].Fingerprint == fingerprint {
-						res <- foundPeers[i]
-						return
-					}
-				}
-
-				peers.add(foundPeers...)
+	for i := 0; i < nearest_count; i++ {
+		// TODO make parallel requests
+		for peers.len() > 0 && found == nil {
+			f, err := d.sendFindPeerWorker(ctx, fingerprint, peers)
+			if err != nil {
+				log.Printf("Error sendFindPeerWorker: %s", err)
+			}
+			if f != nil {
+				found = f
+				break
 			}
 		}
 	}
 
-	for i := 0; i < dht_ALPHA && i < len(nearest); i++ {
-		go worker()
-	}
-
-	// either find the peer or wait timeout
-	select {
-	case found = <-res:
-	case <-ctx.Done():
-	case <-time.After(time.Second * 10):
-	}
-	return
+	return found
 }
 
-func (d *dhtServer) sendFindPeerRequest(fingerprint Fingerprint, peer *Peer) []*Peer {
+func (d *dhtServer) sendFindPeerWorker(ctx context.Context, fingerprint Fingerprint, peers *peerRequestSet) (*Peer, error) {
+	peer := peers.get()
+	if peer == nil {
+		return nil, nil
+	}
+
 	client, err := d.account.Client(peer.Fingerprint, []string{d.address})
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	params := url.Values{}
@@ -322,9 +249,14 @@ func (d *dhtServer) sendFindPeerRequest(fingerprint Fingerprint, peer *Peer) []*
 		RawQuery: params.Encode(),
 	}
 
-	resp, err := client.Get(u.String())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return nil
+		return nil, err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
 	}
 
 	// Add it to the known peers
@@ -334,11 +266,11 @@ func (d *dhtServer) sendFindPeerRequest(fingerprint Fingerprint, peer *Peer) []*
 	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	if err = json.Unmarshal(body, &foundPeers); err != nil {
-		return nil
+		return nil, err
 	}
 
 	// peer should return max K peers, if it's more limit it to K
@@ -346,7 +278,15 @@ func (d *dhtServer) sendFindPeerRequest(fingerprint Fingerprint, peer *Peer) []*
 		foundPeers = foundPeers[:dht_K]
 	}
 
-	return foundPeers
+	for i := range foundPeers {
+		if foundPeers[i].Fingerprint == fingerprint {
+			return foundPeers[i], nil
+		}
+	}
+
+	peers.add(foundPeers...)
+
+	return nil, nil
 }
 
 func (d *dhtServer) recieveFindPeer(w http.ResponseWriter, r *http.Request) {
@@ -355,12 +295,14 @@ func (d *dhtServer) recieveFindPeer(w http.ResponseWriter, r *http.Request) {
 	fingerprint, err := ParseFingerprint(r.FormValue("fingerprint"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
-	peers := d.nearest(fingerprint)
+	peers := d.nearest(fingerprint, dht_K)
 	output, err := json.Marshal(peers)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Write(output)
@@ -381,7 +323,7 @@ func (d *dhtServer) Join(bootstrap []*Peer) {
 	d.refreshAllBuckets()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	d.refreshStallBuckets(ctx)
+	go d.refreshStallBuckets(ctx)
 	d.cancelRefresh = cancel
 }
 
@@ -461,7 +403,7 @@ func (d *dhtServer) refreshStallBuckets(ctx context.Context) {
 			// we'll go over all buckets and refresh the bucket or exit
 			for i := range d.buckets {
 				// if it's refreshable we'll refresh it
-				if time.Since(d.buckets[i].lastLookup) > dht_STALL_PERIOD {
+				if time.Since(d.buckets[i].lastLookup) >= dht_STALL_PERIOD {
 					select {
 					case <-ctx.Done():
 						return
@@ -486,17 +428,17 @@ func (d *dhtServer) refreshStallBuckets(ctx context.Context) {
 // TODO add context for faster termination
 func (d *dhtServer) refreshBucket(i int) {
 	if rando := d.buckets[i].randomPeer(); rando != nil {
-		d.sendFindPeer(rando.Fingerprint)
+		d.sendFindPeer(rando.Fingerprint) // this won't ask the network as this function will find the peer and return from local cache
 		d.buckets[i].lastLookup = time.Now()
 	}
 }
 
 // nearest returns list of peers near fingerprint, limited to DHT_K
-func (d *dhtServer) nearest(fingerprint Fingerprint) []*Peer {
+func (d *dhtServer) nearest(fingerprint Fingerprint, limit int) []*Peer {
 	b := d.bucketFor(fingerprint) // nearest bucket
 	peers := d.buckets[b].dup()
 
-	for i := 1; len(peers) < dht_K && (b-i >= 0 || b+i < dht_B); i++ {
+	for i := 1; len(peers) < limit && (b-i >= 0 || b+i < dht_B); i++ {
 		if b-i >= 0 {
 			peers = append(peers, d.buckets[b-i].values...)
 		}
@@ -507,8 +449,8 @@ func (d *dhtServer) nearest(fingerprint Fingerprint) []*Peer {
 
 	sortByDistance(fingerprint, peers)
 
-	if len(peers) > dht_K {
-		peers = peers[:dht_K]
+	if len(peers) > limit {
+		peers = peers[:limit]
 	}
 
 	return peers
@@ -521,6 +463,61 @@ func (d *dhtServer) bucketFor(fingerprint Fingerprint) (i int) {
 		i--
 	}
 	return
+}
+
+// Sorted unique set of peers, adds one peer once
+type peerRequestSet struct {
+	mutex       sync.Mutex
+	fingerprint Fingerprint
+	peers       []*Peer
+	added       map[Fingerprint]bool
+}
+
+func newPeerRequestSet(fpr Fingerprint, initial []*Peer) *peerRequestSet {
+	peers := peerRequestSet{
+		fingerprint: fpr,
+		peers:       []*Peer{},
+		added:       map[Fingerprint]bool{},
+	}
+
+	peers.add(initial...)
+
+	return &peers
+}
+
+func (p *peerRequestSet) add(peers ...*Peer) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	for i := range peers {
+		if p.added[peers[i].Fingerprint] {
+			return
+		}
+
+		p.added[peers[i].Fingerprint] = true
+		p.peers = append(p.peers, peers[i])
+	}
+
+	sortByDistance(p.fingerprint, p.peers)
+}
+
+func (p *peerRequestSet) get() *Peer {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	if len(p.peers) == 0 {
+		return nil
+	}
+
+	peer := p.peers[0]
+	p.peers = p.peers[1:]
+	return peer
+}
+
+func (p *peerRequestSet) len() int {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	return len(p.peers)
 }
 
 // Binary operations

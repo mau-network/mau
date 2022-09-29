@@ -43,6 +43,7 @@ func (a *Account) Client(peer Fingerprint, DNSNames []string) (*Client, error) {
 	}
 
 	c.Client = http.Client{
+		Timeout: time.Second * 3,
 		// Prevent Redirects
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
 		Transport: &http.Transport{
