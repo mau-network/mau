@@ -129,8 +129,6 @@ func TestDHTServer(t *testing.T) {
 	ASSERT_NO_ERROR(t, err)
 	REFUTE_EQUAL(t, nil, server)
 	go server.Serve(*listener, bootstrap_hostport)
-	for ; server.dhtServer == nil; time.Sleep(time.Millisecond) {
-	}
 
 	peers := []*Account{}
 	servers := []*Server{}

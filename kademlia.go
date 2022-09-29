@@ -212,20 +212,27 @@ func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	var wg sync.WaitGroup
+	wg.Add(nearest_count)
+
 	for i := 0; i < nearest_count; i++ {
-		// TODO make parallel requests
-		for peers.len() > 0 && found == nil {
-			f, err := d.sendFindPeerWorker(ctx, fingerprint, peers)
-			if err != nil {
-				log.Printf("Error sendFindPeerWorker: %s", err)
+		go func() {
+			for peers.len() > 0 && found == nil {
+				f, err := d.sendFindPeerWorker(ctx, fingerprint, peers)
+				if err != nil {
+					log.Printf("Error sendFindPeerWorker: %s", err)
+				}
+				if f != nil {
+					found = f
+					cancel()
+					break
+				}
 			}
-			if f != nil {
-				found = f
-				break
-			}
-		}
+			wg.Done()
+		}()
 	}
 
+	wg.Wait()
 	return found
 }
 
