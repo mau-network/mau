@@ -61,14 +61,14 @@ func TestNewDHTServer(t *testing.T) {
 	ASSERT_EQUAL(t, "localhost:80", s.address)
 }
 
-func TestRecievePing(t *testing.T) {
+func TestReceivePing(t *testing.T) {
 	account, _ := NewAccount(t.TempDir(), "Main peer", "main@example.com", "password")
 	s := newDHTServer(account, "localhost:80")
 
 	t.Run("without mTLS", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/kad/ping", &bytes.Buffer{})
-		s.recievePing(w, r)
+		s.receivePing(w, r)
 
 		ASSERT_EQUAL(t, http.StatusBadRequest, w.Result().StatusCode)
 	})
@@ -164,10 +164,9 @@ func TestDHTServer(t *testing.T) {
 	t.Run("Bootstrap contact list", func(t *testing.T) {
 		c, _ := bootstrap.Client(bootstrap_peer.Fingerprint, nil)
 		u := url.URL{
-			Scheme:   uriProtocolName,
-			Path:     dht_FIND_PEER_PATH,
-			Host:     bootstrap_hostport,
-			RawQuery: "fingerprint=" + bootstrap.Fingerprint().String(),
+			Scheme: uriProtocolName,
+			Path:   dht_FIND_PEER_PATH + bootstrap.Fingerprint().String(),
+			Host:   bootstrap_hostport,
 		}
 
 		resp, err := c.Get(u.String())
@@ -200,10 +199,9 @@ func TestDHTServer(t *testing.T) {
 			s.dhtServer.refreshAllBuckets()
 			c, _ := bootstrap.Client(s.account.Fingerprint(), nil)
 			u := url.URL{
-				Scheme:   uriProtocolName,
-				Path:     dht_FIND_PEER_PATH,
-				Host:     s.dhtServer.address,
-				RawQuery: "fingerprint=0000000000000000000000000000000000000F0F",
+				Scheme: uriProtocolName,
+				Path:   dht_FIND_PEER_PATH + "0000000000000000000000000000000000000F0F",
+				Host:   s.dhtServer.address,
 			}
 
 			resp, err := c.Get(u.String())

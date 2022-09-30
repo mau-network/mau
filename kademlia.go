@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -23,7 +24,7 @@ const (
 	dht_ALPHA          = 3                   // parallelism factor
 	dht_STALL_PERIOD   = time.Hour
 	dht_PING_PATH      = "/kad/ping"
-	dht_FIND_PEER_PATH = "/kad/find_peer"
+	dht_FIND_PEER_PATH = "/kad/find_peer/"
 )
 
 // Peer is a reference to another instance of the program, identified by the
@@ -155,8 +156,8 @@ func newDHTServer(account *Account, address string) *dhtServer {
 		address: address,
 	}
 
-	d.mux.HandleFunc(dht_PING_PATH, d.recievePing)
-	d.mux.HandleFunc(dht_FIND_PEER_PATH, d.recieveFindPeer)
+	d.mux.HandleFunc(dht_PING_PATH, d.receivePing)
+	d.mux.HandleFunc(dht_FIND_PEER_PATH, d.receiveFindPeer)
 
 	return d
 }
@@ -184,8 +185,8 @@ func (d *dhtServer) sendPing(peer *Peer) error {
 	return err
 }
 
-// recievePing responds with http.StatusOK
-func (d *dhtServer) recievePing(w http.ResponseWriter, r *http.Request) {
+// receivePing responds with http.StatusOK
+func (d *dhtServer) receivePing(w http.ResponseWriter, r *http.Request) {
 	err := d.addPeerFromRequest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -249,14 +250,10 @@ func (d *dhtServer) sendFindPeerWorker(ctx context.Context, fingerprint Fingerpr
 		return nil, err
 	}
 
-	params := url.Values{}
-	params.Add("fingerprint", fingerprint.String())
-
 	u := url.URL{
-		Scheme:   uriProtocolName,
-		Host:     peer.Address,
-		Path:     dht_FIND_PEER_PATH,
-		RawQuery: params.Encode(),
+		Scheme: uriProtocolName,
+		Host:   peer.Address,
+		Path:   dht_FIND_PEER_PATH + fingerprint.String(),
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
@@ -300,10 +297,11 @@ func (d *dhtServer) sendFindPeerWorker(ctx context.Context, fingerprint Fingerpr
 	return nil, nil
 }
 
-func (d *dhtServer) recieveFindPeer(w http.ResponseWriter, r *http.Request) {
+func (d *dhtServer) receiveFindPeer(w http.ResponseWriter, r *http.Request) {
 	d.addPeerFromRequest(r)
 
-	fingerprint, err := ParseFingerprint(r.FormValue("fingerprint"))
+	fpr := strings.TrimPrefix(r.URL.Path, dht_FIND_PEER_PATH)
+	fingerprint, err := ParseFingerprint(fpr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
