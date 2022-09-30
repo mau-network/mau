@@ -70,8 +70,7 @@ func TestRecievePing(t *testing.T) {
 		r := httptest.NewRequest("GET", "/kad/ping", &bytes.Buffer{})
 		s.recievePing(w, r)
 
-		// TODO: we can change that so that all /kad paths require mTLS
-		ASSERT_EQUAL(t, http.StatusOK, w.Result().StatusCode)
+		ASSERT_EQUAL(t, http.StatusBadRequest, w.Result().StatusCode)
 	})
 
 	t.Run("with mTLS", func(t *testing.T) {

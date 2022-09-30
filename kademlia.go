@@ -219,9 +219,11 @@ func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
 		go func() {
 			for peers.len() > 0 && found == nil {
 				f, err := d.sendFindPeerWorker(ctx, fingerprint, peers)
+
 				if err != nil {
 					log.Printf("Error sendFindPeerWorker: %s", err)
 				}
+
 				if f != nil {
 					found = f
 					cancel()
@@ -249,6 +251,7 @@ func (d *dhtServer) sendFindPeerWorker(ctx context.Context, fingerprint Fingerpr
 
 	params := url.Values{}
 	params.Add("fingerprint", fingerprint.String())
+
 	u := url.URL{
 		Scheme:   uriProtocolName,
 		Host:     peer.Address,
@@ -263,6 +266,7 @@ func (d *dhtServer) sendFindPeerWorker(ctx context.Context, fingerprint Fingerpr
 
 	resp, err := client.Do(req)
 	if err != nil {
+		d.removePeer(peer)
 		return nil, err
 	}
 
@@ -343,9 +347,8 @@ func (d *dhtServer) Leave() {
 
 // addPeerFromRequest: When any peers send us a request add it to the contact list
 func (d *dhtServer) addPeerFromRequest(r *http.Request) error {
-	// this isn't an authenticated request in the first place
 	if r.TLS == nil {
-		return nil
+		return ErrIncorrectPeerCertificate
 	}
 
 	fingerprint, err := certToFingerprint(r.TLS.PeerCertificates)
@@ -384,6 +387,11 @@ func (d *dhtServer) addPeer(peer *Peer) {
 			bucket.addToTail(peer)
 		}
 	}
+}
+
+func (d *dhtServer) removePeer(peer *Peer) {
+	bucket := &d.buckets[d.bucketFor(peer.Fingerprint)]
+	bucket.remove(peer)
 }
 
 // Refresh all stall buckets
@@ -435,7 +443,9 @@ func (d *dhtServer) refreshStallBuckets(ctx context.Context) {
 // TODO add context for faster termination
 func (d *dhtServer) refreshBucket(i int) {
 	if rando := d.buckets[i].randomPeer(); rando != nil {
-		d.sendFindPeer(rando.Fingerprint) // this won't ask the network as this function will find the peer and return from local cache
+		d.removePeer(rando)
+		d.sendFindPeer(rando.Fingerprint)
+		d.addPeer(rando)
 		d.buckets[i].lastLookup = time.Now()
 	}
 }
@@ -539,7 +549,6 @@ func xor(a, b Fingerprint) (c Fingerprint) {
 }
 
 // prefixLen returns the number of leading zeros in a.
-// TODO try the log2 approach to get leading zeros
 func prefixLen(a Fingerprint) int {
 	for i, b := range a {
 		if b != 0 {
