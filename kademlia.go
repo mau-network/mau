@@ -190,6 +190,7 @@ func (d *dhtServer) receivePing(w http.ResponseWriter, r *http.Request) {
 	err := d.addPeerFromRequest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 }
 
@@ -298,7 +299,11 @@ func (d *dhtServer) sendFindPeerWorker(ctx context.Context, fingerprint Fingerpr
 }
 
 func (d *dhtServer) receiveFindPeer(w http.ResponseWriter, r *http.Request) {
-	d.addPeerFromRequest(r)
+	err := d.addPeerFromRequest(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	fpr := strings.TrimPrefix(r.URL.Path, dht_FIND_PEER_PATH)
 	fingerprint, err := ParseFingerprint(fpr)
@@ -371,6 +376,11 @@ func (d *dhtServer) addPeerFromRequest(r *http.Request) error {
 // full it pings the first peer if the peer responded it's discarded. else it
 // removes the first peer and adds the new peer to the bucket
 func (d *dhtServer) addPeer(peer *Peer) {
+	// don't add yourself to the contact list
+	if peer.Fingerprint == d.account.Fingerprint() {
+		return
+	}
+
 	bucket := &d.buckets[d.bucketFor(peer.Fingerprint)]
 
 	if oldPeer := bucket.get(peer.Fingerprint); oldPeer != nil {

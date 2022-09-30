@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -162,7 +163,7 @@ func TestDHTServer(t *testing.T) {
 	})
 
 	t.Run("Bootstrap contact list", func(t *testing.T) {
-		c, _ := bootstrap.Client(bootstrap_peer.Fingerprint, nil)
+		c, _ := bootstrap.Client(bootstrap_peer.Fingerprint, []string{bootstrap_hostport})
 		u := url.URL{
 			Scheme: uriProtocolName,
 			Path:   dht_FIND_PEER_PATH + bootstrap.Fingerprint().String(),
@@ -176,6 +177,7 @@ func TestDHTServer(t *testing.T) {
 		body, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		err = json.Unmarshal(body, &peers)
+		log.Printf("%s", body)
 		ASSERT_NO_ERROR(t, err)
 		ASSERT_EQUAL(t, COUNT, len(peers))
 	})
@@ -197,7 +199,7 @@ func TestDHTServer(t *testing.T) {
 	t.Run("looking up unknown peer", func(t *testing.T) {
 		for _, s := range servers {
 			s.dhtServer.refreshAllBuckets()
-			c, _ := bootstrap.Client(s.account.Fingerprint(), nil)
+			c, _ := bootstrap.Client(s.account.Fingerprint(), []string{bootstrap_hostport})
 			u := url.URL{
 				Scheme: uriProtocolName,
 				Path:   dht_FIND_PEER_PATH + "0000000000000000000000000000000000000F0F",
