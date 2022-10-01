@@ -12,6 +12,8 @@ schemes:
 paths:
   /p2p/{FPR}:
     get:
+      tags:
+      - p2p
       summary: "List modified files since last update"
       description: "Server will look in FPR directory and list all the files accessible by the client. Order the files by modification date in ascending order and limit the files list to files modified after the If-Modified-Since header value and also limit the list to a reasonable length. So expect to call this with new If-Modified-Since value until you get 304 status."
       produces:
@@ -39,7 +41,7 @@ paths:
               properties:
                 path:
                   type: string
-                  description: "multiaddress representation of the file without the user multiaddress prefix"
+                  description: "path of the file"
                   example: "/file/content-file.pgp"
                 size:
                   type: integer
@@ -51,6 +53,8 @@ paths:
                   example: "S5WhR8DewVr1S8pxtBUVetLZ2RztsobVLpFX8h2c7gXUcT"
   /p2p/{FPR}/file/{fileID}:
     get:
+      tags:
+        - p2p
       summary: "returns the requested file - should support resume via Range header."
       parameters:
       - in: "path"
@@ -70,6 +74,8 @@ paths:
           description: "File content in binary format"
   /p2p/{FPR}/file/{fileID}/version/{versionID}:
     get:
+      tags:
+      - p2p
       summary: "returns the requested file version - should support resume via Range header."
       parameters:
       - in: "path"
@@ -92,6 +98,49 @@ paths:
       responses:
         "200":
           description: "File content in binary format"
+
+  /kad/ping:
+    get:
+      tags:
+      - kademlia
+      summary: "ping a peer to know if it's online"
+      description: "This is used to check if a peer is online to allow for refreshing kademlia k buckets and generally let us know if a peer is still online or available for requests"
+      produces:
+      - "application/json"
+      responses:
+        "200":
+          description: "signals the client that the peer is reachable and available for requests"
+
+  /kad/find_peer/{FPR}:
+    get:
+      tags:
+      - kademlia
+      summary: "List of nearest peers to the peer with fingerprint FPR."
+      description: "Returns a maximum of 160 peers ordered by nearest to furthest from fingerprint FPR. This endpoint can be used to lookup a peer address in the network but sending the nearest peers we know of a request to find peer and recursively ask nearest peers to the fingerprint for more peers until we find the peer addres. review Kademlia original paper for more detailed information about the protocol."
+      produces:
+      - "application/json"
+      parameters:
+      - in: "path"
+        name: "FPR"
+        description: "Peer public key fingerprint"
+        type: string
+        required: true
+      responses:
+        "200":
+          description: "A list of peers (maximm 160 peer)"
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                fingerprint:
+                  type: string
+                  description: "the fingerprint of the peer encoded in hex lower-cased"
+                  example: "fa3944a68bc2973b64b5c3df6d895c8bdf600e5b"
+                address:
+                  type: string
+                  description: "the IP:port pair or domain:port pair of the peer. other peers can use it for dialing in."
+                  example: "100.32.42.1:4345"
 externalDocs:
   description: "Find out more about Mau"
   url: "https://github.com/emad-elsaid/mau"
