@@ -31,8 +31,8 @@ const (
 // address (host:port or ip:port) and Fingerprint of the public key. used for
 // allowing the server to join a P2P network.
 type Peer struct {
-	Fingerprint Fingerprint
-	Address     string // Hostname:Port or IP:Port without the protocol
+	Fingerprint Fingerprint `json:"fingerprint"`
+	Address     string      `json:"address"` // Hostname:Port or IP:Port without the protocol
 }
 
 // A list of peers
