@@ -3,7 +3,6 @@ module github.com/mau-network/mau
 go 1.19
 
 require (
-	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/mdns v1.0.5
 	github.com/huin/goupnp v1.0.3
 	github.com/keybase/go-crypto v0.0.0-20200123153347-de78d2cb44f4

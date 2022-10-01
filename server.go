@@ -9,9 +9,8 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 
-	// TODO: Remove dependency
-	"github.com/gorilla/mux"
 	"github.com/hashicorp/mdns"
 	"golang.org/x/crypto/openpgp/packet"
 )
@@ -23,7 +22,7 @@ type Server struct {
 	dhtServer      *dhtServer
 	bootstrapNodes []*Peer
 	resultsLimit   uint
-	router         *mux.Router
+	router         *http.ServeMux
 }
 
 type FileListItem struct {
@@ -38,7 +37,7 @@ func (a *Account) Server(knownNodes []*Peer) (*Server, error) {
 		return nil, err
 	}
 
-	router := mux.NewRouter()
+	router := http.NewServeMux()
 	s := Server{
 		account:        a,
 		resultsLimit:   100,
@@ -64,12 +63,31 @@ func (a *Account) Server(knownNodes []*Peer) (*Server, error) {
 		},
 	}
 
-	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}", s.list).Methods("GET")
-	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}/{fileID}", s.get).Methods("GET")
-	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}/{fileID}/{versionID}", s.version).Methods("GET")
+	router.HandleFunc("/p2p/", s.ServeHTTP)
+	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}", s.list)
+	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}/{fileID}", s.get)
+	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}/{fileID}/{versionID}", s.version)
 	s.router = router
 
 	return &s, nil
+}
+
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "", http.StatusMethodNotAllowed)
+	}
+
+	segments := strings.Count(strings.TrimPrefix(r.URL.Path, "/p2p"), "/")
+	switch segments {
+	case 1:
+		s.list(w, r)
+	case 2:
+		s.get(w, r)
+	case 3:
+		s.version(w, r)
+	default:
+		http.Error(w, "", http.StatusBadRequest)
+	}
 }
 
 func (s *Server) Serve(l net.Listener, externalAddress string) error {
@@ -107,7 +125,7 @@ func (s *Server) serveMDNS(port int) error {
 // TODO improve this method to take a context and be cancellable along with serveMDNS and serve methods
 func (s *Server) serveDHT(externalAddress string) error {
 	s.dhtServer = newDHTServer(s.account, externalAddress)
-	s.router.PathPrefix("/kad/").Handler(s.dhtServer)
+	s.router.Handle("/kad/", s.dhtServer)
 	s.dhtServer.Join(s.bootstrapNodes)
 	return nil
 }
@@ -139,8 +157,7 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vars := mux.Vars(r)
-	fprStr := vars["FPR"]
+	fprStr := strings.TrimPrefix(r.URL.Path, "/p2p/")
 
 	var fpr Fingerprint
 
@@ -195,9 +212,13 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
+	segments := strings.Split(strings.TrimPrefix(r.URL.Path, "/p2p/"), "/")
+	if len(segments) != 2 {
+		http.Error(w, "", http.StatusBadRequest)
+		return
+	}
 
-	fprStr := vars["FPR"]
+	fprStr := segments[0]
 	var fpr Fingerprint
 	var err error
 	fpr, err = ParseFingerprint(fprStr)
@@ -206,7 +227,7 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, err := s.account.GetFile(fpr, vars["fileID"])
+	file, err := s.account.GetFile(fpr, segments[1])
 	if err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
@@ -238,15 +259,19 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) version(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
+	segments := strings.Split(strings.TrimPrefix(r.URL.Path, "/p2p/"), "/")
+	if len(segments) != 3 {
+		http.Error(w, "", http.StatusBadRequest)
+		return
+	}
 
-	fpr, err := ParseFingerprint(vars["FPR"])
+	fpr, err := ParseFingerprint(segments[0])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	file, err := s.account.GetFileVersion(fpr, vars["fileID"], vars["versionID"])
+	file, err := s.account.GetFileVersion(fpr, segments[1], segments[2])
 	if err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
