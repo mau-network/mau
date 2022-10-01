@@ -345,10 +345,10 @@ Differences with Kademlia:
 - Kademlia node ID was meant to be random 160 bit key. in our case we can use the public key fingerprint which is 160 bits.
 - mutual TLS will allow exchanging the certificate for any two connected nodes. which means both nodes knows each other public keys and fingerprints. including the DNSNames list or IPAddresses in the certificate allows peers to know the address of the node (hostname and port) or (IP and port)
 - Instead of using UDP port we'll reuse the same HTTP server and have the requests/responses uses HTTP protocol with specific paths
-    - `/kad/ping` to ping a node
-    - `/kad/find_node` to ask for the nearest known nodes for a target node fingerprint
+    - `/kad/ping` to ping a node, the server side record the client fingerprint and the DNS address from the TLS certificate
+    - `/kad/find_peer/<FPR>` to ask for the nearest known nodes for a target node fingerprint (FPR). should return a list of fingerprints and addresses.
 - all requests to the `/kad` routes will have the side effect of adding the requesting node to the serving node contact list.
-
+- Kademlia refer to application instance as a `Node`. instead Mau uses the word Peer as in **Peer to Peer** network to eliminate the confusion of naming the instance two different names (node, peer).
 
 ## ARCHITECTURE DIAGRAM
 
