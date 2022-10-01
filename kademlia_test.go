@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -177,7 +176,6 @@ func TestDHTServer(t *testing.T) {
 		body, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		err = json.Unmarshal(body, &peers)
-		log.Printf("%s", body)
 		ASSERT_NO_ERROR(t, err)
 		ASSERT_EQUAL(t, COUNT, len(peers))
 	})
@@ -214,7 +212,15 @@ func TestDHTServer(t *testing.T) {
 			resp.Body.Close()
 			err = json.Unmarshal(body, &peers)
 			ASSERT_NO_ERROR(t, err)
-			ASSERT_EQUAL(t, 1, len(peers)) // TODO review the logic of this part, the previous test asserts that peers know each other but now it returns only one peer, what's going on here?
+			// (Outdated note for dev) review the logic of this part, the previous test asserts that peers know each other but now it returns only one peer, what's going on here?
+
+			// (comment on the comment) now I understand why this is going on
+			// when asking about a peer in the previous sub test the node doesn't know about it
+			// so it asks the bootstrap node and it returns the list of nodes it knows about, our node now can find the target and return it
+			// without any more requests this is why the contact list include only the bootstrap node.
+			// I understood that after hours of thinking and reading the paper. even though I implemented the fuckin thing it took me time.
+			// maybe I should review the idea of implementing kad
+			ASSERT_EQUAL(t, 1, len(peers))
 		}
 	})
 
