@@ -39,7 +39,7 @@ func TestServer(t *testing.T) {
 		ASSERT_NO_ERROR(t, err)
 	}()
 
-	list_account_files_url := fmt.Sprintf("%s/p2p/%s", address, account.Fingerprint())
+	list_account_files_url := fmt.Sprintf("%s://%s/p2p/%s", uriProtocolName, address, account.Fingerprint())
 
 	t.Run("GET "+list_account_files_url, func(t T) {
 

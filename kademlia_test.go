@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 	"time"
 )
@@ -76,8 +75,7 @@ func TestReceivePing(t *testing.T) {
 	t.Run("with mTLS", func(t *testing.T) {
 		listener, bootstrap_addr := TempListener()
 		server, err := account.Server(nil)
-		hostport := strings.TrimPrefix(bootstrap_addr, "https://")
-		go server.Serve(*listener, hostport)
+		go server.Serve(*listener, bootstrap_addr)
 		for ; server.dhtServer == nil; time.Sleep(time.Millisecond) {
 		}
 
@@ -89,7 +87,7 @@ func TestReceivePing(t *testing.T) {
 
 		u := url.URL{
 			Scheme: uriProtocolName,
-			Host:   hostport,
+			Host:   bootstrap_addr,
 			Path:   "/kad/ping",
 		}
 		resp, err := client.Get(u.String())
@@ -121,13 +119,12 @@ func TestDHTServerAddPeer(t *testing.T) {
 func TestDHTServer(t *testing.T) {
 	bootstrap, err := NewAccount(t.TempDir(), "Main peer", "main@example.com", "password")
 	listener, bootstrap_addr := TempListener()
-	bootstrap_hostport := strings.TrimPrefix(bootstrap_addr, "https://")
-	bootstrap_peer := &Peer{bootstrap.Fingerprint(), bootstrap_hostport}
+	bootstrap_peer := &Peer{bootstrap.Fingerprint(), bootstrap_addr}
 
 	server, err := bootstrap.Server(nil)
 	ASSERT_NO_ERROR(t, err)
 	REFUTE_EQUAL(t, nil, server)
-	go server.Serve(*listener, bootstrap_hostport)
+	go server.Serve(*listener, bootstrap_addr)
 
 	peers := []*Account{}
 	servers := []*Server{}
@@ -145,8 +142,7 @@ func TestDHTServer(t *testing.T) {
 			servers = append(servers, s)
 
 			l, addr := TempListener()
-			hostport := strings.TrimPrefix(addr, "https://")
-			go s.Serve(*l, hostport)
+			go s.Serve(*l, addr)
 		}
 	})
 
@@ -162,11 +158,11 @@ func TestDHTServer(t *testing.T) {
 	})
 
 	t.Run("Bootstrap contact list", func(t *testing.T) {
-		c, _ := bootstrap.Client(bootstrap_peer.Fingerprint, []string{bootstrap_hostport})
+		c, _ := bootstrap.Client(bootstrap_peer.Fingerprint, []string{bootstrap_addr})
 		u := url.URL{
 			Scheme: uriProtocolName,
 			Path:   dht_FIND_PEER_PATH + bootstrap.Fingerprint().String(),
-			Host:   bootstrap_hostport,
+			Host:   bootstrap_addr,
 		}
 
 		resp, err := c.Get(u.String())
@@ -197,7 +193,7 @@ func TestDHTServer(t *testing.T) {
 	t.Run("looking up unknown peer", func(t *testing.T) {
 		for _, s := range servers {
 			s.dhtServer.refreshAllBuckets()
-			c, _ := bootstrap.Client(s.account.Fingerprint(), []string{bootstrap_hostport})
+			c, _ := bootstrap.Client(s.account.Fingerprint(), []string{bootstrap_addr})
 			u := url.URL{
 				Scheme: uriProtocolName,
 				Path:   dht_FIND_PEER_PATH + "0000000000000000000000000000000000000F0F",

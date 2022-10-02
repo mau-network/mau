@@ -11,11 +11,10 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"time"
-
-	"github.com/hashicorp/mdns"
 )
 
 var (
@@ -66,30 +65,34 @@ func (a *Account) Client(peer Fingerprint, DNSNames []string) (*Client, error) {
 	return c, nil
 }
 
-func (c *Client) DownloadFriend(ctx context.Context, address string, fingerprint Fingerprint, after time.Time) error {
+func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, after time.Time, fingerprintResolvers []FingerprintResolver) error {
 	followed := path.Join(c.account.path, fingerprint.String())
 	if _, err := os.Stat(followed); err != nil {
 		return ErrFriendNotFollowed
 	}
 
-	// if no address is provided we'll search for it with MDNS
-	if address == "" {
-		addresses := make(chan string, 1)
-		go findFriend(ctx, fingerprint, addresses)
-		select {
-		case address = <-addresses:
-		case <-ctx.Done():
-			return ErrCantFindFriend
-		}
-		close(addresses)
+	addresses := make(chan string, 1)
+
+	// ask all resolvers for the address concurrently
+	for _, fr := range fingerprintResolvers {
+		go fr(ctx, fingerprint, addresses)
 	}
 
-	// TODO if we still don't have an address lets search on the internet with Kad
+	var address string
+	select {
+	case address = <-addresses:
+	case <-ctx.Done():
+		return ErrCantFindFriend
+	}
 
 	// Get list of remote files since the last modification we have
-	url := fmt.Sprintf("%s/p2p/%s", address, fingerprint)
+	u := url.URL{
+		Scheme: uriProtocolName,
+		Host:   address,
+		Path:   fmt.Sprintf("/p2p/%s", fingerprint),
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -120,7 +123,7 @@ func (c *Client) DownloadFriend(ctx context.Context, address string, fingerprint
 		default:
 			err = c.DownloadFile(ctx, address, fingerprint, &list[i])
 			if err != nil {
-				log.Printf("Error: Downloading File %s\n\t%s", url, err)
+				log.Printf("Error: Downloading File %s\n\t%s", u.String(), err)
 			}
 		}
 	}
@@ -146,9 +149,13 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 		}
 	}
 
-	url := fmt.Sprintf("%s/p2p/%s/%s", address, fingerprint, file.Name)
+	u := url.URL{
+		Scheme: uriProtocolName,
+		Host:   address,
+		Path:   fmt.Sprintf("/p2p/%s/%s", fingerprint, file.Name),
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -160,7 +167,7 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Server returned unsuccessful response %s for %s", resp.Status, url)
+		return fmt.Errorf("Server returned unsuccessful response %s for %s", resp.Status, u.String())
 	}
 
 	content, err := io.ReadAll(resp.Body)
@@ -169,7 +176,7 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 	}
 
 	if len(content) != int(file.Size) {
-		return fmt.Errorf("Size is different for %s\nexpected %d received %d\ncontent:\n%s", url, file.Size, len(content), content)
+		return fmt.Errorf("Size is different for %s\nexpected %d received %d\ncontent:\n%s", u.String(), file.Size, len(content), content)
 	}
 
 	hash := sha256.Sum256(content)
@@ -192,25 +199,4 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 
 func (c *Client) verifyPeerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 	return certIncludes(rawCerts, c.peer)
-}
-
-func findFriend(ctx context.Context, fingerprint Fingerprint, addresses chan<- string) error {
-	name := fmt.Sprintf("%s.%s.%s.", fingerprint, mDNSServiceName, mDNSDomain)
-	entriesCh := make(chan *mdns.ServiceEntry, cap(addresses))
-
-	err := mdns.Lookup(mDNSServiceName, entriesCh)
-	if err != nil {
-		return err
-	}
-
-	for {
-		select {
-		case entry := <-entriesCh:
-			if entry.Name == name {
-				addresses <- fmt.Sprintf("%s://%s:%d", uriProtocolName, entry.AddrV4, entry.Port)
-			}
-		case <-ctx.Done():
-			return nil
-		}
-	}
 }
