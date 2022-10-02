@@ -77,6 +77,7 @@ func TestReceivePing(t *testing.T) {
 		listener, bootstrap_addr := TempListener()
 		server, err := account.Server(nil)
 		go server.Serve(*listener, bootstrap_addr)
+		defer server.Close()
 		for ; server.dhtServer == nil; time.Sleep(time.Millisecond) {
 		}
 
@@ -126,6 +127,7 @@ func TestDHTServer(t *testing.T) {
 	ASSERT_NO_ERROR(t, err)
 	REFUTE_EQUAL(t, nil, server)
 	go server.Serve(*listener, bootstrap_addr)
+	defer server.Close()
 
 	peers := []*Account{}
 	servers := []*Server{}

@@ -131,8 +131,6 @@ func (s *Server) serveDHT(ctx context.Context, externalAddress string) error {
 }
 
 func (s *Server) Close() error {
-	// TODO check why the fuck this panics when closing the server?
-	// regardless of the errors I need to try closing all interfaces
 	mdns_err := s.mdnsServer.Shutdown()
 	http_err := s.httpServer.Close()
 	s.dhtServer.Leave()

@@ -36,8 +36,9 @@ func TestServer(t *testing.T) {
 
 	go func() {
 		err := server.Serve(*listener, "")
-		ASSERT_NO_ERROR(t, err)
+		ASSERT_ERROR(t, http.ErrServerClosed, err)
 	}()
+	defer server.Close()
 
 	list_account_files_url := fmt.Sprintf("%s://%s/p2p/%s", uriProtocolName, address, account.Fingerprint())
 

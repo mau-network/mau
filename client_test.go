@@ -33,6 +33,7 @@ func TestDownloadFriend(t *testing.T) {
 
 	listener, address := TempListener()
 	go server.Serve(*listener, "")
+	defer server.Close()
 
 	client, _ := account.Client(friend.Fingerprint(), nil)
 
