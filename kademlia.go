@@ -372,7 +372,7 @@ func (d *dhtServer) addPeerFromRequest(r *http.Request) error {
 	return nil
 }
 
-// addPeer adds a note to routing table if it doesn't exist if the bucket is
+// addPeer adds a peer to routing table if it doesn't exist if the bucket is
 // full it pings the first peer if the peer responded it's discarded. else it
 // removes the first peer and adds the new peer to the bucket
 func (d *dhtServer) addPeer(peer *Peer) {
