@@ -454,7 +454,6 @@ func (d *dhtServer) refreshStallBuckets(ctx context.Context) {
 	}
 }
 
-// TODO add context for faster termination
 func (d *dhtServer) refreshBucket(ctx context.Context, i int) {
 	if rando := d.buckets[i].randomPeer(); rando != nil {
 		d.removePeer(rando)
