@@ -123,7 +123,6 @@ func (s *Server) serveMDNS(port int) error {
 	return nil
 }
 
-// TODO improve this method to take a context and be cancellable along with serveMDNS and serve methods
 func (s *Server) serveDHT(ctx context.Context, externalAddress string) error {
 	s.dhtServer = newDHTServer(s.account, externalAddress)
 	s.router.Handle("/kad/", s.dhtServer)
