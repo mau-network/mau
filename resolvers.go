@@ -58,7 +58,7 @@ func InternetFriendAddress(server *Server) FingerprintResolver {
 		}
 
 		// sendFindPeer needs to take a context to be able to cancel lookup
-		peer := server.dhtServer.sendFindPeer(fingerprint)
+		peer := server.dhtServer.sendFindPeer(ctx, fingerprint)
 		if peer != nil {
 			addresses <- peer.Address
 		}

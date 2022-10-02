@@ -195,7 +195,7 @@ func (d *dhtServer) receivePing(w http.ResponseWriter, r *http.Request) {
 }
 
 // Lookup a peer by fingerprint
-func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
+func (d *dhtServer) sendFindPeer(ctx context.Context, fingerprint Fingerprint) (found *Peer) {
 	nearest := d.nearest(fingerprint, dht_ALPHA)
 	nearest_count := len(nearest)
 
@@ -211,7 +211,7 @@ func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
 	}
 
 	peers := newPeerRequestSet(fingerprint, nearest)
-	ctx, cancel := context.WithCancel(context.Background())
+	workersCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	var wg sync.WaitGroup
@@ -220,7 +220,7 @@ func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
 	for i := 0; i < nearest_count; i++ {
 		go func() {
 			for peers.len() > 0 && found == nil {
-				f, err := d.sendFindPeerWorker(ctx, fingerprint, peers)
+				f, err := d.sendFindPeerWorker(workersCtx, fingerprint, peers)
 
 				if err != nil {
 					log.Printf("Error sendFindPeerWorker: %s", err)
@@ -235,6 +235,12 @@ func (d *dhtServer) sendFindPeer(fingerprint Fingerprint) (found *Peer) {
 			wg.Done()
 		}()
 	}
+
+	// if the passed context is canceled we cancel our workers
+	go func() {
+		<-ctx.Done()
+		cancel()
+	}()
 
 	wg.Wait()
 	return found
@@ -324,7 +330,7 @@ func (d *dhtServer) receiveFindPeer(w http.ResponseWriter, r *http.Request) {
 
 // Join joins the network by adding a bootstrap known peers to the routing table
 // and querying about itself
-func (d *dhtServer) Join(bootstrap []*Peer) {
+func (d *dhtServer) Join(ctx context.Context, bootstrap []*Peer) {
 	if len(bootstrap) == 0 {
 		return
 	}
@@ -333,8 +339,8 @@ func (d *dhtServer) Join(bootstrap []*Peer) {
 		d.addPeer(peer)
 	}
 
-	d.sendFindPeer(d.account.Fingerprint())
-	d.refreshAllBuckets()
+	d.sendFindPeer(ctx, d.account.Fingerprint())
+	d.refreshAllBuckets(ctx)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go d.refreshStallBuckets(ctx)
@@ -403,9 +409,9 @@ func (d *dhtServer) removePeer(peer *Peer) {
 }
 
 // Refresh all stall buckets
-func (d *dhtServer) refreshAllBuckets() {
+func (d *dhtServer) refreshAllBuckets(ctx context.Context) {
 	for i := range d.buckets {
-		d.refreshBucket(i)
+		d.refreshBucket(ctx, i)
 	}
 }
 
@@ -431,7 +437,7 @@ func (d *dhtServer) refreshStallBuckets(ctx context.Context) {
 					case <-ctx.Done():
 						return
 					default:
-						d.refreshBucket(i)
+						d.refreshBucket(ctx, i)
 					}
 
 				} else {
@@ -449,10 +455,10 @@ func (d *dhtServer) refreshStallBuckets(ctx context.Context) {
 }
 
 // TODO add context for faster termination
-func (d *dhtServer) refreshBucket(i int) {
+func (d *dhtServer) refreshBucket(ctx context.Context, i int) {
 	if rando := d.buckets[i].randomPeer(); rando != nil {
 		d.removePeer(rando)
-		d.sendFindPeer(rando.Fingerprint)
+		d.sendFindPeer(ctx, rando.Fingerprint)
 		d.addPeer(rando)
 		d.buckets[i].lastLookup = time.Now()
 	}

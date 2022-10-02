@@ -1,6 +1,7 @@
 package mau
 
 import (
+	"context"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
@@ -97,7 +98,7 @@ func (s *Server) Serve(l net.Listener, externalAddress string) error {
 		return err
 	}
 
-	if err := s.serveDHT(externalAddress); err != nil {
+	if err := s.serveDHT(context.Background(), externalAddress); err != nil {
 		return err
 	}
 
@@ -123,10 +124,10 @@ func (s *Server) serveMDNS(port int) error {
 }
 
 // TODO improve this method to take a context and be cancellable along with serveMDNS and serve methods
-func (s *Server) serveDHT(externalAddress string) error {
+func (s *Server) serveDHT(ctx context.Context, externalAddress string) error {
 	s.dhtServer = newDHTServer(s.account, externalAddress)
 	s.router.Handle("/kad/", s.dhtServer)
-	s.dhtServer.Join(s.bootstrapNodes)
+	s.dhtServer.Join(ctx, s.bootstrapNodes)
 	return nil
 }
 

@@ -319,7 +319,11 @@ func main() {
 		t := time.Date(2000, 1, 1, 1, 1, 1, 1, time.UTC)
 
 		ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
-		err = client.DownloadFriend(ctx, *address, fpr, t)
+		resolvers := []FingerprintResolver{LocalFriendAddress}
+		if len(*address) > 0 {
+			resolvers = append(resolvers, StaticAddress(*address))
+		}
+		err = client.DownloadFriend(ctx, fpr, t, resolvers)
 		raise(err)
 
 	default:

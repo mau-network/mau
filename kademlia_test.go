@@ -2,6 +2,7 @@ package mau
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -150,7 +151,7 @@ func TestDHTServer(t *testing.T) {
 		for _, s := range servers {
 			for ; s.dhtServer == nil; time.Sleep(time.Millisecond) {
 			}
-			b := s.dhtServer.sendFindPeer(bootstrap.Fingerprint())
+			b := s.dhtServer.sendFindPeer(context.Background(), bootstrap.Fingerprint())
 			ASSERT_EQUAL(t, bootstrap.Fingerprint(), b.Fingerprint)
 			err := s.dhtServer.sendPing(b)
 			ASSERT_NO_ERROR(t, err)
@@ -183,7 +184,7 @@ func TestDHTServer(t *testing.T) {
 					continue
 				}
 
-				b := s.dhtServer.sendFindPeer(p.Fingerprint())
+				b := s.dhtServer.sendFindPeer(context.Background(), p.Fingerprint())
 				REFUTE_EQUAL(t, nil, b)
 				ASSERT_EQUAL(t, p.Fingerprint(), b.Fingerprint)
 			}
@@ -192,7 +193,7 @@ func TestDHTServer(t *testing.T) {
 
 	t.Run("looking up unknown peer", func(t *testing.T) {
 		for _, s := range servers {
-			s.dhtServer.refreshAllBuckets()
+			s.dhtServer.refreshAllBuckets(context.Background())
 			c, _ := bootstrap.Client(s.account.Fingerprint(), []string{bootstrap_addr})
 			u := url.URL{
 				Scheme: uriProtocolName,
@@ -222,7 +223,7 @@ func TestDHTServer(t *testing.T) {
 
 	t.Run("Doesn't find an unknown fingerprint", func(t *testing.T) {
 		for _, s := range servers {
-			b := s.dhtServer.sendFindPeer(ParseFPRIgnoreErr("0000000000000000000000000000000000000F0F"))
+			b := s.dhtServer.sendFindPeer(context.Background(), ParseFPRIgnoreErr("0000000000000000000000000000000000000F0F"))
 			ASSERT_EQUAL(t, nil, b)
 			break
 		}
