@@ -33,6 +33,7 @@
     - [ROADMAP](#roadmap)
     - [CHALLENGES](#challenges)
     - [PROJECT STATUS](#project-status)
+    - [Getting involved](#getting-involved)
     - [License](#license)
     - [TODOs](#todos)
     - [FAQ](#faq)
@@ -364,7 +365,7 @@ The following is a minimum list of modules that is needed to make up the core fu
 * [x] **editor**: An interface that creates and edits encrypted JSON+LD (schema.org) files for existing user and friends.
 * [x] **syncer**: A daemon that implement the peer to peer stack. it downloads new content.
 * [x] **server**: A deamon that exposes existing content via HTTP interface.
-* [ ] **peer**: A deamon that allow P2P networking, peer announcement and discovery over local network and the internet
+* [x] **peer**: A deamon that allow P2P networking, peer announcement and discovery over local network and the internet
 * [ ] **browser**: An interface to show content in chronological order
 
 ## CHALLENGES
@@ -390,6 +391,29 @@ The project is between refining the concept and writing the Proof of concept pha
 | Test Coverage | [![codecov](https://codecov.io/gh/mau-network/mau/branch/master/graph/badge.svg?token=GL1MDCEIVK)](https://codecov.io/gh/mau-network/mau)  |
 | Documentation | [![GoDoc](https://godoc.org/github.com/mau-network/mau?status.svg)](https://godoc.org/github.com/mau-network/mau)                          |
 | Go Card       | [![Go Report Card](https://goreportcard.com/badge/github.com/mau-network/mau)](https://goreportcard.com/report/github.com/mau-network/mau) |
+
+## Getting involved
+
+The following resources are useful to understand the context around Mau and it's powerful concept and limitations. documents doesn't have to be read in order:
+
+- Pretty Good Privacy understanding is very important to know the extent of what Mau can reach using it and can't be done too. a starting point for this topic can be wikipedia page and other related implementations:
+    - PGP on Wikipedia: https://en.wikipedia.org/wiki/Pretty_Good_Privacy
+    - OpenPGP: https://www.openpgp.org/about/
+    - OpenPGP message format RFC4880: https://www.rfc-editor.org/rfc/rfc4880
+    - GnuPG (GPG): https://en.wikipedia.org/wiki/GNU_Privacy_Guard
+    - GnuPG tutorial: https://gnupg.org/gph/en/manual.html
+    - GnuPG Made Easy (GPGME): https://gnupg.org/documentation/manuals/gpgme/
+- To gain more understanding of JSON+LD and topic around it:
+    - JSON-LD: https://json-ld.org/learn.html
+    - Schem.org: https://schema.org/docs/documents.html
+    - Activity Pub: https://de.wikipedia.org/wiki/ActivityPub
+- Understanding HTTP and it's evolutions:
+    - HTTP evolution: https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/Evolution_of_HTTP
+    - HTTP3 cloudflare support: https://blog.cloudflare.com/http3-the-past-present-and-future/
+- Understanding how kademlia works and it's enhancements and improvements:
+    - Kademlia paper: https://pdos.csail.mit.edu/~petar/papers/maymounkov-kademlia-lncs.pdf
+    - S/Kademlia paper: https://telematics.tm.kit.edu/publications/Files/267/SKademlia_2007.pdf
+    - Xlattice: https://xlattice.sourceforge.net/
 
 ## License
 
