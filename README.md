@@ -394,8 +394,12 @@ The project is between refining the concept and writing the Proof of concept pha
 
 ## Getting involved
 
-The following resources are useful to understand the context around Mau and it's powerful concept and limitations. documents doesn't have to be read in order:
+The following resources are useful to understand the context around Mau and its powerful concept and limitations. documents doesn't have to be read in order:
 
+- Videos to get from the client-server mindset to P2P mindset:
+    - [Imagine This: A Web without servers - Tara Vancil](https://www.youtube.com/watch?v=rJ_WvfF3FN8)
+    - [Why IPFS - Juan Benet](https://www.youtube.com/watch?v=zE_WSLbqqvo)
+    - [Stanford Seminar - IPFS and the Permanent Web](https://www.youtube.com/watch?v=HUVmypx9HGI)
 - Pretty Good Privacy understanding is very important to know the extent of what Mau can reach using it and can't be done too. a starting point for this topic can be wikipedia page and other related implementations:
     - PGP on Wikipedia: https://en.wikipedia.org/wiki/Pretty_Good_Privacy
     - OpenPGP: https://www.openpgp.org/about/
