@@ -1,5 +1,4 @@
-𓃠 Mau
-===
+This document describes a peer to peer (P2P) web2 applications convention. Utilizing the filesystem, PGP primitives and Kademlia protocol for data storage, privacy and peer discovery and routing respectively. With no parallel data structures constraints.
 
 <p align="center">
   <img width="460" height="300" src="logo.svg">
@@ -8,46 +7,40 @@
 <!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
 **Table of Contents**
 
-- [𓃠 Mau](#𓃠-mau)
-    - [INTRODUCTION](#introduction)
-    - [PROBLEM](#problem)
-    - [ALTERNATIVE SOLUTIONS](#alternative-solutions)
-    - [REQUIREMENTS](#requirements)
-    - [CORE CONCEPT](#core-concept)
-        - [Use the file system](#use-the-file-system)
-        - [Use JSON format](#use-json-format)
-        - [Use JSON+LD + Schema.org vocabulary](#use-jsonld--schemaorg-vocabulary)
-        - [Use Pretty Good Privacy (PGP)](#use-pretty-good-privacy-pgp)
-        - [Use HTTP interface to serve files](#use-http-interface-to-serve-files)
-    - [BENEFITS](#benefits)
-    - [TECHNICAL DETAILS](#technical-details)
-        - [Addressing](#addressing)
-        - [Directory structure](#directory-structure)
-            - [Keeping file versions](#keeping-file-versions)
-        - [HTTP server interface](#http-server-interface)
-        - [Peer to Peer Stack](#peer-to-peer-stack)
-            - [MDNS Service discovery](#mdns-service-discovery)
-            - [Listening on internet requests](#listening-on-internet-requests)
-            - [Kademlia Routing](#kademlia-routing)
-    - [ARCHITECTURE DIAGRAM](#architecture-diagram)
-    - [ROADMAP](#roadmap)
-    - [CHALLENGES](#challenges)
-    - [PROJECT STATUS](#project-status)
-    - [Getting involved](#getting-involved)
-    - [License](#license)
-    - [TODOs](#todos)
-    - [FAQ](#faq)
-        - [Why are keys written in binary format?](#why-are-keys-written-in-binary-format)
-        - [Why are friends keys encrypted?](#why-are-friends-keys-encrypted)
+- [PROBLEM](#problem)
+- [ALTERNATIVE SOLUTIONS](#alternative-solutions)
+- [REQUIREMENTS](#requirements)
+- [CORE CONCEPT](#core-concept)
+    - [Use the file system](#use-the-file-system)
+    - [Use JSON format](#use-json-format)
+    - [Use JSON+LD + Schema.org vocabulary](#use-jsonld--schemaorg-vocabulary)
+    - [Use Pretty Good Privacy (PGP)](#use-pretty-good-privacy-pgp)
+    - [Use HTTP interface to serve files](#use-http-interface-to-serve-files)
+- [BENEFITS](#benefits)
+- [TECHNICAL DETAILS](#technical-details)
+    - [Addressing](#addressing)
+    - [Directory structure](#directory-structure)
+    - [Versioning](#versioning)
+    - [HTTP server interface](#http-server-interface)
+    - [Peer to Peer Stack](#peer-to-peer-stack)
+        - [MDNS Service discovery](#mdns-service-discovery)
+        - [Listening on internet requests](#listening-on-internet-requests)
+        - [Kademlia Routing](#kademlia-routing)
+- [ARCHITECTURE DIAGRAM](#architecture-diagram)
+- [ROADMAP](#roadmap)
+- [CHALLENGES](#challenges)
+- [PROJECT STATUS](#project-status)
+- [Getting involved](#getting-involved)
+- [License](#license)
+- [TODOs](#todos)
+- [FAQ](#faq)
+    - [Why are keys written in binary format?](#why-are-keys-written-in-binary-format)
+    - [Why are friends keys encrypted?](#why-are-friends-keys-encrypted)
 
 <!-- markdown-toc end -->
 
 
-## INTRODUCTION
-
-This document describes a peer to peer (P2P) web2 applications convention. Utilizing the filesystem, PGP primitives and Kademlia protocol for data storage, privacy and peer discovery and routing respectively. With no parallel data structures constraints.
-
-## PROBLEM
+# PROBLEM
 
 * The current popular web2 applications stagnated leading to a halt in innovation and privacy issues. for example popular social media networks lack an organized way to post structured content such as a recipe or a technical blog post or information about a disease or a chemical formula or a mathematical equation. Also many were involved in personal information leakage incidents that led to users arrest or twisting democratic elections.
 
@@ -63,7 +56,7 @@ This document describes a peer to peer (P2P) web2 applications convention. Utili
 
 * Lying by omission: Where content feeds are manipulated by an algorithm that is both flawed and biased to the users. taking away the user freedom to choose what to be displayed and in what order.
 
-## ALTERNATIVE SOLUTIONS
+# ALTERNATIVE SOLUTIONS
 
 For the past years many projects were initiated to solve this problem. Some solutions were drifting towards federated applications others towards a complete peer to peer communication. [Which We learned a lot by following what they achieved and built](https://matrix.org/_matrix/media/r0/download/twitter.modular.im/981b258141aa0b197804127cd2f7d298757bad20).
 
@@ -75,7 +68,7 @@ In our point of view some shortcoming were inherited for each approach adopted:
 * Most of the implementations except for (heypercore, IPFS) utilizes opaque storage where the user can't access his own data without the tool provided by the social network. replicating the walled gardens problem all over again.
 * Some protocols went for data formats and vocabulary that tries to replicate current social media instead of reflecting real life. Which renders clients that decides to implement it helpless in expressing real life behavior and users needs.
 
-## REQUIREMENTS
+# REQUIREMENTS
 
 The solution we are aiming for should:
 
@@ -87,11 +80,11 @@ The solution we are aiming for should:
 - Puts the user in the center. giving them complete control for who access his data.
 - Should be flexible to evolve over time and adapt to changes in the cryptography advancements and presentation formats.
 
-## CORE CONCEPT
+# CORE CONCEPT
 
 The following section will describe what we think of as the corner stone of a concept that allow building a P2P web2 application. that we can refer to it initially by **[𓃠 Mau](https://en.wikipedia.org/wiki/Egyptian_Mau)**.
 
-### Use the file system
+## Use the file system
 
 Extending the Unix approach [everything is a file](https://en.wikipedia.org/wiki/Unix_philosophy) to the web2 applications will make any web2 application implementation a mere application that reads files from the user machine.
 
@@ -105,13 +98,13 @@ This will lead to interesting properties:
 * Deleting your copy of the data will be a simple directory deletion.
 * Data can live on local machine storage device or remote device access by any network file system.
 
-### Use JSON format
+## Use JSON format
 
 Using unstructured text will not be sufficient to represent all kinds of content created by users. a piece of content that represent a simple status update should have different structure than a recipe or a technical blog post or a doctor sharing a disease information. or an athlete sharing his bike ride.
 
 JSON has a wide support from popular programming languages and using it as a content format will introduce structure to the data. while making it still readable by any text editor.
 
-### Use JSON+LD + Schema.org vocabulary
+## Use JSON+LD + Schema.org vocabulary
 
 JSON by itself is a format that defines a set of primitive data types (int, float, boolean, null, array, object). making sure all clients understand each other means we need a way to use the same names for the same things. a title of an article should be called "title" for example not "header".
 
@@ -126,7 +119,7 @@ This will lead to the following benefits:
 - Other Vocabulary can be supported gradually like ActivityPub or others. while old clients can ignore these new vocabulary.
 - All activities can be presented as Schema.org type such as SocialMediaPosting, API Reference, Book, FollowAction, LikeAction, DislikeAction...etc
 
-### Use Pretty Good Privacy (PGP)
+## Use Pretty Good Privacy (PGP)
 
 While public posts are meant to be read by anyone. We still need to:
 
@@ -160,7 +153,7 @@ This leads to the following features for the system:
 - Granular privacy for every piece of information on the network. A FollowAction for example can be public (not encrypted). Shared with one of my friends (encrypted for my friend) or shared with a specific list of my friends (encrypted for multiple recipients). This applies on a file by file basis. Another example: A Message can be encrypted to one person for a private end-to-end chat or multiple recipients for a group chat.
 - Using trust levels in the PGP keyrings can be beneficial. for example a peer with key of `never` trust level should be ignored by any communication software and his content never be written to the disk.
 
-### Use HTTP interface to serve files
+## Use HTTP interface to serve files
 
 Files that are created by one user needs to be downloaded to all peers that are asking for it when they become online. the simplest interface that can serve the files and provide interoperability with current web is an HTTP interface.
 
@@ -190,7 +183,7 @@ This will lead to some benefits:
 - Existing web frameworks can be used to protect the interface against common DDOS attacks. Rate limiting...etc.
 
 
-## BENEFITS
+# BENEFITS
 
 * A chat application will involve creating [SocialMediaPosting](https://schema.org/SocialMediaPosting) files for example. Sign them with the user private key. and encrypt it for the current user and for the recipient. And request updates from the other side for synchronization every period.
 
@@ -216,9 +209,9 @@ This will lead to some benefits:
 
 * A Client can be developed to exchange files over the email messages. As PGP content can be exported as armored data. Clients can connect to SMTP servers to send new posts and check POP3/IMAP servers for new emails with PGP content. rendering the emails a synchronization mechanism. And it won't contradict with any other client syncing over another interface as the provided SHA sum from `/files` endpoint will prevent downloading the file again leading to multiple clients syncing over different interfaces.
 
-## TECHNICAL DETAILS
+# TECHNICAL DETAILS
 
-### Addressing
+## Addressing
 
 We have three entities in our system:
 
@@ -237,7 +230,7 @@ We have three entities in our system:
   * Addressing a version should be scoped by the user and the content `/p2p/<user-FPR>/file/<filename>/version/<version-hash>`
   * Version hash is a SHA256 sum of the content downcase characters.
 
-### Directory structure
+## Directory structure
 
 * Storing all files under one directory will introduce collision in file names between users. hence we'll have to separate files by user ID hash following the same addressing schema on the file system
 ```
@@ -284,7 +277,7 @@ friend2-FPR:
 
 * Clients can be instructed to encrypt the file for one key or all contacts in a keyring (rendering the keyring as a group of users).
 
-#### Keeping file versions
+## Versioning
 
 * Initially a file has one version (the latest version) which is written in `<file-name>.pgp`
 * When editing the file `<file-name>` and before writing the new version the following should be done to keep track of the versions:
@@ -298,13 +291,13 @@ friend2-FPR:
 * When downloading a new version of the file to the user machine we can follow the same previous steps to keep old versions and prevent the signed version from being lost forever.
 * This can be very useful if an application criticaly depend on the file version like contracts signed by users.
 
-### HTTP server interface
+## HTTP server interface
 
 Serving files through HTTP is the interface where one peer can ask the another peer for changed files since last update. and it should adhere to the following [swagger specifications](api.yml)
 
 Authentication should happen in the security layer with both peers doing a TLS1.3 handshake with their identity keys to establish a secure communication.
 
-### Peer to Peer Stack
+## Peer to Peer Stack
 
 Using a reduced Kademlia routing protocol over TCP/HTTP allows peers to find other peers using their public key fingerprint and authenticate all requests using mutual-TLS allows passing any needed information in the certificate such as IP addresses, DNS names. effectively reusing what the websites already have.
 
@@ -313,7 +306,7 @@ Using a reduced Kademlia routing protocol over TCP/HTTP allows peers to find oth
 
 The previous stack should allow peers discovery over the same network. or with S/Kademlia-DHT routing if not on the same network.
 
-#### MDNS Service discovery
+### MDNS Service discovery
 
 If local network is desired the service may announce itself on the network using MDNS multicast. The service name format must be as follows:
 
@@ -327,11 +320,11 @@ If local network is desired the service may announce itself on the network using
 - protocol: tcp
 - domain: should be always "local"
 
-#### Listening on internet requests
+### Listening on internet requests
 
 The program is responsible for allowing the user to receive connections from outside of local network by utilizing NAT traversal protocols such as UPNP, NAT-PMP or Hole punshing.
 
-#### Kademlia Routing
+### Kademlia Routing
 
 Kademlia protocol specify short list of RPC calls:
 
@@ -351,13 +344,12 @@ Differences with Kademlia:
 - all requests to the `/kad` routes will have the side effect of adding the requesting node to the serving node contact list.
 - Kademlia refer to application instance as a `Node`. instead Mau uses the word Peer as in **Peer to Peer** network to eliminate the confusion of naming the instance two different names (node, peer).
 
-## ARCHITECTURE DIAGRAM
-
+# ARCHITECTURE DIAGRAM
 
 ![Architecture diagram](architecture.svg)
 
 
-## ROADMAP
+# ROADMAP
 
 The following is a minimum list of modules that is needed to make up the core functionality of **𓃠 Mau**:
 
@@ -368,7 +360,7 @@ The following is a minimum list of modules that is needed to make up the core fu
 * [x] **peer**: A deamon that allow P2P networking, peer announcement and discovery over local network and the internet
 * [ ] **browser**: An interface to show content in chronological order
 
-## CHALLENGES
+# CHALLENGES
 
 * **Versioning propagation**: After User(B) shares his version to his social network: the content could change to add more references or fix mistakes leading to User(B) social network browsing the old version. As there is no way to get updates on the content after the first share.
 
@@ -382,7 +374,7 @@ The following is a minimum list of modules that is needed to make up the core fu
 
 * **mDNS-SD identity proof**: When the user announces his presence on the local network there is no proof the announcement is coming from the account owner.
 
-## PROJECT STATUS
+# PROJECT STATUS
 
 The project is between refining the concept and writing the Proof of concept phases. This repository includes a proof of concept Go package that can be imported. Also a CLI tool under `cmd/mau` to provide basic interface for the package.
 
@@ -392,7 +384,7 @@ The project is between refining the concept and writing the Proof of concept pha
 | Documentation | [![GoDoc](https://godoc.org/github.com/mau-network/mau?status.svg)](https://godoc.org/github.com/mau-network/mau)                          |
 | Go Card       | [![Go Report Card](https://goreportcard.com/badge/github.com/mau-network/mau)](https://goreportcard.com/report/github.com/mau-network/mau) |
 
-## Getting involved
+# Getting involved
 
 The following resources are useful to understand the context around Mau and its powerful concept and limitations. documents doesn't have to be read in order:
 
@@ -419,19 +411,19 @@ The following resources are useful to understand the context around Mau and its 
     - S/Kademlia paper: https://telematics.tm.kit.edu/publications/Files/267/SKademlia_2007.pdf
     - Xlattice: https://xlattice.sourceforge.net/
 
-## License
+# License
 
 - The project and the implementation is released under GPLv3
 - The license protects the community by preventing [Bait and switch](https://debugagent.com/open-source-bait-and-switch).
 - It maximize freedom with respect to openness preventing corndering the community in the future.
 
-## TODOs
+# TODOs
 
 Project TODOs are mentioned in comments starting with `TODO`.
 
-## FAQ
+# FAQ
 
-### Why are keys written in binary format?
+## Why are keys written in binary format?
 
 - Initially I thought we should accept both formats
    - `.pgp` for binary format
@@ -449,6 +441,6 @@ So `.pgp` was prefered as sole format because of these benefits:
 - It saves disk space which is better for limited resources machines such as IOT devices.
 - Takes less processing power to deal with the binary format as it doesn't need decoding like ASCII armored. so it'll be better when dealing with thousands of key files.
 
-### Why are friends keys encrypted?
+## Why are friends keys encrypted?
 
 To make sure the friend public key is added by the account instead of a malicious program. If the public key is written in plain format it means adding a friend is not an authenticated operation any program can do it without the user permission
