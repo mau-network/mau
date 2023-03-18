@@ -1,4 +1,4 @@
-This document describes a peer to peer (P2P) web2 applications convention. Utilizing the filesystem, PGP primitives and Kademlia protocol for data storage, privacy and peer discovery and routing respectively. With no parallel data structures constraints.
+This document describes a peer-to-peer (P2P) social applications convention. We are utilizing the filesystem, PGP, and Kademlia protocol for storage, privacy, peer discovery, and routing, respectively without any supporting data structures.
 
 <p align="center">
   <img width="460" height="300" src="logo.svg">
@@ -11,11 +11,11 @@ This document describes a peer to peer (P2P) web2 applications convention. Utili
 - [ALTERNATIVE SOLUTIONS](#alternative-solutions)
 - [REQUIREMENTS](#requirements)
 - [CORE CONCEPT](#core-concept)
-    - [Use the file system](#use-the-file-system)
-    - [Use JSON format](#use-json-format)
-    - [Use JSON+LD + Schema.org vocabulary](#use-jsonld--schemaorg-vocabulary)
-    - [Use Pretty Good Privacy (PGP)](#use-pretty-good-privacy-pgp)
-    - [Use HTTP interface to serve files](#use-http-interface-to-serve-files)
+    - [Storage](#storage)
+    - [Data format](#data-format)
+    - [Schema](#schema)
+    - [Authentication and Authorization](#authentication-and-authorization)
+    - [Data Exchange](#data-exchange)
 - [BENEFITS](#benefits)
 - [TECHNICAL DETAILS](#technical-details)
     - [Addressing](#addressing)
@@ -42,84 +42,87 @@ This document describes a peer to peer (P2P) web2 applications convention. Utili
 
 # PROBLEM
 
-* The current popular web2 applications stagnated leading to a halt in innovation and privacy issues. for example popular social media networks lack an organized way to post structured content such as a recipe or a technical blog post or information about a disease or a chemical formula or a mathematical equation. Also many were involved in personal information leakage incidents that led to users arrest or twisting democratic elections.
+* The current popular social applications stagnated leading to a halt in innovation and privacy issues.
+  * Popular social media networks lack an organized way to post structured content such as a recipe or a technical blog post or information about a disease or a chemical formula or a mathematical equation.
+  * Many social media networks were involved in personal information leak incidents that led to users' arrest or twisting of democratic elections.
 
-* [Walled gardens problem](https://en.wikipedia.org/wiki/Closed_platform): Users can't move their data between web2 applications leading to duplication of the same content for the same person on multiple social media networks. We perceive that as a symptom of their incompatibility.
+* [Walled gardens problem](https://en.wikipedia.org/wiki/Closed_platform): Users can't move their data between social applications leading to duplication of the same content for the same person on multiple social media networks. We perceive that as a symptom of their incompatibility.
 
-* Ads intrusive behavior as a result of the excessive users tracking and signals extraction from user content and behavior on the network and other affiliate websites.
+* Ads intrusive behavior as a result of the excessive user tracking and signals extraction from user content and behavior on the network and other affiliate websites.
 
-* Users are not actually in control of their data and its privacy. trusting the application operator to manage their data as they're instructed by the tools presented to the users. Tools that are inherently biased and has limited controls over data.
+* Users are not in control of their data and its privacy. Trusting the application operator to manage their data as they're instructed by the tools presented to the users. Tools that are inherently biased and have limited controls over data.
 
-* Centralization issue: Where sending someone a message in the other room means the message has to travel to the nearest data-center which can be in another continent then comes back again to the room next to you. that's not a sane behavior by any stretch.
+* Centralization issue: Where sending someone a message in the other room means the message has to travel to the nearest data center which can be in another continent then comes back again to the room next to you. that's not sane behavior by any stretch.
 
-* [Censorship](https://en.wikipedia.org/wiki/Censorship#Social_media): Where web2 applications are setting biased guidelines that can be suitable for some of the users and not others because of differences in cultures between countries. even cities in one country has different habits and behaviors. even between families in the same city. acting as a big brother to all of the application users isn't a good situation. this is an inherent disadvantage of hosting users content.
+* [Censorship](https://en.wikipedia.org/wiki/Censorship#Social_media): Social applications set biased guidelines that are suitable for some of the users and not others because of differences in cultures between countries. even cities in one country have different habits and behaviors. even between families in the same city.
+  * acting as a big brother to all of the application users isn't a good situation. this is an inherent disadvantage of hosting users' content.
 
-* Lying by omission: Where content feeds are manipulated by an algorithm that is both flawed and biased to the users. taking away the user freedom to choose what to be displayed and in what order.
+* Lying by omission: Where content feeds are manipulated by an algorithm that is both flawed and biased to the users. taking away the user's freedom to choose what to be displayed and in which order.
 
 # ALTERNATIVE SOLUTIONS
 
-For the past years many projects were initiated to solve this problem. Some solutions were drifting towards federated applications others towards a complete peer to peer communication. [Which We learned a lot by following what they achieved and built](https://matrix.org/_matrix/media/r0/download/twitter.modular.im/981b258141aa0b197804127cd2f7d298757bad20).
+For the past years, many projects were initiated to solve this problem. Some solutions were drifting towards federated applications others towards complete peer-to-peer communication. [We learned a lot by following what they achieved and built](https://matrix.org/_matrix/media/r0/download/twitter.modular.im/981b258141aa0b197804127cd2f7d298757bad20).
 
-In our point of view some shortcoming were inherited for each approach adopted:
+In our point of view, some shortcomings were inherited from each approach adopted:
 
-* [Federated networks](https://en.wikipedia.org/wiki/Federation_(information_technology)) suffers from high population in 2 or 3 servers leading to maintenance difficulties. and moderation nightmare for the people responsible for these servers.
+* [Federated networks](https://en.wikipedia.org/wiki/Federation_(information_technology)) suffer from a high population in 2 or 3 servers leading to maintenance difficulties. and moderation nightmare for the people responsible for these servers.
 * Some applications went for an implementation that doesn't allow the freedom of editing and manipulating your own data which is against what we believe is the simplest freedom on a social network.
 * Some applications suffered from a monolithic implementation where everything is set in stone with no room for changes or evolution. like what algorithms to use and which parameters and how nodes interact together and which hashes to use. which will make it very painful in the future to upgrade the network.
 * Most of the implementations except for (heypercore, IPFS) utilizes opaque storage where the user can't access his own data without the tool provided by the social network. replicating the walled gardens problem all over again.
-* Some protocols went for data formats and vocabulary that tries to replicate current social media instead of reflecting real life. Which renders clients that decides to implement it helpless in expressing real life behavior and users needs.
+* Some protocols went for data formats and vocabulary that try to replicate current social media instead of reflecting real life. This renders clients that decide to implement it helpless in expressing real-life behavior and user needs.
 
 # REQUIREMENTS
 
 The solution we are aiming for should:
 
-- Have a small set of core concepts
+- A small set of core concepts
 - Works well with the current web
 - Uses filesystem structure as a data storage
-- Allows the user to switch clients without loosing their data
-- Utilizes well established encryption primitives and exchange protocols
-- Puts the user in the center. giving them complete control for who access his data.
-- Should be flexible to evolve over time and adapt to changes in the cryptography advancements and presentation formats.
+- Allows the user to switch clients without losing their data
+- Utilizes well-established encryption primitives and exchange protocols
+- User has total control over their data privacy
+- Flexible to evolve over time and adapt to advancements in cryptography and presentation formats
 
 # CORE CONCEPT
 
-The following section will describe what we think of as the corner stone of a concept that allow building a P2P web2 application. that we can refer to it initially by **[𓃠 Mau](https://en.wikipedia.org/wiki/Egyptian_Mau)**.
+The following section will describe a concept for building P2P social applications. The concept fulfills the previous requirements. We will refer to it initially by **[𓃠 Mau](https://en.wikipedia.org/wiki/Egyptian_Mau)**.
 
-## Use the file system
+## Storage
 
-Extending the Unix approach [everything is a file](https://en.wikipedia.org/wiki/Unix_philosophy) to the web2 applications will make any web2 application implementation a mere application that reads files from the user machine.
+Extending the Unix approach [everything is a file](https://en.wikipedia.org/wiki/Unix_philosophy) to the social applications will make any social application implementation a mere application that reads files from the user machine.
 
-So we'll present each piece of content on **𓃠 Mau** as a file in the user file system.
+We will present each piece of content on **𓃠 Mau** as a file in the user file system.
 
 This will lead to interesting properties:
 
 * Backing up your content will be a simple `tar` command for example
 * Restoring your content to a previous state can be achieved by restoring one of your backups.
-* You'll be able to post and read posts from any application that can access your disk like a command-line tool, an extension in your text editor, a desktop GUI. and on phones any App that has permission to access the disk
-* Deleting your copy of the data will be a simple directory deletion.
-* Data can live on local machine storage device or remote device access by any network file system.
+* The user will be able to post and read posts from any application that can access your disk like a command-line tool, an extension in your text editor, a desktop GUI. and on phones any App that has permission to access the disk
+* Deleting the user's copy of the data will be a simple directory deletion.
+* Data can live on a local machine storage device or remote device accessed by any network file system.
 
-## Use JSON format
+## Data format
 
-Using unstructured text will not be sufficient to represent all kinds of content created by users. a piece of content that represent a simple status update should have different structure than a recipe or a technical blog post or a doctor sharing a disease information. or an athlete sharing his bike ride.
+Using unstructured text will not be sufficient to represent all kinds of content created by users. a piece of content that represents a simple status update should have a different structure than a recipe or a technical blog post or a doctor sharing disease information. or an athlete sharing his bike ride.
 
-JSON has a wide support from popular programming languages and using it as a content format will introduce structure to the data. while making it still readable by any text editor.
+JSON has wide support from popular programming languages. Using it as a content format will introduce structure to the data. while making it still readable by any text editor.
 
-## Use JSON+LD + Schema.org vocabulary
+## Schema
 
-JSON by itself is a format that defines a set of primitive data types (int, float, boolean, null, array, object). making sure all clients understand each other means we need a way to use the same names for the same things. a title of an article should be called "title" for example not "header".
+JSON by itself is a format that defines a set of primitive data types (int, float, boolean, null, array, object). making sure all clients understand each other means we need to use the same name for the same concept. a title of an article should be called "title" for example not "header".
 
-Instead of inventing new vocabulary we can use the existing [Schema.org](https://schema.org/docs/full.html) body of work.
+Instead of inventing a new schema, we can use the existing [Schema.org](https://schema.org/docs/full.html) catalog of vocabulary.
 
 This will lead to the following benefits:
 
-- Content attributes can have single value or multiple values for each language/locale
+- Content attributes can have a single value or multiple values for each language
 - Specialized clients can extend the vocabulary for their special uses while other clients will ignore types that are not supported.
-- Websites that uses JSON+LD will have content that's already understandable by **𓃠 Mau** clients leading to natural intercommunication between **𓃠 Mau** clients and the existing web.
+- Websites that use JSON+LD will have content that's already understandable by **𓃠 Mau** clients leading to natural intercommunication between **𓃠 Mau** clients and the existing web.
 - Any website can be extended with JSON+LD data that represent the content of the website itself as a social profile on **𓃠 Mau** clients.
-- Other Vocabulary can be supported gradually like ActivityPub or others. while old clients can ignore these new vocabulary.
+- Other Vocabulary can be supported gradually like ActivityPub or others. while old clients can ignore this new vocabulary.
 - All activities can be presented as Schema.org type such as SocialMediaPosting, API Reference, Book, FollowAction, LikeAction, DislikeAction...etc
 
-## Use Pretty Good Privacy (PGP)
+## Authentication and Authorization
 
 While public posts are meant to be read by anyone. We still need to:
 
@@ -133,50 +136,53 @@ PGP messages is a well [established standard](https://tools.ietf.org/html/rfc488
 
 - Generate a key pair for the user that identify him on the network.
 - The key/subkey can be used to sign all content to prevent tampering.
-- Adding someone to the contact list is as simple as getting his public key and add it to the local trusted keyring.
-- Private content can be encrypted by the user public key
+- Adding someone to the contact list is as simple as getting his public key and adding it to the local trusted keyring.
+- Private content can be encrypted by the user's public key
 - Private messages to another user can be encrypted by their public key
 - PGP allows encrypting a file to multiple people at the same time
 - Mark the date of signing/encrypting a file without depending on the filesystem properties.
 
-This leads to the following features for the system:
+This leads to the following features of the system:
 
-- Having private content that is protected cryptographically
-- Having an end-to-end encrypted content not even any application can read without the user permission
-- Password protected identity
-- Protection against data leakage. Even if the directory was accessed by a malicious application all files are encrypted for their respective recipients with an exception of the public content.
-- Content is signed cryptogrphically which prevents temperament
-- Content that can be relayed with a third-party without reading the content
-- Content that can be sent in an encrypted email message.
-- User can pick his own algorithms for encryption/signing/authentication as he wishes without limiting him to specific algorithm or key length.
-- Content is compressed before encryption reducing size on disk
-- Granular privacy for every piece of information on the network. A FollowAction for example can be public (not encrypted). Shared with one of my friends (encrypted for my friend) or shared with a specific list of my friends (encrypted for multiple recipients). This applies on a file by file basis. Another example: A Message can be encrypted to one person for a private end-to-end chat or multiple recipients for a group chat.
-- Using trust levels in the PGP keyrings can be beneficial. for example a peer with key of `never` trust level should be ignored by any communication software and his content never be written to the disk.
+- Private content is protected cryptographically
+- End-to-end encrypted content. applications can't read user content without the user's permission
+- Password-protected identity
+- Protection against data leaks. Even if the directory was accessed by a malicious application all files are encrypted for their respective recipients with an exception of the public content.
+- Content is signed cryptographically which prevents temperament
+- Content can be relayed through a third party without reading the content
+- Content can be sent in an encrypted email message.
+- The user can pick his own algorithms for encryption/signing/authentication as he wishes without limiting him to specific algorithms or key lengths.
+- Content is compressed before encryption reducing the size on the disk
+- Granular privacy for every piece of information on the network:
+  - A FollowAction for example can be public (not encrypted). Shared with one of my friends (encrypted for my friend) or shared with a specific list of my friends (encrypted for multiple recipients). This applies on a file-by-file basis.
+  - A Message can be encrypted to one person for a private end-to-end chat or multiple recipients for a group chat.
+- Using trust levels in the PGP keyrings can be beneficial.
+  - a peer with a key of `never` trust level should be ignored by any communication software and his content never be written to the disk.
 
-## Use HTTP interface to serve files
+## Data Exchange
 
-Files that are created by one user needs to be downloaded to all peers that are asking for it when they become online. the simplest interface that can serve the files and provide interoperability with current web is an HTTP interface.
+Files that are created by one user need to be copied to all peers that are asking for this content. the simplest interface that can serve the files and provide interoperability with the current web is an HTTP interface.
 
-The simplest form is a normal HTTP server that has 3 endpoints:
+The simplest form is an HTTP server that has 3 endpoints:
 - `/files`: which lists all files created by the user
 - `/files/<file-name>`: which downloads the latest version of a file
-- `/files/<file-name>/versions/<version-hash>`: to download a specific version
+- `/files/<file-name>/versions/<version-hash>`: to download a specific content version
 
-This will provide an interface to download public files that doesn't need authentication.
+This will provide an interface to download public files that don't need authentication.
 
 The list of files will get longer over time so:
 - Client can keep track of the last update time
 - Client will send the update time as a value for the HTTP header `If-Modified-Since`
-- The Serving user `/files` should return only the files list modified after the provided date. Ordered by oldest first and can limit the response if needed.
-- User will download the list of modified files.
+- The server `/files` endpoint should return only the files list modified after the provided date. Ordered by oldest first and can limit the response if needed.
+- Client will download the list of modified files.
 
-The size of each file can be added to the `/files` response to make sure Clients doesn't download files too large. A SHA sum of the file can be also added to the same endpoint to make sure the remote file is not the same as the local file before downloading.
+The size of each file can be added to the `/files` response to make sure Clients don't download files too large. A `SHA` sum of the file can be also added to the same endpoint to make sure the remote file is not the same as the local file before downloading.
 
 Extending the endpoints for `/<user-fingerprint>/files`, `/<user-fingerprint>/files/<filename>` and `/<user-fingerprint>/files/<file-name>/versions/<version-hash>` will allow a user to relay other people content if desired. allowing a user to distribute comments on his content for example from other users.
 
 Adding TLS1.3 to the HTTP interface will allow both sides to identify themselves with their identity keys. The interface in this case can limit the files response to the public files and files encrypted for the requesting user. This will allow users to exchange private messages/content over a secure connection while the content itself is also encrypted for the receiving party so the user can store the response to his disk without any processing whatsoever.
 
-This will lead to some benefits:
+This will lead to the following benefits:
 
 - Existing websites can implement both endpoints easily to serve public content without the need for any intermediary party to get involved in the process.
 - Supporting `Range` HTTP header will lead to resumable downloads for large content files.
@@ -185,19 +191,29 @@ This will lead to some benefits:
 
 # BENEFITS
 
-* A chat application will involve creating [SocialMediaPosting](https://schema.org/SocialMediaPosting) files for example. Sign them with the user private key. and encrypt it for the current user and for the recipient. And request updates from the other side for synchronization every period.
+* A chat application will:
+  * Create [SocialMediaPosting](https://schema.org/SocialMediaPosting) files for example.
+  * Sign them with the user's private key.
+  * Encrypt it for the current user and for the recipients.
+  * Request updates from the other side for synchronization every period.
 
-* A user(A) can post a content, another user(B) will create a comment which user(A) downloads while syncing. Then he can share this comment with his contacts by creating a [ShareAction](https://schema.org/ShareAction). User(C) will sync with user(A) and the ShareAction will contain a reference to User(B) comment. so user(C) can either ask user(A) for the comment if he wish to relay user(B) comment or ask user(B) directly if he's part of his contacts list. This means comment itself can have a privacy of its own and sharing the comment can have an additional privacy which reduces the scope of the original comment.
-
-* Deleting a message can be as simple as deleting the file content. Clients will sync the file as it was updated and the content will be deleted also from their machines.
+* A user(A) can post a content
+  * Another user(B) will create a comment which user(A) downloads while syncing.
+  * Then user(A) can share this comment with his contacts by creating a [ShareAction](https://schema.org/ShareAction).
+  * User(C) will sync with user(A) and the ShareAction will contain a reference to User(B) comment.
+  * User(C) can either
+    * Ask user(A) for the comment if he wishes to serve user(B) comment
+    * or ask user(B) directly if he's part of his contacts list.
+  * This means the comment itself can have privacy of its own and sharing the comment can have additional privacy which reduces the scope of the original comment.
 
 * File name will act as an ID for this user so updating the file will reflect on anyone who keeps synchronizing.
 
 * Multiple applications can work on the same data at the same time. so a chat application can create and update files while a game of chess is also working on creating and updating files of its types without collision.
 
-* Notifications can be derived from new content. for example an application can listen on files changes and notify the user for new [UserComment](https://schema.org/UserComments) content.
+* Notifications can be derived from new content.
+  * An application can listen on files changes and notify the user of new [UserComment](https://schema.org/UserComments) content.
 
-* IOT machines can have the protocol over BLE transport and use special vocabulary to let the user access its functionalities
+* IOT machines can have the protocol over Bluetooth Low Energy (BLE) transport and use special vocabulary to let the user access its functionalities
 
 * An ecosystem of services can work in parallel on the user directory without knowing about each other. like indexing service to allow advanced search. or backup service that pushes to a paid remote storage.
 
@@ -205,9 +221,11 @@ This will lead to some benefits:
 
 * Even files that are not JSON can live side by side with JSON files encrypted for the current user preventing them from moving to other machines.
 
-* Adapting interfaces can be developed for ActivityPub or Matrix networks.
+* Adapter interfaces can be developed for ActivityPub or Matrix networks.
 
-* A Client can be developed to exchange files over the email messages. As PGP content can be exported as armored data. Clients can connect to SMTP servers to send new posts and check POP3/IMAP servers for new emails with PGP content. rendering the emails a synchronization mechanism. And it won't contradict with any other client syncing over another interface as the provided SHA sum from `/files` endpoint will prevent downloading the file again leading to multiple clients syncing over different interfaces.
+* A Client can be developed to exchange files over email messages. As PGP content can be exported as armored data.
+  * Connecting to SMTP servers to send new posts and check POP3/IMAP servers for new emails with PGP content.
+  * And it won't contradict with any other client syncing over another interface as the provided SHA sum from `/files` endpoint will prevent downloading the file again leading to multiple clients syncing over different interfaces.
 
 # TECHNICAL DETAILS
 
