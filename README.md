@@ -75,7 +75,7 @@ In our point of view, some shortcomings were inherited from each approach adopte
 
 The solution we are aiming for should:
 
-- A small set of core concepts
+- Small set of core concepts
 - Works well with the current web
 - Uses filesystem structure as a data storage
 - Allows the user to switch clients without losing their data
@@ -283,15 +283,15 @@ friend2-FPR:
 
 * Directories prefixed with `.` are ignored by the application that downloads new content. can be used to unfollow a friend while keeping his old information. or keep posts that are shared by your friends from users that you don't want to follow.
 
-* `.mau` directory is reserved for friends public key files. saved as `.pgp` in binary format <sup>[?](#why-keys-are-written-in-binary-format)</sup>. each directory file should represent a group of friends. keys can be duplicate (one friend can belong to work and close friend at the same time). account secret/pub key must be named `account.pgp` to make it easy to find among all other keys. `account.pgp` should be the private key export of the PGP identity with subkeys and signatures then symmetrically encrypted with a password of the user choice. All friends public keys should be encrypted with the account key[?](#why-are-friends-keys-encrypted)
+* `.mau` directory is reserved for friends' public key files. saved as `.pgp` in binary format <sup>[?](#why-keys-are-written-in-binary-format)</sup>. each directory file should represent a group of friends. keys can be duplicate (one friend can belong to work and a close friend at the same time). account secret/pub key must be named `account.pgp` to make it easy to find among all other keys. `account.pgp` should be the private key export of the PGP identity with subkeys and signatures then symmetrically encrypted with a password of the user choice. All friends' public keys should be encrypted with the account key[?](#why-are-friends-keys-encrypted)
 
 * Files are written in [OpenPGP message format](https://tools.ietf.org/html/rfc4880) which is supported by any OpenPGP implementation.
 
-* Directories with the same file name suffixed with `.versions` will include the file old versions.
+* Directories with the same file name suffixed with `.versions` will include the file's old versions.
 
-* Creating a directory with someone key-id-hash is a signal for the sync software to keep it in sync.
+* Creating a directory with someone's key-id-hash is a signal for the sync software to keep it in sync.
 
-* Having this directory structure will make it easier for the HTTP interface to map request path to directory structure.
+* Having this directory structure will make it easier for the HTTP interface to map the request path to the directory structure.
 
 * Clients can be instructed to encrypt the file for one key or all contacts in a keyring (rendering the keyring as a group of users).
 
@@ -306,23 +306,23 @@ friend2-FPR:
 * This will keep the file versions in the user directory
 * If another user asked for the latest versions it's already in the usual place `<file-name>.pgp`
 * If a user shared a specific version other users can ask for it and will be found in the version directory
-* When downloading a new version of the file to the user machine we can follow the same previous steps to keep old versions and prevent the signed version from being lost forever.
-* This can be very useful if an application criticaly depend on the file version like contracts signed by users.
+* When downloading a new version of the file to the user's machine we can follow the same previous steps to keep old versions and prevent the signed version from being lost forever.
+* This can be very useful if an application critically depends on the file version like contracts signed by users.
 
 ## HTTP server interface
 
-Serving files through HTTP is the interface where one peer can ask the another peer for changed files since last update. and it should adhere to the following [swagger specifications](api.yml)
+Serving files through HTTP is the interface where one peer can ask another peer for changed files since the last update. and it should adhere to the following [swagger specifications](api.yml)
 
-Authentication should happen in the security layer with both peers doing a TLS1.3 handshake with their identity keys to establish a secure communication.
+Authentication should happen in the security layer with both peers doing a TLS1.3 handshake with their identity keys to establish secure communication.
 
-## Peer to Peer Stack
+## Peer-to-Peer Stack
 
 Using a reduced Kademlia routing protocol over TCP/HTTP allows peers to find other peers using their public key fingerprint and authenticate all requests using mutual-TLS allows passing any needed information in the certificate such as IP addresses, DNS names. effectively reusing what the websites already have.
 
 * **Transport protocol**: HTTP2/TCP
 * **Discovery/Routing**: mDNS, Kademlia routing protocol, DNS (for existing websites interoperability)
 
-The previous stack should allow peers discovery over the same network. or with S/Kademlia-DHT routing if not on the same network.
+The previous stack should allow peer discovery over the same network. or with S/Kademlia-DHT routing if not on the same network.
 
 ### MDNS Service discovery
 
@@ -333,34 +333,34 @@ If local network is desired the service may announce itself on the network using
 |------------ Fingerprint --------------|app-|protocol|domain|
 ```
 
-- Fingerprint: corresponds to the instance user public key fingerprint
+- Fingerprint: corresponds to the instance user's public key fingerprint
 - app: corresponds to the application name
 - protocol: tcp
 - domain: should be always "local"
 
 ### Listening on internet requests
 
-The program is responsible for allowing the user to receive connections from outside of local network by utilizing NAT traversal protocols such as UPNP, NAT-PMP or Hole punshing.
+The program is responsible for allowing the user to receive connections from outside of the local network by utilizing NAT traversal protocols such as UPNP, NAT-PMP, or Hole punching.
 
 ### Kademlia Routing
 
-Kademlia protocol specify short list of RPC calls:
+Kademlia protocol specifies a short list of RPC calls:
 
-- PING: to make sure the node still connected
-- FIND_NODE: to find a list of nodes near a target node. recursively calling the resulting nodes converge on the target node
+- PING: to make sure the node is still connected
+- FIND_NODE: to find a list of nodes near a target node. recursively calling the resulting nodes to converge on the target node
 - STORE: stores a key and a value in the node
 - FIND_VALUE: looks up a key in the network to find its stored value
 
 Differences with Kademlia:
 
 - In our case we don't need to store values so the last two RPCs are removed from **Mau** needed RPCs, simplifying the requirements to implement the convention.
-- Kademlia node ID was meant to be random 160 bit key. in our case we can use the public key fingerprint which is 160 bits.
-- mutual TLS will allow exchanging the certificate for any two connected nodes. which means both nodes knows each other public keys and fingerprints. including the DNSNames list or IPAddresses in the certificate allows peers to know the address of the node (hostname and port) or (IP and port)
-- Instead of using UDP port we'll reuse the same HTTP server and have the requests/responses uses HTTP protocol with specific paths
-    - `/kad/ping` to ping a node, the server side record the client fingerprint and the DNS address from the TLS certificate
+- Kademlia node ID was meant to be a random 160-bit key. in our case, we can use the public key fingerprint which is 160 bits.
+- mutual TLS will allow exchanging the certificate for any two connected nodes. which means both nodes know each other public keys and fingerprints. including the DNSNames list or IP addresses in the certificate allows peers to know the address of the node (hostname and port) or (IP and port)
+- Instead of using a UDP port we'll reuse the same HTTP server and have the requests/responses use HTTP protocol with specific paths
+    - `/kad/ping` to ping a node, the server-side record the client fingerprint and the DNS address from the TLS certificate
     - `/kad/find_peer/<FPR>` to ask for the nearest known nodes for a target node fingerprint (FPR). should return a list of fingerprints and addresses.
 - all requests to the `/kad` routes will have the side effect of adding the requesting node to the serving node contact list.
-- Kademlia refer to application instance as a `Node`. instead Mau uses the word Peer as in **Peer to Peer** network to eliminate the confusion of naming the instance two different names (node, peer).
+- Kademlia refers to application instance as a `Node`. instead, Mau uses the word Peer as in **Peer to Peer** network to eliminate the confusion of naming the instance two different names (node, peer).
 
 # Architecture Diagram
 
@@ -373,9 +373,9 @@ The following is a minimum list of modules that is needed to make up the core fu
 
 * [x] **account**: An interface to create and manage file system structure and keyrings.
 * [x] **editor**: An interface that creates and edits encrypted JSON+LD (schema.org) files for existing user and friends.
-* [x] **syncer**: A daemon that implement the peer to peer stack. it downloads new content.
-* [x] **server**: A deamon that exposes existing content via HTTP interface.
-* [x] **peer**: A deamon that allow P2P networking, peer announcement and discovery over local network and the internet
+* [x] **syncer**: A daemon that implements the peer-to-peer stack. it downloads new content.
+* [x] **server**: A daemon that exposes existing content via HTTP interface.
+* [x] **peer**: A daemon that allow P2P networking, peer announcement, and discovery over the local network and the internet
 * [ ] **browser**: An interface to show content in chronological order
 
 # Challenges
@@ -410,7 +410,7 @@ The following resources are useful to understand the context around Mau and its 
     - [Imagine This: A Web without servers - Tara Vancil](https://www.youtube.com/watch?v=rJ_WvfF3FN8)
     - [Why IPFS - Juan Benet](https://www.youtube.com/watch?v=zE_WSLbqqvo)
     - [Stanford Seminar - IPFS and the Permanent Web](https://www.youtube.com/watch?v=HUVmypx9HGI)
-- Pretty Good Privacy understanding is very important to know the extent of what Mau can reach using it and can't be done too. a starting point for this topic can be wikipedia page and other related implementations:
+- Pretty Good Privacy understanding is very important to know the extent of what Mau can reach using it and can't be done too. a starting point for this topic can be Wikipedia page and other related implementations:
     - PGP on Wikipedia: https://en.wikipedia.org/wiki/Pretty_Good_Privacy
     - OpenPGP: https://www.openpgp.org/about/
     - OpenPGP message format RFC4880: https://www.rfc-editor.org/rfc/rfc4880
