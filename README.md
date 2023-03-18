@@ -7,17 +7,17 @@ This document describes a peer-to-peer (P2P) social applications convention. We 
 <!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
 **Table of Contents**
 
-- [PROBLEM](#problem)
-- [ALTERNATIVE SOLUTIONS](#alternative-solutions)
-- [REQUIREMENTS](#requirements)
-- [CORE CONCEPT](#core-concept)
+- [Problem](#problem)
+- [Alternative Solutions](#alternative-solutions)
+- [Requirements](#requirements)
+- [Core concept](#core-concept)
     - [Storage](#storage)
     - [Data format](#data-format)
     - [Schema](#schema)
     - [Authentication and Authorization](#authentication-and-authorization)
     - [Data Exchange](#data-exchange)
-- [BENEFITS](#benefits)
-- [TECHNICAL DETAILS](#technical-details)
+- [Benefits](#benefits)
+- [Technical Details](#technical-details)
     - [Addressing](#addressing)
     - [Directory structure](#directory-structure)
     - [Versioning](#versioning)
@@ -26,10 +26,10 @@ This document describes a peer-to-peer (P2P) social applications convention. We 
         - [MDNS Service discovery](#mdns-service-discovery)
         - [Listening on internet requests](#listening-on-internet-requests)
         - [Kademlia Routing](#kademlia-routing)
-- [ARCHITECTURE DIAGRAM](#architecture-diagram)
-- [ROADMAP](#roadmap)
-- [CHALLENGES](#challenges)
-- [PROJECT STATUS](#project-status)
+- [Architecture Diagram](#architecture-diagram)
+- [Roadmap](#roadmap)
+- [Challenges](#challenges)
+- [Project Status](#project-status)
 - [Getting involved](#getting-involved)
 - [License](#license)
 - [TODOs](#todos)
@@ -40,7 +40,7 @@ This document describes a peer-to-peer (P2P) social applications convention. We 
 <!-- markdown-toc end -->
 
 
-# PROBLEM
+# Problem
 
 * The current popular social applications stagnated leading to a halt in innovation and privacy issues.
   * Popular social media networks lack an organized way to post structured content such as a recipe or a technical blog post or information about a disease or a chemical formula or a mathematical equation.
@@ -59,7 +59,7 @@ This document describes a peer-to-peer (P2P) social applications convention. We 
 
 * Lying by omission: Where content feeds are manipulated by an algorithm that is both flawed and biased to the users. taking away the user's freedom to choose what to be displayed and in which order.
 
-# ALTERNATIVE SOLUTIONS
+# Alternative Solutions
 
 For the past years, many projects were initiated to solve this problem. Some solutions were drifting towards federated applications others towards complete peer-to-peer communication. [We learned a lot by following what they achieved and built](https://matrix.org/_matrix/media/r0/download/twitter.modular.im/981b258141aa0b197804127cd2f7d298757bad20).
 
@@ -71,7 +71,7 @@ In our point of view, some shortcomings were inherited from each approach adopte
 * Most of the implementations except for (heypercore, IPFS) utilizes opaque storage where the user can't access his own data without the tool provided by the social network. replicating the walled gardens problem all over again.
 * Some protocols went for data formats and vocabulary that try to replicate current social media instead of reflecting real life. This renders clients that decide to implement it helpless in expressing real-life behavior and user needs.
 
-# REQUIREMENTS
+# Requirements
 
 The solution we are aiming for should:
 
@@ -83,7 +83,7 @@ The solution we are aiming for should:
 - User has total control over their data privacy
 - Flexible to evolve over time and adapt to advancements in cryptography and presentation formats
 
-# CORE CONCEPT
+# Core concept
 
 The following section will describe a concept for building P2P social applications. The concept fulfills the previous requirements. We will refer to it initially by **[𓃠 Mau](https://en.wikipedia.org/wiki/Egyptian_Mau)**.
 
@@ -189,7 +189,7 @@ This will lead to the following benefits:
 - Existing web frameworks can be used to protect the interface against common DDOS attacks. Rate limiting...etc.
 
 
-# BENEFITS
+# Benefits
 
 * A chat application will:
   * Create [SocialMediaPosting](https://schema.org/SocialMediaPosting) files for example.
@@ -227,7 +227,7 @@ This will lead to the following benefits:
   * Connecting to SMTP servers to send new posts and check POP3/IMAP servers for new emails with PGP content.
   * And it won't contradict with any other client syncing over another interface as the provided SHA sum from `/files` endpoint will prevent downloading the file again leading to multiple clients syncing over different interfaces.
 
-# TECHNICAL DETAILS
+# Technical Details
 
 ## Addressing
 
@@ -362,12 +362,12 @@ Differences with Kademlia:
 - all requests to the `/kad` routes will have the side effect of adding the requesting node to the serving node contact list.
 - Kademlia refer to application instance as a `Node`. instead Mau uses the word Peer as in **Peer to Peer** network to eliminate the confusion of naming the instance two different names (node, peer).
 
-# ARCHITECTURE DIAGRAM
+# Architecture Diagram
 
 ![Architecture diagram](architecture.svg)
 
 
-# ROADMAP
+# Roadmap
 
 The following is a minimum list of modules that is needed to make up the core functionality of **𓃠 Mau**:
 
@@ -378,7 +378,7 @@ The following is a minimum list of modules that is needed to make up the core fu
 * [x] **peer**: A deamon that allow P2P networking, peer announcement and discovery over local network and the internet
 * [ ] **browser**: An interface to show content in chronological order
 
-# CHALLENGES
+# Challenges
 
 * **Versioning propagation**: After User(B) shares his version to his social network: the content could change to add more references or fix mistakes leading to User(B) social network browsing the old version. As there is no way to get updates on the content after the first share.
 
@@ -392,7 +392,7 @@ The following is a minimum list of modules that is needed to make up the core fu
 
 * **mDNS-SD identity proof**: When the user announces his presence on the local network there is no proof the announcement is coming from the account owner.
 
-# PROJECT STATUS
+# Project Status
 
 The project is between refining the concept and writing the Proof of concept phases. This repository includes a proof of concept Go package that can be imported. Also a CLI tool under `cmd/mau` to provide basic interface for the package.
 
