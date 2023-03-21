@@ -233,10 +233,6 @@ This will lead to the following benefits:
 
 We have three entities in our system:
 
-* **User**: Identified by his public key
-* **Content**: Identified by file name scoped to the user
-* **Content version**: Identified by the content hash
-
 * **Users**:
   * Users identified by their public key fingerprint `FPR` downcase characters
   * Users will be addressed by the address `/p2p/<user-FPR>`
@@ -317,7 +313,9 @@ Authentication should happen in the security layer with both peers doing a TLS1.
 
 ## Peer-to-Peer Stack
 
-Using a reduced Kademlia routing protocol over TCP/HTTP allows peers to find other peers using their public key fingerprint and authenticate all requests using mutual-TLS allows passing any needed information in the certificate such as IP addresses, DNS names. effectively reusing what the websites already have.
+* Using a reduced Kademlia routing protocol over TCP/HTTP
+* This allows peers to find other peers using their public key fingerprint
+* It also allows to authenticate all requests using mutual-TLS and passing any needed information in the certificate such as IP addresses, DNS names. effectively reusing what the websites already have.
 
 * **Transport protocol**: HTTP2/TCP
 * **Discovery/Routing**: mDNS, Kademlia routing protocol, DNS (for existing websites interoperability)
@@ -459,6 +457,6 @@ So `.pgp` was prefered as sole format because of these benefits:
 - It saves disk space which is better for limited resources machines such as IOT devices.
 - Takes less processing power to deal with the binary format as it doesn't need decoding like ASCII armored. so it'll be better when dealing with thousands of key files.
 
-## Why are friends keys encrypted?
+## Why are friends' keys encrypted?
 
-To make sure the friend public key is added by the account instead of a malicious program. If the public key is written in plain format it means adding a friend is not an authenticated operation any program can do it without the user permission
+To make sure the friend public key is added by the account instead of a malicious program. If the public key is written in a plain format it means adding a friend is not an authenticated operation any program can do it without the user's permission
