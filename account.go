@@ -2,6 +2,7 @@ package mau
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -13,10 +14,11 @@ import (
 	"os"
 	"path"
 
-	"github.com/keybase/go-crypto/openpgp"
-	"github.com/keybase/go-crypto/openpgp/armor"
-	"github.com/keybase/go-crypto/openpgp/packet"
-	keybasersa "github.com/keybase/go-crypto/rsa"
+	_ "crypto/sha256"
+
+	"golang.org/x/crypto/openpgp"
+	"golang.org/x/crypto/openpgp/armor"
+	"golang.org/x/crypto/openpgp/packet"
 )
 
 var (
@@ -49,6 +51,7 @@ func NewAccount(rootPath, name, email, passphrase string) (*Account, error) {
 	}
 
 	entity, err := openpgp.NewEntity(name, "", email, &packet.Config{
+		DefaultHash:            crypto.SHA256,
 		DefaultCompressionAlgo: packet.CompressionZIP,
 		RSABits:                rsaKeyLength,
 	})
@@ -174,13 +177,13 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 		BasicConstraintsValid: true,
 	}
 
-	privkey, ok := a.entity.PrivateKey.PrivateKey.(*keybasersa.PrivateKey)
+	privkey, ok := a.entity.PrivateKey.PrivateKey.(*rsa.PrivateKey)
 	if !ok {
 		err = errors.New("Can't convert private key")
 		return
 	}
 
-	pubkey, ok := a.entity.PrimaryKey.PublicKey.(*keybasersa.PublicKey)
+	pubkey, ok := a.entity.PrimaryKey.PublicKey.(*rsa.PublicKey)
 	if !ok {
 		err = errors.New("Can't convert public key")
 		return

@@ -5,7 +5,6 @@ go 1.20
 require (
 	github.com/hashicorp/mdns v1.0.5
 	github.com/huin/goupnp v1.1.0
-	github.com/keybase/go-crypto v0.0.0-20200123153347-de78d2cb44f4
 	golang.org/x/crypto v0.8.0
 	golang.org/x/term v0.7.0
 )
