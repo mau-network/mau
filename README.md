@@ -75,7 +75,7 @@ In our point of view, some shortcomings were inherited from each approach adopte
 
 The solution we are aiming for should:
 
-- Small set of core concepts
+- Have a small set of core concepts
 - Works well with the current web
 - Uses filesystem structure as a data storage
 - Allows the user to switch clients without losing their data
@@ -121,7 +121,7 @@ This will lead to interesting properties:
   * Avro
 
 * From the previous options we'll use JSON as it has the following benefits:
-  * Has wide support from popular programming languages
+  * Supported by most modern programming languages
   * Supported by text editors
   * Supported by web browsers
   * Has many tools to help read/filter/transform it like: jq
