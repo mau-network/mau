@@ -103,9 +103,28 @@ This will lead to interesting properties:
 
 ## Data format
 
-Using unstructured text will not be sufficient to represent all kinds of content created by users. a piece of content that represents a simple status update should have a different structure than a recipe or a technical blog post or a doctor sharing disease information. or an athlete sharing his bike ride.
+* Writing a piece of content that represents a simple status update is different than:
+  * a recipe
+  * a technical blog post
+  * a doctor sharing disease information
+  * or an athlete sharing his bike ride.
 
-JSON has wide support from popular programming languages. Using it as a content format will introduce structure to the data. while making it still readable by any text editor.
+* Using unstructured text will not be sufficient to:
+  * represent all kinds of content created by users
+  * every program will have a different way to find the type of the content
+
+* We have to use a structured format to represent content, some options are:
+  * XML
+  * JSON
+  * YAML
+  * Protobuf
+  * Avro
+
+* From the previous options we'll use JSON as it has the following benefits:
+  * Has wide support from popular programming languages
+  * Supported by text editors
+  * Supported by web browsers
+  * Has many tools to help read/filter/transform it like: jq
 
 ## Schema
 
