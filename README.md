@@ -22,7 +22,7 @@ This document describes a peer-to-peer (P2P) social applications convention. We 
     - [Directory structure](#directory-structure)
     - [Versioning](#versioning)
     - [HTTP server interface](#http-server-interface)
-    - [Peer to Peer Stack](#peer-to-peer-stack)
+    - [Peer-to-Peer Stack](#peer-to-peer-stack)
         - [MDNS Service discovery](#mdns-service-discovery)
         - [Listening on internet requests](#listening-on-internet-requests)
         - [Kademlia Routing](#kademlia-routing)
@@ -32,10 +32,9 @@ This document describes a peer-to-peer (P2P) social applications convention. We 
 - [Project Status](#project-status)
 - [Getting involved](#getting-involved)
 - [License](#license)
-- [TODOs](#todos)
 - [FAQ](#faq)
     - [Why are keys written in binary format?](#why-are-keys-written-in-binary-format)
-    - [Why are friends keys encrypted?](#why-are-friends-keys-encrypted)
+    - [Why are friends' keys encrypted?](#why-are-friends-keys-encrypted)
 
 <!-- markdown-toc end -->
 
@@ -128,18 +127,24 @@ This will lead to interesting properties:
 
 ## Schema
 
-JSON by itself is a format that defines a set of primitive data types (int, float, boolean, null, array, object). making sure all clients understand each other means we need to use the same name for the same concept. a title of an article should be called "title" for example not "header".
-
-Instead of inventing a new schema, we can use the existing [Schema.org](https://schema.org/docs/full.html) catalog of vocabulary.
+* JSON is a format that defines a set of primitive data types (int, float, boolean, null, array, object), Not structures and attributes names.
+* To make sure all clients understand each other, we need to use the same name for the same concept. e.g. a title of an article should be called "title" for example not "header".
+* Instead of inventing a new schema for **𓃠 Mau**, we can use the existing [Schema.org](https://schema.org/docs/full.html) catalog of vocabulary.
 
 This will lead to the following benefits:
 
 - Content attributes can have a single value or multiple values for each language
-- Specialized clients can extend the vocabulary for their special uses while other clients will ignore types that are not supported.
+- Specialized clients can extend the vocabulary for their special use cases while other clients will ignore types that are not supported.
 - Websites that use JSON+LD will have content that's already understandable by **𓃠 Mau** clients leading to natural intercommunication between **𓃠 Mau** clients and the existing web.
 - Any website can be extended with JSON+LD data that represent the content of the website itself as a social profile on **𓃠 Mau** clients.
 - Other Vocabulary can be supported gradually like ActivityPub or others. while old clients can ignore this new vocabulary.
-- All activities can be presented as Schema.org type such as SocialMediaPosting, API Reference, Book, FollowAction, LikeAction, DislikeAction...etc
+- All activities can be presented as Schema.org type such as:
+  - [SocialMediaPosting](https://schema.org/SocialMediaPosting)
+  - [API Reference](https://schema.org/APIReference)
+  - [Book](https://schema.org/Book)
+  - [FollowAction](https://schema.org/FollowAction)
+  - [LikeAction](https://schema.org/LikeAction)
+  - [DislikeAction](https://schema.org/DislikeAction) ...etc
 
 ## Authentication and Authorization
 
@@ -151,7 +156,7 @@ While public posts are meant to be read by anyone. We still need to:
 - Limit sharing to specific people.
 - Keep track of a contact list and their identifiers on the network.
 
-PGP messages is a well [established standard](https://tools.ietf.org/html/rfc4880) that can be used to:
+PGP message format is a well [established standard](https://tools.ietf.org/html/rfc4880) that can be used to:
 
 - Generate a key pair for the user that identify him on the network.
 - The key/subkey can be used to sign all content to prevent tampering.
@@ -250,7 +255,7 @@ This will lead to the following benefits:
 
 ## Addressing
 
-We have three entities in our system:
+**𓃠 Mau** has three entities:
 
 * **Users**:
   * Users identified by their public key fingerprint `FPR` downcase characters
@@ -451,10 +456,6 @@ The following resources are useful to understand the context around Mau and its 
 - The project and the implementation is released under GPLv3
 - The license protects the community by preventing [Bait and switch](https://debugagent.com/open-source-bait-and-switch).
 - It maximize freedom with respect to openness preventing corndering the community in the future.
-
-# TODOs
-
-Project TODOs are mentioned in comments starting with `TODO`.
 
 # FAQ
 
