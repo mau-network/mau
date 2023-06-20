@@ -1,61 +1,21 @@
-This document describes a peer-to-peer (P2P) social applications convention. We are utilizing the filesystem, PGP, and Kademlia protocol for storage, privacy, peer discovery, and routing, respectively without any supporting data structures.
+**𓃠 Mau** is a peer-to-peer (P2P) social applications convention. It utilizes the filesystem for storage, PGP for privacy, and Kademlia protocol peer discovery, and routing. **𓃠 Mau** aims for simplicity of implementation. maximizing user freedom. and complete peer-to-peer decentralization.
 
 <p align="center">
-  <img width="460" height="300" src="logo.svg">
+  <img width="250" src="logo.svg">
 </p>
-
-<!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
-**Table of Contents**
-
-- [Problem](#problem)
-- [Alternative Solutions](#alternative-solutions)
-- [Requirements](#requirements)
-- [Core concept](#core-concept)
-    - [Storage](#storage)
-    - [Data format](#data-format)
-    - [Schema](#schema)
-    - [Authentication and Authorization](#authentication-and-authorization)
-    - [Data Exchange](#data-exchange)
-- [Benefits](#benefits)
-- [Technical Details](#technical-details)
-    - [Addressing](#addressing)
-    - [Directory structure](#directory-structure)
-    - [Versioning](#versioning)
-    - [HTTP server interface](#http-server-interface)
-    - [Peer-to-Peer Stack](#peer-to-peer-stack)
-        - [MDNS Service discovery](#mdns-service-discovery)
-        - [Listening on internet requests](#listening-on-internet-requests)
-        - [Kademlia Routing](#kademlia-routing)
-- [Architecture Diagram](#architecture-diagram)
-- [Roadmap](#roadmap)
-- [Challenges](#challenges)
-- [Project Status](#project-status)
-- [Getting involved](#getting-involved)
-- [License](#license)
-- [FAQ](#faq)
-    - [Why are keys written in binary format?](#why-are-keys-written-in-binary-format)
-    - [Why are friends' keys encrypted?](#why-are-friends-keys-encrypted)
-
-<!-- markdown-toc end -->
-
 
 # Problem
 
-* The current popular social applications stagnated leading to a halt in innovation and privacy issues.
-  * Popular social media networks lack an organized way to post structured content such as a recipe or a technical blog post or information about a disease or a chemical formula or a mathematical equation.
-  * Many social media networks were involved in personal information leak incidents that led to users' arrest or twisting of democratic elections.
-
+* Popular social applications suffers from innovation stagnation for example:
+  * They don't allow creating structured content such as a recipe or a technical blog post or information about a disease or a chemical formula or a mathematical equation.
+  * Third-party developers access is very limited, so third party applications can't extend them in any meaningful way
+* Many social media networks were involved in leaking personal information. people were arrested and democratic elections were twisted as a result.
 * [Walled gardens problem](https://en.wikipedia.org/wiki/Closed_platform): Users can't move their data between social applications leading to duplication of the same content for the same person on multiple social media networks. We perceive that as a symptom of their incompatibility.
-
 * Ads intrusive behavior as a result of the excessive user tracking and signals extraction from user content and behavior on the network and other affiliate websites.
-
 * Users are not in control of their data and its privacy. Trusting the application operator to manage their data as they're instructed by the tools presented to the users. Tools that are inherently biased and have limited controls over data.
-
 * Centralization issue: Where sending someone a message in the other room means the message has to travel to the nearest data center which can be in another continent then comes back again to the room next to you. that's not sane behavior by any stretch.
-
 * [Censorship](https://en.wikipedia.org/wiki/Censorship#Social_media): Social applications set biased guidelines that are suitable for some of the users and not others because of differences in cultures between countries. even cities in one country have different habits and behaviors. even between families in the same city.
-  * acting as a big brother to all of the application users isn't a good situation. this is an inherent disadvantage of hosting users' content.
-
+  * Hosting users' content puts you in a bad situation as you have to moderate it. Which forces the social network to act as a bi brother to all users
 * Lying by omission: Where content feeds are manipulated by an algorithm that is both flawed and biased to the users. taking away the user's freedom to choose what to be displayed and in which order.
 
 # Alternative Solutions
