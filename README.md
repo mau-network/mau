@@ -1,4 +1,4 @@
-**𓃠 Mau** is a peer-to-peer (P2P) social applications convention. It utilizes the filesystem for storage, PGP for privacy, and Kademlia protocol peer discovery, and routing. **𓃠 Mau** aims for simplicity of implementation. maximizing user freedom. and complete peer-to-peer decentralization.
+**𓃠 Mau** is a peer-to-peer (P2P) social applications convention. It utilizes the filesystem for storage, PGP for privacy, and Kademlia protocol for peer discovery, and routing. **𓃠 Mau** aims for simplicity of implementation. maximizing user freedom. and complete peer-to-peer decentralization.
 
 <p align="center">
   <img width="250" src="logo.svg">
@@ -7,7 +7,7 @@
 # Problem
 
 * Popular social applications suffers from innovation stagnation for example:
-  * They don't allow creating structured content such as a recipe or a technical blog post or information about a disease or a chemical formula or a mathematical equation.
+  * Users can't create structured content such as a recipe, a technical blog post, information about a disease, a chemical formula, or a mathematical equation.
   * Third-party developers access is very limited, so third party applications can't extend them in any meaningful way
 * Many social media networks were involved in leaking personal information. people were arrested and democratic elections were twisted as a result.
 * [Walled gardens problem](https://en.wikipedia.org/wiki/Closed_platform): Users can't move their data between social applications leading to duplication of the same content for the same person on multiple social media networks. We perceive that as a symptom of their incompatibility.
@@ -17,18 +17,6 @@
 * [Censorship](https://en.wikipedia.org/wiki/Censorship#Social_media): Social applications set biased guidelines that are suitable for some of the users and not others because of differences in cultures between countries. even cities in one country have different habits and behaviors. even between families in the same city.
   * Hosting users' content puts you in a bad situation as you have to moderate it. Which forces the social network to act as a bi brother to all users
 * Lying by omission: Where content feeds are manipulated by an algorithm that is both flawed and biased to the users. taking away the user's freedom to choose what to be displayed and in which order.
-
-# Alternative Solutions
-
-For the past years, many projects were initiated to solve this problem. Some solutions were drifting towards federated applications others towards complete peer-to-peer communication. [We learned a lot by following what they achieved and built](https://matrix.org/_matrix/media/r0/download/twitter.modular.im/981b258141aa0b197804127cd2f7d298757bad20).
-
-In our point of view, some shortcomings were inherited from each approach adopted:
-
-* [Federated networks](https://en.wikipedia.org/wiki/Federation_(information_technology)) suffer from a high population in 2 or 3 servers leading to maintenance difficulties. and moderation nightmare for the people responsible for these servers.
-* Some applications went for an implementation that doesn't allow the freedom of editing and manipulating your own data which is against what we believe is the simplest freedom on a social network.
-* Some applications suffered from a monolithic implementation where everything is set in stone with no room for changes or evolution. like what algorithms to use and which parameters and how nodes interact together and which hashes to use. which will make it very painful in the future to upgrade the network.
-* Most of the implementations except for (heypercore, IPFS) utilizes opaque storage where the user can't access his own data without the tool provided by the social network. replicating the walled gardens problem all over again.
-* Some protocols went for data formats and vocabulary that try to replicate current social media instead of reflecting real life. This renders clients that decide to implement it helpless in expressing real-life behavior and user needs.
 
 # Requirements
 
@@ -58,18 +46,18 @@ This will lead to interesting properties:
 * Restoring your content to a previous state can be achieved by restoring one of your backups.
 * The user will be able to post and read posts from any application that can access your disk like a command-line tool, an extension in your text editor, a desktop GUI. and on phones any App that has permission to access the disk
 * Deleting the user's copy of the data will be a simple directory deletion.
-* Data can live on a local machine storage device or remote device accessed by any network file system.
+* Data can live on remote device accessed by a network file system.
 
 ## Data format
 
 * Writing a piece of content that represents a simple status update is different than:
   * a recipe
   * a technical blog post
-  * a doctor sharing disease information
-  * or an athlete sharing his bike ride.
+  * a disease information
+  * a bike ride
 
 * Using unstructured text will not be sufficient to:
-  * represent all kinds of content created by users
+  * represent all types of content created by users
   * every program will have a different way to find the type of the content
 
 * We have to use a structured format to represent content, some options are:
@@ -80,6 +68,7 @@ This will lead to interesting properties:
   * Avro
 
 * From the previous options we'll use JSON as it has the following benefits:
+  * Familiar format for developers
   * Supported by most modern programming languages
   * Supported by text editors
   * Supported by web browsers
@@ -118,7 +107,7 @@ While public posts are meant to be read by anyone. We still need to:
 
 PGP message format is a well [established standard](https://tools.ietf.org/html/rfc4880) that can be used to:
 
-- Generate a key pair for the user that identify him on the network.
+- Generate a key pair that identifies the user on the network.
 - The key/subkey can be used to sign all content to prevent tampering.
 - Adding someone to the contact list is as simple as getting his public key and adding it to the local trusted keyring.
 - Private content can be encrypted by the user's public key
@@ -383,6 +372,19 @@ The project is between refining the concept and writing the Proof of concept pha
 | Test Coverage | [![codecov](https://codecov.io/gh/mau-network/mau/branch/master/graph/badge.svg?token=GL1MDCEIVK)](https://codecov.io/gh/mau-network/mau)  |
 | Documentation | [![GoDoc](https://godoc.org/github.com/mau-network/mau?status.svg)](https://godoc.org/github.com/mau-network/mau)                          |
 | Go Card       | [![Go Report Card](https://goreportcard.com/badge/github.com/mau-network/mau)](https://goreportcard.com/report/github.com/mau-network/mau) |
+
+# Alternative Solutions
+
+For the past years, many projects were initiated to solve this problem. Some solutions were drifting towards federated applications others towards complete peer-to-peer communication. [We learned a lot by following what they achieved and built](https://matrix.org/_matrix/media/r0/download/twitter.modular.im/981b258141aa0b197804127cd2f7d298757bad20).
+
+In our point of view, some shortcomings were inherited from each approach adopted:
+
+* [Federated networks](https://en.wikipedia.org/wiki/Federation_(information_technology)) suffer from a high population in 2 or 3 servers leading to maintenance difficulties. and moderation nightmare for the people responsible for these servers.
+* Some applications went for an implementation that doesn't allow the freedom of editing and manipulating your own data which is against what we believe is the simplest freedom on a social network.
+* Some applications suffered from a monolithic implementation where everything is set in stone with no room for changes or evolution. like what algorithms to use and which parameters and how nodes interact together and which hashes to use. which will make it very painful in the future to upgrade the network.
+* Most of the implementations except for (heypercore, IPFS) utilizes opaque storage where the user can't access his own data without the tool provided by the social network. replicating the walled gardens problem all over again.
+* Some protocols went for data formats and vocabulary that try to replicate current social media instead of reflecting real life. This renders clients that decide to implement it helpless in expressing real-life behavior and user needs.
+
 
 # Getting involved
 
