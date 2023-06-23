@@ -1,10 +1,12 @@
-**𓃠 Mau** is a peer-to-peer (P2P) social applications convention. It utilizes the filesystem for storage, PGP for privacy, and Kademlia protocol for peer discovery, and routing. **𓃠 Mau** aims for simplicity of implementation. maximizing user freedom. and complete peer-to-peer decentralization.
+# Abstract
+
+This specification defines **𓃠 Mau** a peer-to-peer (P2P) social applications convention. It utilizes the filesystem for storage, PGP for privacy, and Kademlia protocol for peer discovery, and routing. **𓃠 Mau** aims for simplicity of implementation. maximizing user freedom. and complete peer-to-peer decentralization.
 
 <p align="center">
   <img width="250" src="logo.svg">
 </p>
 
-# Problem
+# Introduction
 
 * Popular social applications suffers from innovation stagnation for example:
   * Users can't create structured content such as a recipe, a technical blog post, information about a disease, a chemical formula, or a mathematical equation.
@@ -162,7 +164,7 @@ This will lead to the following benefits:
 - Existing web frameworks can be used to protect the interface against common DDOS attacks. Rate limiting...etc.
 
 
-# Benefits
+# Example Use Cases
 
 * A chat application will:
   * Create [SocialMediaPosting](https://schema.org/SocialMediaPosting) files for example.
@@ -250,7 +252,7 @@ friend2-FPR:
     friend3-FPR.pgp
 ```
 
-* Directories prefixed with `.` are ignored by the application that downloads new content. can be used to unfollow a friend while keeping his old information. or keep posts that are shared by your friends from users that you don't want to follow.
+* Applications will ignore directories prefixed with `.`. This mechanism can be used to unfollow a friend while keeping his old information. or keep posts that are shared by your friends from users that you don't want to follow.
 
 * `.mau` directory is reserved for friends' public key files. saved as `.pgp` in binary format <sup>[?](#why-keys-are-written-in-binary-format)</sup>. each directory file should represent a group of friends. keys can be duplicate (one friend can belong to work and a close friend at the same time). account secret/pub key must be named `account.pgp` to make it easy to find among all other keys. `account.pgp` should be the private key export of the PGP identity with subkeys and signatures then symmetrically encrypted with a password of the user choice. All friends' public keys should be encrypted with the account key[?](#why-are-friends-keys-encrypted)
 
