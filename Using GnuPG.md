@@ -13,6 +13,7 @@
 * User can use `gpg` CLI to operate on their keys and imported friends public keys
 * The `~/.gnupg` directory on *nix machines has a documented structure and the technical depth for future Mau expansions such as trust levels
 * GPG can do maintainance operations such as generating revocation, sending keys, updating trustdb file.
+* There is no need for `.mau` directory anymore in the content directory as key material and friends public keys will be stored in `~/.gnupg`
 
 ## Disadvantages
 * Implementer must learn GPG CLI if they're going to invoke the process from their application
