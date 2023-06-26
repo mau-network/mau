@@ -23,6 +23,7 @@
   * or use the system keyring/keystore service. which is different for Android and iOS. this will open the door for guessing the implementation between different applications trying to reuse the same account for different data types
   * Or compile GpgME library for the target platform. which is a huge effort for a developer
 * Storing account information separate from the content data so backing up an account is a different process than backing up the content
+* in case of invoking `gpg` it will cause slowdown compared to using linked/static library
 
 # Decision
 * To be decided
