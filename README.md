@@ -15,7 +15,7 @@ This specification defines **𓃠 Mau** a peer-to-peer (P2P) social applications
 * [Walled gardens problem](https://en.wikipedia.org/wiki/Closed_platform): Users can't move their data between social applications leading to duplication of the same content for the same person on multiple social media networks. We perceive that as a symptom of their incompatibility.
 * Ads intrusive behavior as a result of the excessive user tracking and signals extraction from user content and behavior on the network and other affiliate websites.
 * Users are not in control of their data and its privacy. Trusting the application operator to manage their data as they're instructed by the tools presented to the users. Tools that are inherently biased and have limited controls over data.
-* Centralization issue: Where sending someone a message in the other room means the message has to travel to the nearest data center which can be in another continent then comes back again to the room next to you. that's not sane behavior by any stretch.
+* Centralization issue: Where sending someone a message in the other room means the message has to travel to the nearest data center which can be in another continent then transferred back again to the room next to you. that's not sane behavior by any stretch.
 * [Censorship](https://en.wikipedia.org/wiki/Censorship#Social_media): Social applications set biased guidelines that are suitable for some of the users and not others because of differences in cultures between countries. even cities in one country have different habits and behaviors. even between families in the same city.
   * Hosting users' content puts you in a bad situation as you have to moderate it. Which forces the social network to act as a bi brother to all users
 * Lying by omission: Where content feeds are manipulated by an algorithm that is both flawed and biased to the users. taking away the user's freedom to choose what to be displayed and in which order.
@@ -38,7 +38,7 @@ The following section will describe a concept for building P2P social applicatio
 
 ## Storage
 
-Extending the Unix approach [everything is a file](https://en.wikipedia.org/wiki/Unix_philosophy) to the social applications will make any social application implementation a mere application that reads files from the user machine.
+Adopting the Unix approach [everything is a file](https://en.wikipedia.org/wiki/Unix_philosophy) in social applications will make any social application implementation a mere application that reads files from the user machine.
 
 We will present each piece of content on **𓃠 Mau** as a file in the user file system.
 
