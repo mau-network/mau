@@ -228,7 +228,7 @@ func main() {
 		after := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
 		files := account.ListFiles(fpr, after, 0)
 		for _, f := range files {
-			if f.Deleted(account) {
+			if f.Deleted() {
 				continue
 			}
 

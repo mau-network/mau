@@ -134,16 +134,9 @@ func (f *File) Size() (int64, error) {
 	return info.Size(), nil
 }
 
-func (f *File) Deleted(account *Account) bool {
-	r, err := f.Reader(account)
-	if err != nil {
-		return false
-	}
-
-	buf := make([]byte, 1)
-	_, err = io.ReadFull(r, buf)
-
-	return err != nil
+func (f *File) Deleted() bool {
+	_, err := os.Stat(f.Path)
+	return os.IsNotExist(err)
 }
 
 func (a *Account) GetFileVersion(fpr Fingerprint, name, version string) (*File, error) {
@@ -229,13 +222,7 @@ func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File
 }
 
 func (a *Account) RemoveFile(file *File) error {
-	rs, err := file.Recipients(a)
-	if err != nil {
-		return err
-	}
-
-	_, err = a.AddFile(bytes.NewReader([]byte{}), file.Name(), rs)
-	return err
+	return os.Remove(file.Path)
 }
 
 func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint) []*File {

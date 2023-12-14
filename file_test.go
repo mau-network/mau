@@ -21,7 +21,7 @@ func TestFile(t *testing.T) {
 	ASSERT_EQUAL(t, 0, len(versions))
 
 	ASSERT_EQUAL(t, "hello.txt.pgp", file.Name())
-	ASSERT_EQUAL(t, false, file.Deleted(account))
+	ASSERT_EQUAL(t, false, file.Deleted())
 
 	size, err := file.Size()
 	ASSERT_NO_ERROR(t, err)
@@ -79,7 +79,7 @@ func TestGetFile(t *testing.T) {
 
 	ASSERT_EQUAL(t, file.Path, opened.Path)
 	ASSERT_EQUAL(t, file.Name(), opened.Name())
-	ASSERT_EQUAL(t, file.Deleted(account), opened.Deleted(account))
+	ASSERT_EQUAL(t, file.Deleted(), opened.Deleted())
 	ASSERT_EQUAL(t, len(file.Versions()), len(opened.Versions()))
 
 	file_hash, _ := file.Hash()
@@ -99,12 +99,12 @@ func TestRemoveFile(t *testing.T) {
 	account, _ := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "password value")
 
 	file, _ := account.AddFile(strings.NewReader("hello world"), "hello.txt", []*Friend{})
-	ASSERT(t, !file.Deleted(account), "File should exist (not deleted)")
+	ASSERT(t, !file.Deleted(), "File should exist (not deleted)")
 
 	err := account.RemoveFile(file)
 	ASSERT_NO_ERROR(t, err)
 
-	ASSERT(t, file.Deleted(account), "File should be deleted")
+	ASSERT(t, file.Deleted(), "File should be deleted")
 
 	recipients, err := file.Recipients(account)
 	ASSERT_EQUAL(t, 0, len(recipients))
