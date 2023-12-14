@@ -49,6 +49,7 @@ This will lead to interesting properties:
 * The user will be able to post and read posts from any application that can access your disk like a command-line tool, an extension in your text editor, a desktop GUI. and on phones any App that has permission to access the disk
 * Deleting the user's copy of the data will be a simple directory deletion.
 * Data can live on remote device accessed by a network file system.
+* Deleting a post is a simple file deletion
 
 ## Data format
 
@@ -360,8 +361,6 @@ The following is a minimum list of modules that is needed to make up the core fu
 * **Multiple devices**: Accessing one account from multiple devices isn't possible with the current concept state.
 
 * **Key revocation**: There is no mechanism to revoke or change keys. unless done manually through another channel like PGP keyservers synchronization.
-
-* **Deletion**: Deletion of a file happens by overwriting the file with empty content and moving the old content to the `.versions` directory. Simply overwriting the file content with empty content will not prove the authenticity of the operation so the file content has to be signed by the author and encrypted to the same users who had access to the file. This means the deleted file size will not be 0 bytes. this means by listing files with the HTTP endpoint the deleted files can't be detected from the size. it has to be downloaded as any other file. and while viewing the files then we'll know that this file is a mark of deletion after decryption which consumes CPU and memory for each deleted file. This also means to delete a file you need to decrypt the file and make sure it's not already deleted otherwise you'll delete a deleted file alredy. I was hoping to know about the deleted files from the files listing HTTP endpoint by its size.
 
 * **mDNS-SD identity proof**: When the user announces his presence on the local network there is no proof the announcement is coming from the account owner.
 
