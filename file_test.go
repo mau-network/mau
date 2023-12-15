@@ -101,10 +101,14 @@ func TestRemoveFile(t *testing.T) {
 	file, _ := account.AddFile(strings.NewReader("hello world"), "hello.txt", []*Friend{})
 	ASSERT(t, !file.Deleted(), "File should exist (not deleted)")
 
+	file, _ = account.AddFile(strings.NewReader("bye world"), "hello.txt", []*Friend{})
+	ASSERT_EQUAL(t, 1, len(file.Versions()))
+
 	err := account.RemoveFile(file)
 	ASSERT_NO_ERROR(t, err)
 
 	ASSERT(t, file.Deleted(), "File should be deleted")
+	ASSERT_EQUAL(t, 0, len(file.Versions()))
 
 	recipients, err := file.Recipients(account)
 	ASSERT_EQUAL(t, 0, len(recipients))

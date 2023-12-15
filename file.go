@@ -222,7 +222,23 @@ func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File
 }
 
 func (a *Account) RemoveFile(file *File) error {
-	return os.Remove(file.Path)
+	err := os.Remove(file.Path)
+	if err != nil {
+		return err
+	}
+
+	if file.version {
+		return nil
+	}
+
+	for _, version := range file.Versions() {
+		err := a.RemoveFile(version)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint) []*File {
