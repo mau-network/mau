@@ -132,8 +132,6 @@ This leads to the following features of the system:
 - Granular privacy for every piece of information on the network:
   - A FollowAction for example can be public (not encrypted). Shared with one of my friends (encrypted for my friend) or shared with a specific list of my friends (encrypted for multiple recipients). This applies on a file-by-file basis.
   - A Message can be encrypted to one person for a private end-to-end chat or multiple recipients for a group chat.
-- Using trust levels in the PGP keyrings can be beneficial.
-  - a peer with a key of `never` trust level should be ignored by any communication software and his content never be written to the disk.
 
 ## Data Exchange
 
