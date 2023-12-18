@@ -80,7 +80,7 @@ This will lead to interesting properties:
 ## Schema
 
 * JSON is a format that defines a set of primitive data types (int, float, boolean, null, array, object), Not structures and attributes names.
-* To make sure all clients understand each other, we need to use the same name for the same concept. e.g. a title of an article should be called "title" for example not "header".
+* To make sure all clients understand each other, we need to use the same name for the same concept. e.g. a title of an article should be called "title" for example not "headline".
 * Instead of inventing a new schema for **𓃠 Mau**, we can use the existing [Schema.org](https://schema.org/docs/full.html) catalog of vocabulary.
 
 This will lead to the following benefits:
