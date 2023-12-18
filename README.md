@@ -17,7 +17,7 @@ This specification defines **𓃠 Mau** a peer-to-peer (P2P) social applications
 * Users are not in control of their data and its privacy. Trusting the application operator to manage their data as they're instructed by the tools presented to the users. Tools that are inherently biased and have limited controls over data.
 * Centralization issue: Where sending someone a message in the other room means the message has to travel to the nearest data center which can be in another continent then transferred back again to the room next to you. that's not sane behavior by any stretch.
 * [Censorship](https://en.wikipedia.org/wiki/Censorship#Social_media): Social applications set biased guidelines that are suitable for some of the users and not others because of differences in cultures between countries. even cities in one country have different habits and behaviors. even between families in the same city.
-  * Hosting users' content puts you in a bad situation as you have to moderate it. Which forces the social network to act as a bi brother to all users
+  * Hosting users' content puts you in a bad situation as you have to moderate it. Which forces the social network to act as a big brother to all users
 * Lying by omission: Where content feeds are manipulated by an algorithm that is both flawed and biased to the users. taking away the user's freedom to choose what to be displayed and in which order.
 
 # Requirements
