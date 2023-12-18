@@ -114,7 +114,7 @@ PGP message format is a well [established standard](https://tools.ietf.org/html/
 - The key/subkey can be used to sign all content to prevent tampering.
 - Adding someone to the contact list is as simple as getting his public key and adding it to the local trusted keyring.
 - Private content can be encrypted by the user's public key
-- Private messages to another user can be encrypted by their public key
+- Private messages to another user can be encrypted by the reciever public key
 - PGP allows encrypting a file to multiple people at the same time
 - Mark the date of signing/encrypting a file without depending on the filesystem properties.
 
