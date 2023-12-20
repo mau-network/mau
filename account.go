@@ -10,9 +10,12 @@ import (
 	"encoding/pem"
 	"errors"
 	"io"
+	"io/fs"
 	"math/big"
 	"os"
 	"path"
+	"sort"
+	"time"
 
 	_ "crypto/sha256"
 
@@ -225,4 +228,145 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 	pem.Encode(&certPemBytes, certPem)
 
 	return tls.X509KeyPair(certPemBytes.Bytes(), keyPemBytes.Bytes())
+}
+
+func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File, error) {
+	if path.Ext(name) != ".pgp" {
+		name += ".pgp"
+	}
+
+	fpr := a.Fingerprint().String()
+
+	if err := os.MkdirAll(path.Join(a.path, fpr), dirPerm); err != nil {
+		return nil, err
+	}
+
+	p := path.Join(a.path, fpr, name)
+	if _, err := os.Stat(p); err == nil {
+		file := File{Path: p}
+		np, err := file.Hash()
+		if err != nil {
+			return nil, err
+		}
+
+		if err = os.MkdirAll(p+".versions", dirPerm); err != nil {
+			return nil, err
+		}
+
+		if err = os.Rename(p, path.Join(p+".versions", np)); err != nil {
+			return nil, err
+		}
+	}
+
+	entities := []*openpgp.Entity{a.entity}
+	for _, f := range recipients {
+		entities = append(entities, f.entity)
+	}
+
+	file, err := os.Create(p)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	w, err := openpgp.Encrypt(file, entities, a.entity, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	io.Copy(w, r)
+	w.Close()
+
+	return &File{Path: p}, nil
+}
+
+func (a *Account) RemoveFile(file *File) error {
+	err := os.Remove(file.Path)
+	if err != nil {
+		return err
+	}
+
+	if file.version {
+		return nil
+	}
+
+	for _, version := range file.Versions() {
+		err := a.RemoveFile(version)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint) []*File {
+	followedPath := path.Join(a.path, fingerprint.String())
+	unfollowedPath := path.Join(a.path, "."+fingerprint.String())
+	var dirpath string
+
+	if _, err := os.Stat(followedPath); err == nil {
+		dirpath = followedPath
+	} else if _, err := os.Stat(unfollowedPath); err == nil {
+		dirpath = unfollowedPath
+	} else {
+		return []*File{}
+	}
+
+	files, err := os.ReadDir(dirpath)
+	if err != nil {
+		return []*File{}
+	}
+
+	type dirEntry struct {
+		entry        fs.DirEntry
+		info         fs.FileInfo
+		modification time.Time
+	}
+
+	recent := []dirEntry{}
+	for _, f := range files {
+		if !f.Type().IsRegular() {
+			continue
+		}
+
+		info, err := f.Info()
+		if err != nil {
+			continue
+		}
+
+		mod := info.ModTime()
+		if mod.Before(after) {
+			continue
+		}
+
+		recent = append(recent, dirEntry{
+			entry:        f,
+			modification: mod,
+		})
+	}
+
+	sort.Slice(recent, func(i, j int) bool {
+		return recent[i].modification.Before(recent[j].modification)
+	})
+
+	if uint(len(recent)) < limit {
+		limit = uint(len(recent))
+	}
+
+	page := recent
+
+	// if limit was 0 then it's unlimited
+	if limit > 0 {
+		page = recent[:limit]
+	}
+
+	list := make([]*File, 0, len(page))
+	for _, item := range page {
+		list = append(list, &File{
+			Path: path.Join(dirpath, item.entry.Name()),
+		})
+	}
+
+	return list
 }
