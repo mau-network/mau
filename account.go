@@ -31,25 +31,23 @@ var (
 	ErrAccountAlreadyExists = errors.New("Account already exists")
 )
 
-func mauDir(rootPath string) string {
-	return path.Join(rootPath, mauDirName)
-}
+func mauDir(d string) string      { return path.Join(d, mauDirName) }
+func accountFile(d string) string { return path.Join(mauDir(d), accountKeyFilename) }
 
-func accountFile(rootPath string) string {
-	return path.Join(mauDir(rootPath), accountKeyFilename)
-}
-
-func NewAccount(rootPath, name, email, passphrase string) (*Account, error) {
+func NewAccount(root, name, email, passphrase string) (*Account, error) {
 	if len(passphrase) == 0 {
 		return nil, ErrPassphraseRequired
 	}
 
-	err := os.MkdirAll(mauDir(rootPath), dirPerm)
+	dir := mauDir(root)
+
+	err := os.MkdirAll(dir, dirPerm)
 	if err != nil {
 		return nil, err
 	}
 
-	if _, err := os.Stat(accountFile(rootPath)); err == nil {
+	acc := accountFile(root)
+	if _, err := os.Stat(acc); err == nil {
 		return nil, ErrAccountAlreadyExists
 	}
 
@@ -62,7 +60,7 @@ func NewAccount(rootPath, name, email, passphrase string) (*Account, error) {
 		return nil, err
 	}
 
-	plainFile, err := os.Create(accountFile(rootPath))
+	plainFile, err := os.Create(acc)
 	if err != nil {
 		return nil, err
 	}
@@ -78,17 +76,21 @@ func NewAccount(rootPath, name, email, passphrase string) (*Account, error) {
 		return nil, err
 	}
 
-	account := Account{entity: entity, path: rootPath}
-	return &account, nil
+	return &Account{
+		entity: entity,
+		path:   root,
+	}, nil
 }
 
 func OpenAccount(rootPath, passphrase string) (*Account, error) {
-	err := os.MkdirAll(mauDir(rootPath), dirPerm)
+	dir := mauDir(rootPath)
+	err := os.MkdirAll(dir, dirPerm)
 	if err != nil {
 		return nil, err
 	}
 
-	encryptedFile, err := os.Open(accountFile(rootPath))
+	acc := accountFile(rootPath)
+	encryptedFile, err := os.Open(acc)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +116,10 @@ func OpenAccount(rootPath, passphrase string) (*Account, error) {
 		return nil, err
 	}
 
-	return &Account{entity: entity, path: rootPath}, nil
+	return &Account{
+		entity: entity,
+		path:   rootPath,
+	}, nil
 }
 
 type Account struct {
