@@ -138,21 +138,21 @@ This leads to the following features of the system:
 Files that are created by one user need to be copied to all peers that are asking for this content. the simplest interface that can serve the files and provide interoperability with the current web is an HTTP interface.
 
 The simplest form is an HTTP server that has 3 endpoints:
-- `/files`: which lists all files created by the user
-- `/files/<file-name>`: which downloads the latest version of a file
-- `/files/<file-name>/versions/<version-hash>`: to download a specific content version
+- `/<user-fingerprint>`: which lists all files created by the user that has public key fingerprint `<user-fingerprint>`
+- `/<user-fingerprint>/<file-name>`: which downloads the latest version of a file
+- `/<user-fingerprint>/<file-name>.versions/<version-hash>`: to download a specific content version
 
 This will provide an interface to download public files that don't need authentication.
 
 The list of files will get longer over time so:
 - Client can keep track of the last update time
 - Client will send the update time as a value for the HTTP header `If-Modified-Since`
-- The server `/files` endpoint should return only the files list modified after the provided date. Ordered by oldest first and can limit the response if needed.
+- The server `/<user-fingerprint>` endpoint should return only the files list modified after the provided date. Ordered by oldest first and can limit the response if needed.
 - Client will download the list of modified files.
 
-The size of each file can be added to the `/files` response to make sure Clients don't download files too large. A `SHA` sum of the file can be also added to the same endpoint to make sure the remote file is not the same as the local file before downloading.
+The size of each file can be part of `/<user-fingerprint>` response to make sure Clients don't download files too large. A `SHA` sum of the file can be also included to the same endpoint to make sure the remote file is not the same as the local file before downloading.
 
-Extending the endpoints for `/<user-fingerprint>/files`, `/<user-fingerprint>/files/<filename>` and `/<user-fingerprint>/files/<file-name>/versions/<version-hash>` will allow a user to relay other people content if desired. allowing a user to distribute comments on his content for example from other users.
+Using another fingerprint in the request to `/<user-fingerprint>`, `/<user-fingerprint>/<filename>` and `/<user-fingerprint>/<file-name>.versions/<version-hash>` will allow a user to relay other people content if desired. allowing a user to distribute comments on his content for example from other users.
 
 Adding TLS1.3 to the HTTP interface will allow both sides to identify themselves with their identity keys. The interface in this case can limit the files response to the public files and files encrypted for the requesting user. This will allow users to exchange private messages/content over a secure connection while the content itself is also encrypted for the receiving party so the user can store the response to his disk without any processing whatsoever.
 
@@ -161,7 +161,6 @@ This will lead to the following benefits:
 - Existing websites can implement both endpoints easily to serve public content without the need for any intermediary party to get involved in the process.
 - Supporting `Range` HTTP header will lead to resumable downloads for large content files.
 - Existing web frameworks can be used to protect the interface against common DDOS attacks. Rate limiting...etc.
-
 
 # Example Use Cases
 
@@ -199,7 +198,7 @@ This will lead to the following benefits:
 
 * A Client can be developed to exchange files over email messages. As PGP content can be exported as armored data.
   * Connecting to SMTP servers to send new posts and check POP3/IMAP servers for new emails with PGP content.
-  * And it won't contradict with any other client syncing over another interface as the provided SHA sum from `/files` endpoint will prevent downloading the file again leading to multiple clients syncing over different interfaces.
+  * And it won't contradict with any other client syncing over another interface as the SHA sum will prevent downloading the file again leading to multiple clients syncing over different interfaces.
 
 # Technical Details
 
@@ -212,10 +211,10 @@ This will lead to the following benefits:
   * Users will be addressed by the address `/p2p/<user-FPR>`
 * **Content**
   * The user has the freedom to name his content files as he wishes we'll refer to it by `filename`
-  * As the content id has to be scope to the user then the content full address will be `/p2p/<user-FPR>/file/<filename>`
+  * As the content id has to be scope to the user then the content full address will be `/p2p/<user-FPR>/<filename>`
 * **Content versions**:
   * When editing a content file the old version should be kept on the disk.
-  * Addressing a version should be scoped by the user and the content `/p2p/<user-FPR>/file/<filename>/version/<version-hash>`
+  * Addressing a version should be scoped by the user and the content `/p2p/<user-FPR>/<filename>.version/<version-hash>`
   * Version hash is a SHA256 sum of the content downcase characters.
 
 ## Directory structure
@@ -271,7 +270,7 @@ friend2-FPR:
 * When editing the file `<file-name>` and before writing the new version the following should be done to keep track of the versions:
   * Create a directory `<file-name>.pgp.versions/` if it doesn't exist
   * Sum the `<file-name>.pgp` with SHA256. we'll call it `<version-hash>`
-  * Write the file old content to `<file-name>.pgp.versions/<version-hash>`
+  * Write the file old content to `<file-name>.pgp.versions/<version-hash>.pgp`
   * Write the new file content after editing to `<file-name>.pgp`
 * This will keep the file versions in the user directory
 * If another user asked for the latest versions it's already in the usual place `<file-name>.pgp`
@@ -416,13 +415,13 @@ The following resources are useful to understand the context around Mau and its 
 
 - The project and the implementation is released under GPLv3
 - The license protects the community by preventing [Bait and switch](https://debugagent.com/open-source-bait-and-switch).
-- It maximize freedom with respect to openness preventing corndering the community in the future.
+- It maximize freedom with respect to openness preventing cornering the community in the future.
 
 # FAQ
 
 ## Why are keys written in binary format?
 
-- Initially I thought we should accept both formats
+- Initially both formats were considered:
    - `.pgp` for binary format
    - `.asc` for ASCII armored format
 - But this can make implementing a client harder as client has to

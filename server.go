@@ -10,7 +10,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/mdns"
 	"golang.org/x/crypto/openpgp/packet"
@@ -65,26 +67,28 @@ func (a *Account) Server(knownNodes []*Peer) (*Server, error) {
 	}
 
 	router.HandleFunc("/p2p/", s.ServeHTTP)
-	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}", s.list)
-	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}/{fileID}", s.get)
-	router.HandleFunc("/p2p/{FPR:[0-9a-f]+}/{fileID}/{versionID}", s.version)
 	s.router = router
 
 	return &s, nil
 }
+
+var (
+	listReg    = regexp.MustCompile(`^/p2p/[0-9a-f]+$`)
+	getReg     = regexp.MustCompile(`^/p2p/[0-9a-f]+/([^/]+)$`)
+	versionReg = regexp.MustCompile(`^/p2p/[0-9a-f]+/([^/]+).version/([^/]+)$`)
+)
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "", http.StatusMethodNotAllowed)
 	}
 
-	segments := strings.Count(strings.TrimPrefix(r.URL.Path, "/p2p"), "/")
-	switch segments {
-	case 1:
+	switch {
+	case listReg.MatchString(r.URL.Path):
 		s.list(w, r)
-	case 2:
+	case getReg.MatchString(r.URL.Path):
 		s.get(w, r)
-	case 3:
+	case versionReg.MatchString(r.URL.Path):
 		s.version(w, r)
 	default:
 		http.Error(w, "", http.StatusBadRequest)
@@ -143,23 +147,21 @@ func (s *Server) Close() error {
 }
 
 func (s *Server) list(w http.ResponseWriter, r *http.Request) {
-	ifModifiedSince := r.Header.Get("If-Modified-Since")
-	if ifModifiedSince == "" {
-		http.Error(w, "Missing If-Modified-Since header", http.StatusBadRequest)
-		return
-	}
+	var lastModified time.Time
+	var err error
 
-	lastModified, err := http.ParseTime(ifModifiedSince)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	ifModifiedSince := r.Header.Get("If-Modified-Since")
+	if ifModifiedSince != "" {
+
+		lastModified, err = http.ParseTime(ifModifiedSince)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	fprStr := strings.TrimPrefix(r.URL.Path, "/p2p/")
-
-	var fpr Fingerprint
-
-	fpr, err = ParseFingerprint(fprStr)
+	fpr, err := ParseFingerprint(fprStr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

@@ -42,7 +42,7 @@ paths:
                 path:
                   type: string
                   description: "path of the file"
-                  example: "/file/content-file.pgp"
+                  example: "/{FPR}/content-file.pgp"
                 size:
                   type: integer
                   description: "size of the file in bytes"
@@ -51,7 +51,7 @@ paths:
                   type: string
                   description: "SHA256 sum of the file presented in multihash format base58 encoded"
                   example: "S5WhR8DewVr1S8pxtBUVetLZ2RztsobVLpFX8h2c7gXUcT"
-  /p2p/{FPR}/file/{fileID}:
+  /p2p/{FPR}/{fileID}:
     get:
       tags:
         - p2p
@@ -72,7 +72,7 @@ paths:
       responses:
         "200":
           description: "File content in binary format"
-  /p2p/{FPR}/file/{fileID}/version/{versionID}:
+  /p2p/{FPR}/{fileID}.version/{versionID}:
     get:
       tags:
       - p2p
