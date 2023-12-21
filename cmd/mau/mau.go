@@ -109,7 +109,7 @@ func main() {
 		friends, err := account.ListFriends()
 		raise(err)
 
-		fpr, err := ParseFingerprint(*fingerprint)
+		fpr, err := FingerprintFromString(*fingerprint)
 		raise(err)
 
 		friend := friends.FindByFingerprint(fpr)
@@ -131,7 +131,7 @@ func main() {
 		friends, err := account.ListFriends()
 		raise(err)
 
-		fpr, err := ParseFingerprint(*fingerprint)
+		fpr, err := FingerprintFromString(*fingerprint)
 		raise(err)
 
 		friend := friends.FindByFingerprint(fpr)
@@ -153,7 +153,7 @@ func main() {
 		friends, err := account.ListFriends()
 		raise(err)
 
-		fpr, err := ParseFingerprint(*fingerprint)
+		fpr, err := FingerprintFromString(*fingerprint)
 		raise(err)
 
 		friend := friends.FindByFingerprint(fpr)
@@ -192,7 +192,7 @@ func main() {
 		fprs := strings.Split(*fingerprints, ",")
 		friends := []*Friend{}
 		for _, fprStr := range fprs {
-			fpr, err := ParseFingerprint(fprStr)
+			fpr, err := FingerprintFromString(fprStr)
 			if err != nil {
 				raise(fmt.Errorf("Can't parse %s as fingerprint", fprStr))
 			}
@@ -221,7 +221,7 @@ func main() {
 			fpr = account.Fingerprint()
 		} else {
 			var err error
-			fpr, err = ParseFingerprint(*fingerprint)
+			fpr, err = FingerprintFromString(*fingerprint)
 			raise(err)
 		}
 
@@ -258,7 +258,7 @@ func main() {
 			fpr = account.Fingerprint()
 		} else {
 			var err error
-			fpr, err = ParseFingerprint(*fingerprint)
+			fpr, err = FingerprintFromString(*fingerprint)
 			raise(err)
 		}
 
@@ -309,7 +309,7 @@ func main() {
 
 		account := getAccount()
 		var fpr Fingerprint
-		fpr, err := ParseFingerprint(*fprStr)
+		fpr, err := FingerprintFromString(*fprStr)
 		raise(err)
 
 		client, err := account.Client(fpr, nil)

@@ -19,10 +19,10 @@ func TestBucket(t *testing.T) {
 	ASSERT_EQUAL(t, false, b.isFull())
 	ASSERT_EQUAL(t, nil, b.get(Fingerprint{}))
 
-	fpr1, err := ParseFingerprint("ABAF11C65A2970B130ABE3C479BE3E4300411886")
+	fpr1, err := FingerprintFromString("ABAF11C65A2970B130ABE3C479BE3E4300411886")
 	ASSERT_NO_ERROR(t, err)
 
-	fpr2, err := ParseFingerprint("AAAF11C65A2970B130ABE3C479BE3E4300411886")
+	fpr2, err := FingerprintFromString("AAAF11C65A2970B130ABE3C479BE3E4300411886")
 	ASSERT_NO_ERROR(t, err)
 
 	b.addToTail(&Peer{fpr1, "address"})
@@ -102,10 +102,10 @@ func TestDHTServerAddPeer(t *testing.T) {
 	account, _ := NewAccount(t.TempDir(), "Main peer", "main@example.com", "password")
 	s := newDHTServer(account, "localhost:80")
 
-	peerFpr, err := ParseFingerprint("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")
+	peerFpr, err := FingerprintFromString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")
 	ASSERT_NO_ERROR(t, err)
 
-	peerFpr2, err := ParseFingerprint("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE")
+	peerFpr2, err := FingerprintFromString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE")
 	ASSERT_NO_ERROR(t, err)
 
 	distance := s.bucketFor(peerFpr)
@@ -233,10 +233,10 @@ func TestDHTServer(t *testing.T) {
 }
 
 func TestXor(t *testing.T) {
-	fpr1, _ := ParseFingerprint("0000000000000000000000000000000000000F0F")
-	fpr2, _ := ParseFingerprint("00000000000000000000000000000000000000FF")
+	fpr1, _ := FingerprintFromString("0000000000000000000000000000000000000F0F")
+	fpr2, _ := FingerprintFromString("00000000000000000000000000000000000000FF")
 
-	res, _ := ParseFingerprint("0000000000000000000000000000000000000FF0")
+	res, _ := FingerprintFromString("0000000000000000000000000000000000000FF0")
 	ASSERT_EQUAL(t, res, xor(fpr1, fpr2))
 }
 
@@ -273,6 +273,6 @@ func TestPrefixLen(t *testing.T) {
 }
 
 func ParseFPRIgnoreErr(fpr string) Fingerprint {
-	v, _ := ParseFingerprint(fpr)
+	v, _ := FingerprintFromString(fpr)
 	return v
 }

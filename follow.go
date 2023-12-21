@@ -20,7 +20,7 @@ func (a *Account) ListFollows() ([]*Friend, error) {
 	follows := []*Friend{}
 	for _, file := range files {
 		if file.IsDir() && file.Name()[0] != '.' {
-			fpr, err := ParseFingerprint(file.Name())
+			fpr, err := FingerprintFromString(file.Name())
 			if err != nil {
 				return follows, fmt.Errorf("Error parsing fingerprint: %w", err)
 			}

@@ -38,7 +38,7 @@ func (f *Fingerprint) UnmarshalJSON(b []byte) error {
 	}
 
 	v := string(b[1 : len(b)-1])
-	pf, err := ParseFingerprint(v)
+	pf, err := FingerprintFromString(v)
 	if err != nil {
 		return err
 	}
@@ -50,7 +50,42 @@ func (f *Fingerprint) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func ParseFingerprint(s string) (fpr Fingerprint, err error) {
+func (fpr *Fingerprint) isInCert(rawCerts [][]byte) error {
+	for _, rawcert := range rawCerts {
+		certs, err := x509.ParseCertificates(rawcert)
+		if err != nil {
+			return err
+		}
+
+		// Go over all certs. check public key
+		// if one of the keys fingerprint == fingerprint we return nil
+		for _, cert := range certs {
+			switch cert.PublicKeyAlgorithm {
+			case x509.RSA:
+				if pubkey, ok := cert.PublicKey.(*rsa.PublicKey); ok {
+					var id Fingerprint = packet.NewRSAPublicKey(cert.NotBefore, pubkey).Fingerprint
+					if *fpr == id {
+						return nil
+					}
+				}
+			case x509.ECDSA:
+				if pubkey, ok := cert.PublicKey.(*ecdsa.PublicKey); ok {
+					var id Fingerprint = packet.NewECDSAPublicKey(cert.NotBefore, pubkey).Fingerprint
+					if *fpr == id {
+						return nil
+					}
+				}
+			default:
+				return x509.ErrUnsupportedAlgorithm
+			}
+		}
+	}
+
+	// non of the certs include fingerprint
+	return ErrIncorrectPeerCertificate
+}
+
+func FingerprintFromString(s string) (fpr Fingerprint, err error) {
 	decodeLen := hex.DecodedLen(len(s))
 	if decodeLen != cap(fpr) {
 		err = fmt.Errorf("%w : provided: %d", ErrIncorrectFingerprintLength, decodeLen)
@@ -67,42 +102,7 @@ func ParseFingerprint(s string) (fpr Fingerprint, err error) {
 	return
 }
 
-func certIncludes(rawCerts [][]byte, fpr Fingerprint) error {
-	for _, rawcert := range rawCerts {
-		certs, err := x509.ParseCertificates(rawcert)
-		if err != nil {
-			return err
-		}
-
-		// Go over all certs. check public key
-		// if one of the keys fingerprint == fingerprint we return nil
-		for _, cert := range certs {
-			switch cert.PublicKeyAlgorithm {
-			case x509.RSA:
-				if pubkey, ok := cert.PublicKey.(*rsa.PublicKey); ok {
-					var id Fingerprint = packet.NewRSAPublicKey(cert.NotBefore, pubkey).Fingerprint
-					if fpr == id {
-						return nil
-					}
-				}
-			case x509.ECDSA:
-				if pubkey, ok := cert.PublicKey.(*ecdsa.PublicKey); ok {
-					var id Fingerprint = packet.NewECDSAPublicKey(cert.NotBefore, pubkey).Fingerprint
-					if fpr == id {
-						return nil
-					}
-				}
-			default:
-				return x509.ErrUnsupportedAlgorithm
-			}
-		}
-	}
-
-	// non of the certs include fingerprint
-	return ErrIncorrectPeerCertificate
-}
-
-func certToFingerprint(certs []*x509.Certificate) (Fingerprint, error) {
+func FingerprintFromCert(certs []*x509.Certificate) (Fingerprint, error) {
 	for _, cert := range certs {
 		switch cert.PublicKeyAlgorithm {
 		case x509.RSA:

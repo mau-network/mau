@@ -202,7 +202,7 @@ func (d *dhtServer) receiveFindPeer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fpr := strings.TrimPrefix(r.URL.Path, dht_FIND_PEER_PATH)
-	fingerprint, err := ParseFingerprint(fpr)
+	fingerprint, err := FingerprintFromString(fpr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -250,7 +250,7 @@ func (d *dhtServer) addPeerFromRequest(r *http.Request) error {
 		return ErrIncorrectPeerCertificate
 	}
 
-	fingerprint, err := certToFingerprint(r.TLS.PeerCertificates)
+	fingerprint, err := FingerprintFromCert(r.TLS.PeerCertificates)
 	if err != nil {
 		return err
 	}

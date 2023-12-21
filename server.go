@@ -161,7 +161,7 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fprStr := strings.TrimPrefix(r.URL.Path, "/p2p/")
-	fpr, err := ParseFingerprint(fprStr)
+	fpr, err := FingerprintFromString(fprStr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -221,7 +221,7 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 	fprStr := segments[0]
 	var fpr Fingerprint
 	var err error
-	fpr, err = ParseFingerprint(fprStr)
+	fpr, err = FingerprintFromString(fprStr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -265,7 +265,7 @@ func (s *Server) version(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fpr, err := ParseFingerprint(segments[0])
+	fpr, err := FingerprintFromString(segments[0])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

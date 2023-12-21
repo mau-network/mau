@@ -139,7 +139,7 @@ func TestListFiles(t *testing.T) {
 	})
 
 	t.Run("Asking for a fingerprint other than the account", func(t T) {
-		unknownFpr, _ := ParseFingerprint("01234567891234567890")
+		unknownFpr, _ := FingerprintFromString("01234567891234567890")
 		files := account.ListFiles(unknownFpr, time.Now().Add(-time.Second), 10)
 		ASSERT_EQUAL(t, 0, len(files))
 	})
