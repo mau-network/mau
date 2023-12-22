@@ -25,10 +25,12 @@ import (
 )
 
 var (
-	ErrPassphraseRequired   = errors.New("Passphrase must be specified")
-	ErrIncorrectPassphrase  = errors.New("Incorrect passphrase")
-	ErrNoIdentity           = errors.New("Can't find identity")
-	ErrAccountAlreadyExists = errors.New("Account already exists")
+	ErrPassphraseRequired      = errors.New("Passphrase must be specified")
+	ErrIncorrectPassphrase     = errors.New("Incorrect passphrase")
+	ErrNoIdentity              = errors.New("Can't find identity")
+	ErrAccountAlreadyExists    = errors.New("Account already exists")
+	ErrCannotConvertPrivateKey = errors.New("Can't convert private key")
+	ErrCannotConvertPublicKey  = errors.New("Can't convert public key")
 )
 
 func mauDir(d string) string      { return path.Join(d, mauDirName) }
@@ -187,13 +189,13 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 
 	privkey, ok := a.entity.PrivateKey.PrivateKey.(*rsa.PrivateKey)
 	if !ok {
-		err = errors.New("Can't convert private key")
+		err = ErrCannotConvertPrivateKey
 		return
 	}
 
 	pubkey, ok := a.entity.PrimaryKey.PublicKey.(*rsa.PublicKey)
 	if !ok {
-		err = errors.New("Can't convert public key")
+		err = ErrCannotConvertPublicKey
 		return
 	}
 
