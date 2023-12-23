@@ -8,8 +8,10 @@ import (
 	"github.com/hashicorp/mdns"
 )
 
+// FingerprintResolver resolves a fingerprint into a IP:Port address
 type FingerprintResolver func(ctx context.Context, fingerprint Fingerprint, addresses chan<- string) error
 
+// StaticAddress returns the same address for any fingerprint
 func StaticAddress(address string) FingerprintResolver {
 	return func(ctx context.Context, fingerprint Fingerprint, addresses chan<- string) error {
 		select {
@@ -47,6 +49,8 @@ func LocalFriendAddress(ctx context.Context, fingerprint Fingerprint, addresses 
 	}
 }
 
+var ErrServerDoesNotAllowLookUp = errors.New("Server doesn't allow looking up friends on the internet")
+
 // InternetFriendAddress returns a resolver function that will use the server
 // kademlia network to lookup the friend address. it require the server to have
 // already joined an overlay network. by having valid bootstrap peers already in
@@ -54,7 +58,7 @@ func LocalFriendAddress(ctx context.Context, fingerprint Fingerprint, addresses 
 func InternetFriendAddress(server *Server) FingerprintResolver {
 	return func(ctx context.Context, fingerprint Fingerprint, addresses chan<- string) error {
 		if server.dhtServer == nil {
-			return errors.New("Server doesn't allow looking up friends on the internet")
+			return ErrServerDoesNotAllowLookUp
 		}
 
 		// sendFindPeer needs to take a context to be able to cancel lookup
