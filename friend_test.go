@@ -83,7 +83,7 @@ func TestListFriends(t *testing.T) {
 	REFUTE_EQUAL(t, nil, keyring)
 	ASSERT_EQUAL(t, path.Join(dir, ".mau"), keyring.Path)
 	ASSERT_EQUAL(t, 1, len(keyring.Friends))
-	ASSERT_EQUAL(t, 0, len(keyring.KeyRings))
+	ASSERT_EQUAL(t, 0, len(keyring.SubKeyrings))
 
 	err = account.RemoveFriend(friend)
 
@@ -92,5 +92,5 @@ func TestListFriends(t *testing.T) {
 	REFUTE_EQUAL(t, nil, keyring)
 	ASSERT_EQUAL(t, path.Join(dir, ".mau"), keyring.Path)
 	ASSERT_EQUAL(t, 0, len(keyring.Friends))
-	ASSERT_EQUAL(t, 0, len(keyring.KeyRings))
+	ASSERT_EQUAL(t, 0, len(keyring.SubKeyrings))
 }

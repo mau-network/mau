@@ -6,23 +6,23 @@ import (
 	"path"
 )
 
-type KeyRing struct {
-	Path     string
-	Friends  []*Friend
-	KeyRings []*KeyRing
+type Keyring struct {
+	Path        string
+	Friends     []*Friend
+	SubKeyrings []*Keyring
 }
 
-func (k *KeyRing) Name() string {
+func (k *Keyring) Name() string {
 	return path.Base(k.Path)
 }
 
-func (k *KeyRing) FriendsSet() []*Friend {
+func (k *Keyring) FriendsSet() []*Friend {
 	friends := map[Fingerprint]*Friend{}
 	for _, f := range k.Friends {
 		friends[f.Fingerprint()] = f
 	}
 
-	for _, sk := range k.KeyRings {
+	for _, sk := range k.SubKeyrings {
 		for _, f := range sk.FriendsSet() {
 			friends[f.Fingerprint()] = f
 		}
@@ -36,14 +36,14 @@ func (k *KeyRing) FriendsSet() []*Friend {
 	return set
 }
 
-func (k *KeyRing) FindByFingerprint(fingerprint Fingerprint) *Friend {
+func (k *Keyring) FindByFingerprint(fingerprint Fingerprint) *Friend {
 	for _, friend := range k.Friends {
 		if friend.Fingerprint() == fingerprint {
 			return friend
 		}
 	}
 
-	for _, keyring := range k.KeyRings {
+	for _, keyring := range k.SubKeyrings {
 		friend := keyring.FindByFingerprint(fingerprint)
 		if friend != nil {
 			return friend
@@ -53,7 +53,7 @@ func (k *KeyRing) FindByFingerprint(fingerprint Fingerprint) *Friend {
 	return nil
 }
 
-func (k *KeyRing) FriendById(id uint64) *Friend {
+func (k *Keyring) FriendById(id uint64) *Friend {
 	for _, f := range k.Friends {
 		if f.entity.PrimaryKey.KeyId == id {
 			return f
@@ -65,7 +65,7 @@ func (k *KeyRing) FriendById(id uint64) *Friend {
 		}
 	}
 
-	for _, sk := range k.KeyRings {
+	for _, sk := range k.SubKeyrings {
 		f := sk.FriendById(id)
 		if f != nil {
 			return f
@@ -75,7 +75,7 @@ func (k *KeyRing) FriendById(id uint64) *Friend {
 	return nil
 }
 
-func (k *KeyRing) read(account *Account) error {
+func (k *Keyring) read(account *Account) error {
 	files, err := os.ReadDir(k.Path)
 	if err != nil {
 		return fmt.Errorf("Can't read dir: %w", err)
@@ -87,14 +87,14 @@ func (k *KeyRing) read(account *Account) error {
 		}
 
 		if file.IsDir() {
-			keyring := KeyRing{Path: fmt.Sprintf("%s/%s", k.Path, file.Name())}
+			keyring := Keyring{Path: fmt.Sprintf("%s/%s", k.Path, file.Name())}
 
 			err := keyring.read(account)
 			if err != nil {
 				return err
 			}
 
-			k.KeyRings = append(k.KeyRings, &keyring)
+			k.SubKeyrings = append(k.SubKeyrings, &keyring)
 			continue
 		}
 

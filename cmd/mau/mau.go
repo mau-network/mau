@@ -97,7 +97,7 @@ func main() {
 		friends, err := account.ListFriends()
 		raise(err)
 
-		printKeyRing("", friends)
+		printKeyring("", friends)
 
 	case "unfriend":
 		unfriendCmd := flag.NewFlagSet("unfriend", flag.ExitOnError)
@@ -348,13 +348,13 @@ func getPassword() string {
 	return string(bytepw)
 }
 
-func printKeyRing(p string, r *KeyRing) {
+func printKeyring(p string, r *Keyring) {
 	fmt.Println(r.Name(), ":")
 	for _, f := range r.Friends {
 		fmt.Println(p+" ", f.Name(), f.Email(), f.Fingerprint())
 	}
-	for _, k := range r.KeyRings {
-		printKeyRing(p+" ", k)
+	for _, k := range r.SubKeyrings {
+		printKeyring(p+" ", k)
 	}
 }
 

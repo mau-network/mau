@@ -12,9 +12,11 @@ import (
 	"golang.org/x/crypto/openpgp/packet"
 )
 
-var ErrIncorrectFingerprintLength = errors.New("Provided fingerprint length is not correct")
-var ErrCantFindFingerprint = errors.New("Can't find fingerprint.")
-var ErrCantFindAddress = errors.New("Can't find address (DNSName) in certificate.")
+var (
+	ErrIncorrectFingerprintLength = errors.New("Provided fingerprint length is not correct")
+	ErrCantFindFingerprint        = errors.New("Can't find fingerprint.")
+	ErrCantFindAddress            = errors.New("Can't find address (DNSName) in certificate.")
+)
 
 const FINGERPRINT_LEN = 20
 

@@ -119,8 +119,8 @@ func (a *Account) RemoveFriend(friend *Friend) error {
 	return a.Unfollow(friend)
 }
 
-func (a *Account) ListFriends() (*KeyRing, error) {
-	friends := KeyRing{Path: mauDir(a.path)}
+func (a *Account) ListFriends() (*Keyring, error) {
+	friends := Keyring{Path: mauDir(a.path)}
 
 	err := friends.read(a)
 	if err != nil {
