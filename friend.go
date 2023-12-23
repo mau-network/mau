@@ -97,8 +97,8 @@ func (a *Account) AddFriend(reader io.Reader) (*Friend, error) {
 
 func (a *Account) RemoveFriend(friend *Friend) error {
 	file := fmt.Sprintf("%s.pgp", friend.Fingerprint())
-	uncategorized := fmt.Sprintf("%s/%s", mauDir(a.path), file)
-	pattern := fmt.Sprintf("%s/**/%s", mauDir(a.path), file)
+	uncategorized := path.Join(mauDir(a.path), file)
+	pattern := path.Join(mauDir(a.path), "**", file)
 
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
