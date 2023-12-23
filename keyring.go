@@ -86,8 +86,10 @@ func (k *Keyring) read(account *Account) error {
 			continue
 		}
 
+		filePath := path.Join(k.Path, file.Name())
+
 		if file.IsDir() {
-			keyring := Keyring{Path: fmt.Sprintf("%s/%s", k.Path, file.Name())}
+			keyring := Keyring{Path: filePath}
 
 			err := keyring.read(account)
 			if err != nil {
@@ -98,7 +100,7 @@ func (k *Keyring) read(account *Account) error {
 			continue
 		}
 
-		reader, err := os.Open(fmt.Sprintf("%s/%s", k.Path, file.Name()))
+		reader, err := os.Open(filePath)
 		if err != nil {
 			return err
 		}

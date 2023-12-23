@@ -17,6 +17,10 @@ type File struct {
 	version bool
 }
 
+func (f *File) Name() string {
+	return path.Base(f.Path)
+}
+
 func (f *File) Versions() []*File {
 	if f.version {
 		return []*File{}
@@ -46,10 +50,6 @@ func (f *File) Versions() []*File {
 	}
 
 	return versions
-}
-
-func (f *File) Name() string {
-	return path.Base(f.Path)
 }
 
 func (f *File) Recipients(account *Account) ([]*Friend, error) {
