@@ -1,12 +1,16 @@
 package mau
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"log"
+	"math/bits"
+	"math/rand"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -383,4 +387,194 @@ func (d *dhtServer) bucketFor(fingerprint Fingerprint) (i int) {
 		i--
 	}
 	return
+}
+
+// A list of peers
+// [],[],[],[],[],[],[],[]
+// ^--Head (oldest)      ^--Tail (newest)
+type bucket struct {
+	mutex      sync.RWMutex
+	values     []*Peer
+	lastLookup time.Time
+}
+
+// get returns a peer from the bucket by fingerprint
+func (b *bucket) get(fingerprint Fingerprint) *Peer {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	for i := range b.values {
+		if b.values[i].Fingerprint == fingerprint {
+			return b.values[i]
+		}
+	}
+
+	return nil
+}
+
+// remove removes a peer from the bucket
+func (b *bucket) remove(peer *Peer) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	newValues := make([]*Peer, 0, len(b.values))
+	for i := range b.values {
+		if b.values[i].Fingerprint != peer.Fingerprint {
+			newValues = append(newValues, b.values[i])
+		}
+	}
+
+	b.values = newValues
+}
+
+// addToTail adds a peer to the tail of the bucket
+func (b *bucket) addToTail(peer *Peer) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	b.values = append(b.values, peer)
+	b.lastLookup = time.Now()
+}
+
+// moveToTail moves a peer that exists in the bucket to the end
+func (b *bucket) moveToTail(peer *Peer) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	newValues := make([]*Peer, 0, len(b.values))
+	for i := range b.values {
+		if b.values[i].Fingerprint != peer.Fingerprint {
+			newValues = append(newValues, b.values[i])
+		}
+	}
+
+	b.values = append(newValues, peer)
+	b.lastLookup = time.Now()
+}
+
+// leastRecentlySeen returns the least recently seen peer
+func (b *bucket) leastRecentlySeen() (peer *Peer) {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	if len(b.values) > 0 {
+		peer = b.values[0]
+	}
+
+	return
+}
+
+// randomPeer returns a random peer from the bucket
+func (b *bucket) randomPeer() *Peer {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	if len(b.values) == 0 {
+		return nil
+	}
+
+	return b.values[rand.Intn(len(b.values))]
+}
+
+// isFull returns true if the bucket is full to the limit of K
+func (b *bucket) isFull() bool {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return len(b.values) == dht_K
+}
+
+// dup returns a copy of the bucket values
+func (b *bucket) dup() []*Peer {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	c := make([]*Peer, len(b.values))
+	copy(c, b.values)
+
+	return c
+}
+
+// Sorted unique set of peers, adds one peer once
+type peerRequestSet struct {
+	mutex       sync.Mutex
+	fingerprint Fingerprint
+	peers       []*Peer
+	added       map[Fingerprint]bool
+}
+
+func newPeerRequestSet(fpr Fingerprint, initial []*Peer) *peerRequestSet {
+	peers := peerRequestSet{
+		fingerprint: fpr,
+		peers:       []*Peer{},
+		added:       map[Fingerprint]bool{},
+	}
+
+	peers.add(initial...)
+
+	return &peers
+}
+
+func (p *peerRequestSet) add(peers ...*Peer) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	for i := range peers {
+		if p.added[peers[i].Fingerprint] {
+			return
+		}
+
+		p.added[peers[i].Fingerprint] = true
+		p.peers = append(p.peers, peers[i])
+	}
+
+	sortByDistance(p.fingerprint, p.peers)
+}
+
+func (p *peerRequestSet) get() *Peer {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	if len(p.peers) == 0 {
+		return nil
+	}
+
+	peer := p.peers[0]
+	p.peers = p.peers[1:]
+	return peer
+}
+
+func (p *peerRequestSet) len() int {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	return len(p.peers)
+}
+
+// xor two fingerprints
+func xor(a, b Fingerprint) (c Fingerprint) {
+	for i := range a {
+		c[i] = a[i] ^ b[i]
+	}
+
+	return
+}
+
+// prefixLen returns the number of leading zeros in a.
+func prefixLen(a Fingerprint) int {
+	for i, b := range a {
+		if b != 0 {
+			return i*8 + bits.LeadingZeros8(b)
+		}
+	}
+
+	return len(a) * 8
+}
+
+// sortByDistance sorts ids by ascending XOR distance with respect to fingerprint
+func sortByDistance(fingerprint Fingerprint, peers []*Peer) {
+	sort.Slice(peers, func(i, j int) bool {
+		ixor := xor(peers[i].Fingerprint, fingerprint)
+		jxor := xor(peers[j].Fingerprint, fingerprint)
+		return bytes.Compare(ixor[:], jxor[:]) == -1
+	})
 }
