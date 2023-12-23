@@ -22,7 +22,7 @@ func (a *Account) ListFollows() ([]*Friend, error) {
 		if file.IsDir() && file.Name()[0] != '.' {
 			fpr, err := FingerprintFromString(file.Name())
 			if err != nil {
-				return follows, fmt.Errorf("Error parsing fingerprint: %w", err)
+				continue // Ignore any directory that's not a fingerprint
 			}
 
 			friend := keyring.FindByFingerprint(fpr)

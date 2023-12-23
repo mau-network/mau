@@ -2,6 +2,7 @@ package mau
 
 import (
 	"bytes"
+	"os"
 	"path"
 	"testing"
 )
@@ -62,6 +63,13 @@ func TestListFollows(t *testing.T) {
 	t.Run("After unfollowing the friend", func(t T) {
 		account.Unfollow(friend)
 		follows, _ := account.ListFollows()
+		ASSERT_EQUAL(t, 0, len(follows))
+	})
+
+	t.Run("When having a dir that's not a fingerprint", func(t T) {
+		os.Mkdir(path.Join(account.path, "systemdir"), 0777)
+		follows, err := account.ListFollows()
+		ASSERT_NO_ERROR(t, err)
 		ASSERT_EQUAL(t, 0, len(follows))
 	})
 
