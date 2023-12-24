@@ -198,5 +198,22 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 }
 
 func (c *Client) verifyPeerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
-	return c.peer.isInCert(rawCerts)
+	for _, rawcert := range rawCerts {
+		certs, err := x509.ParseCertificates(rawcert)
+		if err != nil {
+			return err
+		}
+
+		id, err := FingerprintFromCert(certs)
+		if err != nil {
+			return err
+		}
+
+		if id == c.peer {
+			return nil
+		}
+	}
+
+	// non of the certs include fingerprint
+	return ErrIncorrectPeerCertificate
 }
