@@ -2,7 +2,6 @@ package mau
 
 import (
 	"context"
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -15,7 +14,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/mdns"
-	"golang.org/x/crypto/openpgp/packet"
 )
 
 type Server struct {
@@ -303,21 +301,14 @@ func (s *Server) version(w http.ResponseWriter, r *http.Request) {
 }
 
 func isPermitted(certs []*x509.Certificate, recipients []*Friend) bool {
-	for _, c := range certs {
-		var id Fingerprint
-		switch c.PublicKeyAlgorithm {
-		case x509.RSA:
-			pubkey := c.PublicKey.(*rsa.PublicKey)
-			id = packet.NewRSAPublicKey(c.NotBefore, pubkey).Fingerprint
-		default:
-			fmt.Println("Error public key algorithm not supported")
-			return false
-		}
+	fpr, err := FingerprintFromCert(certs)
+	if err != nil {
+		return false
+	}
 
-		for _, r := range recipients {
-			if id == r.Fingerprint() {
-				return true
-			}
+	for _, r := range recipients {
+		if fpr == r.Fingerprint() {
+			return true
 		}
 	}
 
