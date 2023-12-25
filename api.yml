@@ -15,7 +15,12 @@ paths:
       tags:
       - p2p
       summary: "List modified files since last update"
-      description: "Server will look in FPR directory and list all the files accessible by the client. Order the files by modification date in ascending order and limit the files list to files modified after the If-Modified-Since header value and also limit the list to a reasonable length. So expect to call this with new If-Modified-Since value until you get 304 status."
+      description: |
+        Server will look in FPR directory and list all the files accessible by
+        the client. Order the files by modification date in ascending order and
+        limit the files list to files modified after the If-Modified-Since
+        header value and also limit the list to a reasonable length. So expect
+        to call this with new If-Modified-Since value until you get 304 status.
       produces:
       - "application/json"
       parameters:
@@ -104,7 +109,10 @@ paths:
       tags:
       - kademlia
       summary: "ping a peer to know if it's online"
-      description: "This is used to check if a peer is online to allow for refreshing kademlia k buckets and generally let us know if a peer is still online or available for requests"
+      description: |
+        This is used to check if a peer is online to allow for refreshing
+        kademlia k buckets and generally let us know if a peer is still online
+        or available for requests
       produces:
       - "application/json"
       responses:
@@ -116,7 +124,13 @@ paths:
       tags:
       - kademlia
       summary: "List of nearest peers to the peer with fingerprint FPR."
-      description: "Returns a maximum of 160 peers ordered by nearest to furthest from fingerprint FPR. This endpoint can be used to lookup a peer address in the network but sending the nearest peers we know of a request to find peer and recursively ask nearest peers to the fingerprint for more peers until we find the peer addres. review Kademlia original paper for more detailed information about the protocol."
+      description: |
+        Returns a maximum of 160 peers ordered by nearest to furthest from
+        fingerprint FPR. This endpoint can be used to lookup a peer address in
+        the network but sending the nearest peers we know of a request to find
+        peer and recursively ask nearest peers to the fingerprint for more peers
+        until we find the peer addres. review Kademlia original paper for more
+        detailed information about the protocol.
       produces:
       - "application/json"
       parameters:
