@@ -355,6 +355,8 @@ The following is a minimum list of modules that is needed to make up the core fu
 
 * **Groups**: The concept support sharing to multiple people. which can work as private group. if a hash tag is used to mark content it can be separated by hash. User can pin hashes then browse all local content in it. so hash tag can be synonym to group name. all or this works only if users are following each other so the content flows from one person to the next if they shared it together. so if one person posted to a hashtag the rest of the people won't know about him unless one of them is following him and decides to share his content on this hashtag. so the implementation will be hard to reason about.
 
+* Requesting content before date: HTTP header `if-modified-since` returns content created/modified after a time. there is no way to get content before time. one workaround is for the application to request content in a paste date. but it is not guranteed to return content.
+
 * **Multiple devices**: Accessing one account from multiple devices isn't possible with the current concept state.
 
 * **Key revocation**: There is no mechanism to revoke or change keys. unless done manually through another channel like PGP keyservers synchronization.
