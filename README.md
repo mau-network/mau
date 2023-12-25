@@ -1,5 +1,7 @@
 # Abstract
 
+* [On Github](https://github.com/mau-network/mau)
+
 This specification defines **𓃠 Mau** a peer-to-peer (P2P) social applications convention. It utilizes the filesystem for storage, PGP for privacy, and Kademlia protocol for peer discovery, and routing. **𓃠 Mau** aims for simplicity of implementation. maximizing user freedom. and complete peer-to-peer decentralization.
 
 <p align="center">

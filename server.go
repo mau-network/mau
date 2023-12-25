@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -17,13 +18,16 @@ import (
 )
 
 type Server struct {
-	account        *Account
-	httpServer     http.Server
-	mdnsServer     *mdns.Server
-	dhtServer      *dhtServer
+	account *Account
+
+	router *http.ServeMux
+
+	httpServer http.Server
+	mdnsServer *mdns.Server
+	dhtServer  *dhtServer
+
 	bootstrapNodes []*Peer
 	resultsLimit   uint
-	router         *http.ServeMux
 }
 
 type FileListItem struct {
@@ -39,8 +43,10 @@ func (a *Account) Server(knownNodes []*Peer) (*Server, error) {
 	}
 
 	router := http.NewServeMux()
+
 	s := Server{
 		account:        a,
+		router:         router,
 		resultsLimit:   serverResultLimit,
 		bootstrapNodes: knownNodes,
 		httpServer: http.Server{
@@ -64,8 +70,7 @@ func (a *Account) Server(knownNodes []*Peer) (*Server, error) {
 		},
 	}
 
-	router.HandleFunc("/p2p/", s.ServeHTTP)
-	s.router = router
+	router.Handle("/p2p/", &s)
 
 	return &s, nil
 }
@@ -244,16 +249,15 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO needs to support interrupt resume
-	content, err := os.ReadFile(file.Path)
+	reader, err := os.Open(file.Path)
 	if err != nil {
 		http.Error(w, "Error reading file", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Add("Content-Type", "application/octet-stream")
-	w.Header().Add("Content-Length", fmt.Sprint(len(content)))
 	w.WriteHeader(http.StatusOK)
-	w.Write(content)
+	io.Copy(w, reader)
 }
 
 func (s *Server) version(w http.ResponseWriter, r *http.Request) {
@@ -288,16 +292,15 @@ func (s *Server) version(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO needs to support interrupt resume
-	content, err := os.ReadFile(file.Path)
+	reader, err := os.Open(file.Path)
 	if err != nil {
 		http.Error(w, "Error reading file", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Add("Content-Type", "application/octet-stream")
-	w.Header().Add("Content-Length", fmt.Sprint(len(content)))
 	w.WriteHeader(http.StatusOK)
-	w.Write(content)
+	io.Copy(w, reader)
 }
 
 func isPermitted(certs []*x509.Certificate, recipients []*Friend) bool {
