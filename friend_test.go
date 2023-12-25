@@ -44,7 +44,7 @@ func TestAddFriend(t *testing.T) {
 		anotherAccount, _ := NewAccount(anotherDir, "Unknown account", "unknow@example.com", "password")
 
 		file_content, _ := os.ReadFile(path.Join(dir, ".mau", fingerprint.String()+".pgp"))
-		os.WriteFile(path.Join(anotherDir, ".mau", fingerprint.String()+".pgp"), file_content, 0700)
+		os.WriteFile(path.Join(anotherDir, ".mau", fingerprint.String()+".pgp"), file_content, dirPerm)
 
 		friends, err := anotherAccount.ListFriends()
 		ASSERT(t, err != nil, "ListFriends should fail to decrypt a friend")

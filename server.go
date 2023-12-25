@@ -41,7 +41,7 @@ func (a *Account) Server(knownNodes []*Peer) (*Server, error) {
 	router := http.NewServeMux()
 	s := Server{
 		account:        a,
-		resultsLimit:   100,
+		resultsLimit:   serverResultLimit,
 		bootstrapNodes: knownNodes,
 		httpServer: http.Server{
 			Handler: router,

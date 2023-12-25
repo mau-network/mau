@@ -48,7 +48,7 @@ func (a *Account) Follow(friend *Friend) error {
 		return os.Rename(unfollowed, followed)
 	}
 
-	return os.Mkdir(followed, 0700)
+	return os.Mkdir(followed, dirPerm)
 }
 
 func (a *Account) Unfollow(friend *Friend) error {

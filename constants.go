@@ -5,6 +5,7 @@ var (
 )
 
 const (
+	serverResultLimit  = 100
 	mDNSServiceName    = "_mau._tcp"
 	mauDirName         = ".mau"
 	accountKeyFilename = "account.pgp"
