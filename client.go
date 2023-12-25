@@ -132,10 +132,8 @@ func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, af
 }
 
 func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint Fingerprint, file *FileListItem) error {
-	fpath := path.Join(c.account.path, fingerprint.String(), file.Name)
-
 	f := File{
-		Path:    fpath,
+		Path:    path.Join(c.account.path, fingerprint.String(), file.Name),
 		version: false,
 	}
 
@@ -189,7 +187,7 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 	// TODO: check for file encrypted to current user
 	// TODO: keep existing version
 
-	err = os.WriteFile(fpath, content, 0600)
+	err = os.WriteFile(f.Path, content, 0600)
 	if err != nil {
 		return err
 	}
