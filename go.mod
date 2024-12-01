@@ -1,6 +1,6 @@
 module github.com/mau-network/mau
 
-go 1.20
+go 1.23
 
 require (
 	github.com/hashicorp/mdns v1.0.5
