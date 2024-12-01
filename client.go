@@ -24,7 +24,7 @@ var (
 )
 
 type Client struct {
-	http.Client
+	client  *resty.Client
 	account *Account
 	peer    Fingerprint
 }
@@ -41,12 +41,11 @@ func (a *Account) Client(peer Fingerprint, DNSNames []string) (*Client, error) {
 		peer:    peer,
 	}
 
-	c.Client = http.Client{
-		Timeout: time.Second * 3,
-		// Prevent Redirects
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
+	c.client = resty.New().
+		SetRedirectPolicy(resty.NoRedirectPolicy()).
+		SetTimeout(3 * time.Second).
+		SetTLSClientConfig(
+			&tls.Config{
 				Certificates:          []tls.Certificate{cert},
 				InsecureSkipVerify:    true,
 				VerifyPeerCertificate: c.verifyPeerCertificate,
@@ -59,8 +58,7 @@ func (a *Account) Client(peer Fingerprint, DNSNames []string) (*Client, error) {
 					tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 				},
 			},
-		},
-	}
+		)
 
 	return c, nil
 }
@@ -88,8 +86,7 @@ func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, af
 	// Get list of remote files since the last modification we have
 	var list []FileListItem
 
-	resp, err := resty.
-		NewWithClient(&c.Client).
+	resp, err := c.client.
 		R().
 		SetContext(ctx).
 		SetHeader("If-Modified-Since", after.UTC().Format(http.TimeFormat)).
@@ -143,8 +140,7 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 		}
 	}
 
-	resp, err := resty.
-		NewWithClient(&c.Client).
+	resp, err := c.client.
 		R().
 		SetContext(ctx).
 		Get(

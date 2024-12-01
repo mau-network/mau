@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"log"
 	"math/bits"
 	"math/rand"
@@ -74,7 +73,9 @@ func (d *dhtServer) sendPing(peer *Peer) error {
 		Host:   peer.Address,
 		Path:   dht_PING_PATH,
 	}
-	_, err = client.Get(u.String())
+
+	// TODO add context maybe
+	_, err = client.client.R().Get(u.String())
 
 	return err
 }
@@ -151,18 +152,21 @@ func (d *dhtServer) sendFindPeerWorker(ctx context.Context, fingerprint Fingerpr
 		return nil, err
 	}
 
+	var foundPeers []*Peer
+
 	u := url.URL{
 		Scheme: uriProtocolName,
 		Host:   peer.Address,
 		Path:   dht_FIND_PEER_PATH + fingerprint.String(),
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return nil, err
-	}
+	_, err = client.client.
+		R().
+		SetContext(ctx).
+		ForceContentType("application/json").
+		SetResult(&foundPeers).
+		Get(u.String())
 
-	resp, err := client.Do(req)
 	if err != nil {
 		d.removePeer(peer)
 		return nil, err
@@ -170,17 +174,6 @@ func (d *dhtServer) sendFindPeerWorker(ctx context.Context, fingerprint Fingerpr
 
 	// Add it to the known peers
 	d.addPeer(peer)
-
-	var foundPeers []*Peer
-	body, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	if err = json.Unmarshal(body, &foundPeers); err != nil {
-		return nil, err
-	}
 
 	// peer should return max K peers, if it's more limit it to K
 	if len(foundPeers) > dht_K {

@@ -3,9 +3,7 @@ package mau
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -92,9 +90,9 @@ func TestReceivePing(t *testing.T) {
 			Host:   bootstrap_addr,
 			Path:   "/kad/ping",
 		}
-		resp, err := client.Get(u.String())
+		resp, err := client.client.R().Get(u.String())
 		ASSERT_NO_ERROR(t, err)
-		ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
+		ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode())
 	})
 }
 
@@ -168,13 +166,13 @@ func TestDHTServer(t *testing.T) {
 			Host:   bootstrap_addr,
 		}
 
-		resp, err := c.Get(u.String())
-		ASSERT_NO_ERROR(t, err)
-
 		var peers []Peer
-		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		err = json.Unmarshal(body, &peers)
+		_, err := c.client.
+			R().
+			ForceContentType("application/json").
+			SetResult(&peers).
+			Get(u.String())
+
 		ASSERT_NO_ERROR(t, err)
 		ASSERT_EQUAL(t, COUNT, len(peers))
 	})
@@ -203,14 +201,14 @@ func TestDHTServer(t *testing.T) {
 				Host:   s.dhtServer.address,
 			}
 
-			resp, err := c.Get(u.String())
+			var peers []Peer
+			_, err := c.client.R().
+				ForceContentType("application/json").
+				SetResult(&peers).
+				Get(u.String())
+
 			ASSERT_NO_ERROR(t, err)
 
-			var peers []Peer
-			body, err := io.ReadAll(resp.Body)
-			resp.Body.Close()
-			err = json.Unmarshal(body, &peers)
-			ASSERT_NO_ERROR(t, err)
 			// (Outdated note for dev) review the logic of this part, the previous test asserts that peers know each other but now it returns only one peer, what's going on here?
 
 			// (comment on the comment) now I understand why this is going on
