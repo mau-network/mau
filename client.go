@@ -5,16 +5,16 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
 	"time"
+
+	"github.com/go-resty/resty/v2"
 )
 
 var (
@@ -86,33 +86,29 @@ func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, af
 	}
 
 	// Get list of remote files since the last modification we have
-	u := url.URL{
-		Scheme: uriProtocolName,
-		Host:   address,
-		Path:   fmt.Sprintf("/p2p/%s", fingerprint),
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return err
-	}
-
-	req.Header.Add("If-Modified-Since", after.UTC().Format(http.TimeFormat))
-
-	resp, err := c.Do(req)
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Peer responded with error: %s", resp.Status)
-	}
-
 	var list []FileListItem
-	err = json.NewDecoder(resp.Body).Decode(&list)
-	resp.Body.Close()
+
+	resp, err := resty.
+		NewWithClient(&c.Client).
+		R().
+		SetContext(ctx).
+		SetHeader("If-Modified-Since", after.UTC().Format(http.TimeFormat)).
+		SetResult(&list).
+		ForceContentType("application/json").
+		Get(
+			(&url.URL{
+				Scheme: uriProtocolName,
+				Host:   address,
+				Path:   fmt.Sprintf("/p2p/%s", fingerprint),
+			}).String(),
+		)
+
 	if err != nil {
-		return err
+		return fmt.Errorf("Error requesting list of files: %w", err)
+	}
+
+	if resp.StatusCode() != http.StatusOK {
+		return fmt.Errorf("Peer responded with error: %s", resp.Status())
 	}
 
 	// Download each file in order
@@ -123,7 +119,7 @@ func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, af
 		default:
 			err = c.DownloadFile(ctx, address, fingerprint, &list[i])
 			if err != nil {
-				log.Printf("Error: Downloading File %s\n\t%s", u.String(), err)
+				log.Printf("Error: Downloading File %s\n\t%s", resp.Request.URL, err)
 			}
 		}
 	}
@@ -147,37 +143,31 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 		}
 	}
 
-	u := url.URL{
-		Scheme: uriProtocolName,
-		Host:   address,
-		Path:   fmt.Sprintf("/p2p/%s/%s", fingerprint, file.Name),
-	}
+	resp, err := resty.
+		NewWithClient(&c.Client).
+		R().
+		SetContext(ctx).
+		Get(
+			(&url.URL{
+				Scheme: uriProtocolName,
+				Host:   address,
+				Path:   fmt.Sprintf("/p2p/%s/%s", fingerprint, file.Name),
+			}).String(),
+		)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("Error getting file: %w", err)
 	}
 
-	resp, err := c.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Server returned unsuccessful response %s for %s", resp.Status, u.String())
+	if resp.StatusCode() != http.StatusOK {
+		return fmt.Errorf("Server returned unsuccessful response %s for %s", resp.Status(), resp.Request.URL)
 	}
 
-	content, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
+	if len(resp.Body()) != int(file.Size) {
+		return fmt.Errorf("Size is different for %s\nexpected %d received %d\ncontent:\n%s", resp.Request.URL, file.Size, len(resp.Body()), resp.Body())
 	}
 
-	if len(content) != int(file.Size) {
-		return fmt.Errorf("Size is different for %s\nexpected %d received %d\ncontent:\n%s", u.String(), file.Size, len(content), content)
-	}
-
-	hash := sha256.Sum256(content)
+	hash := sha256.Sum256(resp.Body())
 	h := fmt.Sprintf("%x", hash)
 	if h != file.Sum {
 		return fmt.Errorf("Hash sum is different received %s", h)
@@ -187,7 +177,7 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 	// TODO: check for file encrypted to current user
 	// TODO: keep existing version
 
-	err = os.WriteFile(f.Path, content, 0600)
+	err = os.WriteFile(f.Path, resp.Body(), 0600)
 	if err != nil {
 		return err
 	}
