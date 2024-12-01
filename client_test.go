@@ -9,14 +9,16 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestClient(t *testing.T) {
 	account, err := NewAccount(t.TempDir(), "Ahmed Mohamed", "ahmed@example.com", "strong password")
 
 	client, err := account.Client(account.Fingerprint(), nil)
-	ASSERT_NO_ERROR(t, err)
-	REFUTE_EQUAL(t, nil, client)
+	assert.NoError(t, err)
+	assert.NotEqual(t, nil, client)
 }
 
 func TestDownloadFriend(t *testing.T) {
@@ -39,51 +41,51 @@ func TestDownloadFriend(t *testing.T) {
 
 	t.Run("When the fingerprint is not a friend", func(t T) {
 		err := client.DownloadFriend(context.Background(), friend.Fingerprint(), time.Now(), []FingerprintResolver{StaticAddress(address)})
-		ASSERT_ERROR(t, ErrFriendNotFollowed, err)
+		assert.Error(t, ErrFriendNotFollowed, err)
 	})
 
 	t.Run("When friend but not followed", func(t T) {
 		account.AddFriend(bytes.NewReader(friend_key.Bytes()))
 		err := client.DownloadFriend(context.Background(), friend.Fingerprint(), time.Now(), []FingerprintResolver{StaticAddress(address)})
-		ASSERT_ERROR(t, ErrFriendNotFollowed, err)
+		assert.Error(t, ErrFriendNotFollowed, err)
 	})
 
 	t.Run("When friend and followed", func(t T) {
 		f, err := account.AddFriend(bytes.NewReader(friend_key.Bytes()))
-		ASSERT_NO_ERROR(t, err)
+		assert.NoError(t, err)
 		account.Follow(f)
 
 		err = client.DownloadFriend(Timeout(time.Second), friend.Fingerprint(), time.Now(), []FingerprintResolver{StaticAddress(address)})
-		ASSERT_NO_ERROR(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("When a file is encrypted for friend", func(t T) {
 		// Create a file in the friend account
 		aFriend, _ := friend.AddFriend(bytes.NewReader(account_key.Bytes()))
 		_, err := friend.AddFile(strings.NewReader("Hello world!"), "hello world.txt", []*Friend{aFriend})
-		ASSERT_NO_ERROR(t, err)
-		ASSERT_FILE_EXISTS(t, path.Join(friend_dir, friend.Fingerprint().String(), "hello world.txt.pgp"))
+		assert.NoError(t, err)
+		assert.FileExists(t, path.Join(friend_dir, friend.Fingerprint().String(), "hello world.txt.pgp"))
 
 		// and download it to the account
 		err = client.DownloadFriend(Timeout(time.Second), friend.Fingerprint(), time.Now().Add(-time.Second), []FingerprintResolver{StaticAddress(address)})
-		ASSERT_NO_ERROR(t, err)
-		ASSERT_FILE_EXISTS(t, path.Join(account_dir, friend.Fingerprint().String(), "hello world.txt.pgp"))
+		assert.NoError(t, err)
+		assert.FileExists(t, path.Join(account_dir, friend.Fingerprint().String(), "hello world.txt.pgp"))
 	})
 
 	t.Run("When private file exists", func(t T) {
 		_, err := friend.AddFile(strings.NewReader("Private social security number"), "private.txt", []*Friend{})
-		ASSERT_NO_ERROR(t, err)
-		ASSERT_FILE_EXISTS(t, path.Join(friend_dir, friend.Fingerprint().String(), "private.txt.pgp"))
+		assert.NoError(t, err)
+		assert.FileExists(t, path.Join(friend_dir, friend.Fingerprint().String(), "private.txt.pgp"))
 
 		err = client.DownloadFriend(Timeout(time.Second), friend.Fingerprint(), time.Now().Add(-time.Second), []FingerprintResolver{StaticAddress(address)})
-		ASSERT_NO_ERROR(t, err)
-		REFUTE_FILE_EXISTS(t, path.Join(account_dir, friend.Fingerprint().String(), "private.txt.pgp"))
+		assert.NoError(t, err)
+		assert.NoFileExists(t, path.Join(account_dir, friend.Fingerprint().String(), "private.txt.pgp"))
 	})
 
 	t.Run("When no address is provided it find the user on the local network", func(t T) {
 		ctx := Timeout(10 * time.Second)
 		err := client.DownloadFriend(ctx, friend.Fingerprint(), time.Now().Add(-time.Second), []FingerprintResolver{LocalFriendAddress})
-		ASSERT_NO_ERROR(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("Connecting to an account with wrong peer ID", func(t T) {
@@ -91,7 +93,7 @@ func TestDownloadFriend(t *testing.T) {
 		client, _ := account.Client(anotherFriend.Fingerprint(), nil)
 		ctx := Timeout(10 * time.Second)
 		err := client.DownloadFriend(ctx, friend.Fingerprint(), time.Now().Add(-time.Second), []FingerprintResolver{StaticAddress(address)})
-		ASSERT_ERROR(t, ErrIncorrectPeerCertificate, err)
+		assert.Error(t, ErrIncorrectPeerCertificate, err)
 	})
 }
 

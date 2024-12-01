@@ -10,33 +10,35 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestServer(t *testing.T) {
 	dir := t.TempDir()
 	account, err := NewAccount(dir, "Ahmed Mohamed", "ahmed@example.com", "password")
-	ASSERT_NO_ERROR(t, err)
-	REFUTE_EQUAL(t, nil, account)
+	assert.NoError(t, err)
+	assert.NotEqual(t, nil, account)
 
 	friendAccount, err := NewAccount(t.TempDir(), "Friend of Ahmed", "friend@example.com", "password")
-	ASSERT_NO_ERROR(t, err)
-	REFUTE_EQUAL(t, nil, friendAccount)
+	assert.NoError(t, err)
+	assert.NotEqual(t, nil, friendAccount)
 
 	var friendPub bytes.Buffer
 	err = friendAccount.Export(&friendPub)
-	ASSERT_NO_ERROR(t, err)
+	assert.NoError(t, err)
 	friend, err := account.AddFriend(&friendPub)
-	ASSERT_NO_ERROR(t, err)
+	assert.NoError(t, err)
 
 	server, err := account.Server(nil)
-	ASSERT_NO_ERROR(t, err)
-	REFUTE_EQUAL(t, nil, server)
+	assert.NoError(t, err)
+	assert.NotEqual(t, nil, server)
 
 	listener, address := TempListener()
 
 	go func() {
 		err := server.Serve(*listener, "")
-		ASSERT_ERROR(t, http.ErrServerClosed, err)
+		assert.Error(t, http.ErrServerClosed, err)
 	}()
 	defer server.Close()
 
@@ -51,56 +53,56 @@ func TestServer(t *testing.T) {
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
 				resp.Body.Close()
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, "[]", string(body))
+				assert.NoError(t, err)
+				assert.Equal(t, "[]", string(body))
 			})
 
 			t.Run("With one private file", func(t T) {
 				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{})
-				ASSERT_NO_ERROR(t, err)
+				assert.NoError(t, err)
 				defer os.Remove(file.Path)
 
 				req, _ := http.NewRequest("GET", list_account_files_url, nil)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
 				resp.Body.Close()
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, "[]", string(body))
+				assert.NoError(t, err)
+				assert.Equal(t, "[]", string(body))
 			})
 
 			t.Run("With one shared file", func(t T) {
 				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{friend})
-				ASSERT_NO_ERROR(t, err)
+				assert.NoError(t, err)
 				defer os.Remove(file.Path)
 
 				req, _ := http.NewRequest("GET", list_account_files_url, nil)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
 				resp.Body.Close()
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, "[]", string(body))
+				assert.NoError(t, err)
+				assert.Equal(t, "[]", string(body))
 			})
 		})
 
 		t.Run("With client cert not a friend", func(t T) {
 			anotherAccount, _ := NewAccount(t.TempDir(), "Unknown", "unknown@example.com", "password")
 			cert, err := anotherAccount.certificate(nil)
-			ASSERT_NO_ERROR(t, err)
+			assert.NoError(t, err)
 
 			oldTransport := http.DefaultClient.Transport
 			defer func() { http.DefaultClient.Transport = oldTransport }()
@@ -123,55 +125,55 @@ func TestServer(t *testing.T) {
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
 				resp.Body.Close()
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, "[]", string(body))
+				assert.NoError(t, err)
+				assert.Equal(t, "[]", string(body))
 			})
 
 			t.Run("With one private file", func(t T) {
 				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{})
-				ASSERT_NO_ERROR(t, err)
+				assert.NoError(t, err)
 				defer os.Remove(file.Path)
 
 				req, _ := http.NewRequest("GET", list_account_files_url, nil)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
 				resp.Body.Close()
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, "[]", string(body))
+				assert.NoError(t, err)
+				assert.Equal(t, "[]", string(body))
 			})
 
 			t.Run("With one shared file", func(t T) {
 				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{friend})
-				ASSERT_NO_ERROR(t, err)
+				assert.NoError(t, err)
 				defer os.Remove(file.Path)
 
 				req, _ := http.NewRequest("GET", list_account_files_url, nil)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
 				resp.Body.Close()
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, "[]", string(body))
+				assert.NoError(t, err)
+				assert.Equal(t, "[]", string(body))
 			})
 		})
 
 		t.Run("With client cert of a friend", func(t T) {
 			cert, err := friendAccount.certificate(nil)
-			ASSERT_NO_ERROR(t, err)
+			assert.NoError(t, err)
 
 			oldTransport := http.DefaultClient.Transport
 			defer func() { http.DefaultClient.Transport = oldTransport }()
@@ -194,49 +196,49 @@ func TestServer(t *testing.T) {
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
 				resp.Body.Close()
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, "[]", string(body))
+				assert.NoError(t, err)
+				assert.Equal(t, "[]", string(body))
 			})
 
 			t.Run("With one private file", func(t T) {
 				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{})
-				ASSERT_NO_ERROR(t, err)
+				assert.NoError(t, err)
 				defer os.Remove(file.Path)
 
 				req, _ := http.NewRequest("GET", list_account_files_url, nil)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
 				resp.Body.Close()
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, "[]", string(body))
+				assert.NoError(t, err)
+				assert.Equal(t, "[]", string(body))
 			})
 
 			t.Run("With one shared file", func(t T) {
 				file, err := account.AddFile(strings.NewReader("Hello world"), "hello.txt", []*Friend{friend})
-				ASSERT_NO_ERROR(t, err)
+				assert.NoError(t, err)
 				defer os.Remove(file.Path)
 
 				req, _ := http.NewRequest("GET", list_account_files_url, nil)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
-				ASSERT_NO_ERROR(t, err)
-				ASSERT_EQUAL(t, http.StatusOK, resp.StatusCode)
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 				body, err := io.ReadAll(resp.Body)
 				resp.Body.Close()
-				ASSERT_NO_ERROR(t, err)
-				ASSERT(t, strings.Contains(string(body), "hello.txt.pgp"), "hello.txt.pgp not found in the response, Response: %s", body)
+				assert.NoError(t, err)
+				assert.Contains(t, string(body), "hello.txt.pgp", "hello.txt.pgp not found in the response, Response: %s", body)
 			})
 
 		})

@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestUPNPClient(t *testing.T) {
@@ -13,9 +15,9 @@ func TestUPNPClient(t *testing.T) {
 	defer cancel()
 
 	client, err := newUPNPClient(ctx)
-	ASSERT_NO_ERROR(t, err)
+	assert.NoError(t, err)
 
 	address, err := client.GetExternalIPAddress()
-	ASSERT_NO_ERROR(t, err)
-	REFUTE_EQUAL(t, "", address)
+	assert.NoError(t, err)
+	assert.NotEqual(t, "", address)
 }

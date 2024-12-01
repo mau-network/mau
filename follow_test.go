@@ -5,6 +5,8 @@ import (
 	"os"
 	"path"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFollow(t *testing.T) {
@@ -18,8 +20,8 @@ func TestFollow(t *testing.T) {
 	friend, _ := account.AddFriend(&friend_pub)
 
 	err := account.Follow(friend)
-	ASSERT_NO_ERROR(t, err)
-	ASSERT_DIR_EXISTS(t, path.Join(dir, friend_account.Fingerprint().String()))
+	assert.NoError(t, err)
+	assert.DirExists(t, path.Join(dir, friend_account.Fingerprint().String()))
 }
 
 func TestUnfollow(t *testing.T) {
@@ -34,8 +36,8 @@ func TestUnfollow(t *testing.T) {
 
 	account.Follow(friend)
 	err := account.Unfollow(friend)
-	ASSERT_NO_ERROR(t, err)
-	ASSERT_DIR_EXISTS(t, path.Join(dir, "."+friend_account.Fingerprint().String()))
+	assert.NoError(t, err)
+	assert.DirExists(t, path.Join(dir, "."+friend_account.Fingerprint().String()))
 }
 
 func TestListFollows(t *testing.T) {
@@ -50,27 +52,27 @@ func TestListFollows(t *testing.T) {
 
 	t.Run("Before following anyone", func(t T) {
 		follows, _ := account.ListFollows()
-		ASSERT_EQUAL(t, 0, len(follows))
+		assert.Equal(t, 0, len(follows))
 	})
 
 	t.Run("After following a friend", func(t T) {
 		account.Follow(friend)
 		follows, err := account.ListFollows()
-		ASSERT_NO_ERROR(t, err)
-		ASSERT_EQUAL(t, 1, len(follows))
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(follows))
 	})
 
 	t.Run("After unfollowing the friend", func(t T) {
 		account.Unfollow(friend)
 		follows, _ := account.ListFollows()
-		ASSERT_EQUAL(t, 0, len(follows))
+		assert.Equal(t, 0, len(follows))
 	})
 
 	t.Run("When having a dir that's not a fingerprint", func(t T) {
 		os.Mkdir(path.Join(account.path, "systemdir"), 0777)
 		follows, err := account.ListFollows()
-		ASSERT_NO_ERROR(t, err)
-		ASSERT_EQUAL(t, 0, len(follows))
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(follows))
 	})
 
 }

@@ -5,6 +5,8 @@ import (
 	"os"
 	"path"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAddFriend(t *testing.T) {
@@ -17,26 +19,26 @@ func TestAddFriend(t *testing.T) {
 	var friend_account_pub bytes.Buffer
 	friend_account.Export(&friend_account_pub)
 	friend, err := account.AddFriend(&friend_account_pub)
-	ASSERT_NO_ERROR(t, err)
-	ASSERT_FILE_EXISTS(t, path.Join(dir, ".mau", fingerprint.String()+".pgp"))
+	assert.NoError(t, err)
+	assert.FileExists(t, path.Join(dir, ".mau", fingerprint.String()+".pgp"))
 
 	t.Run("Email", func(t T) {
-		ASSERT_EQUAL(t, "mohamed@example.com", friend.Email())
+		assert.Equal(t, "mohamed@example.com", friend.Email())
 	})
 
 	t.Run("Name", func(t T) {
-		ASSERT_EQUAL(t, "Mohamed Mahmoud", friend.Name())
+		assert.Equal(t, "Mohamed Mahmoud", friend.Name())
 	})
 
 	t.Run("Fingerprint", func(t T) {
-		ASSERT_EQUAL(t, friend_account.Fingerprint(), friend.Fingerprint())
+		assert.Equal(t, friend_account.Fingerprint(), friend.Fingerprint())
 	})
 
 	t.Run("Identity", func(t T) {
 		friend_account_identity, _ := friend_account.Identity()
 		friend_identity, err := friend.Identity()
-		ASSERT_NO_ERROR(t, err)
-		ASSERT_EQUAL(t, friend_account_identity, friend_identity)
+		assert.NoError(t, err)
+		assert.Equal(t, friend_account_identity, friend_identity)
 	})
 
 	t.Run("File should be encrypted for this account", func(t T) {
@@ -47,8 +49,8 @@ func TestAddFriend(t *testing.T) {
 		os.WriteFile(path.Join(anotherDir, ".mau", fingerprint.String()+".pgp"), file_content, dirPerm)
 
 		friends, err := anotherAccount.ListFriends()
-		ASSERT(t, err != nil, "ListFriends should fail to decrypt a friend")
-		ASSERT_EQUAL(t, nil, friends)
+		assert.Error(t, err, "ListFriends should fail to decrypt a friend")
+		assert.Nil(t, friends)
 	})
 }
 
@@ -64,8 +66,8 @@ func TestRemoveFriend(t *testing.T) {
 	friend, _ := account.AddFriend(&friend_account_pub)
 
 	err := account.RemoveFriend(friend)
-	ASSERT_NO_ERROR(t, err)
-	REFUTE_FILE_EXISTS(t, path.Join(dir, ".mau", fingerprint.String()+".pgp"))
+	assert.NoError(t, err)
+	assert.NoFileExists(t, path.Join(dir, ".mau", fingerprint.String()+".pgp"))
 }
 
 func TestListFriends(t *testing.T) {
@@ -79,18 +81,18 @@ func TestListFriends(t *testing.T) {
 	friend, _ := account.AddFriend(&friend_account_pub)
 
 	keyring, err := account.ListFriends()
-	ASSERT_NO_ERROR(t, err)
-	REFUTE_EQUAL(t, nil, keyring)
-	ASSERT_EQUAL(t, path.Join(dir, ".mau"), keyring.Path)
-	ASSERT_EQUAL(t, 1, len(keyring.Friends))
-	ASSERT_EQUAL(t, 0, len(keyring.SubKeyrings))
+	assert.NoError(t, err)
+	assert.NotEqual(t, nil, keyring)
+	assert.Equal(t, path.Join(dir, ".mau"), keyring.Path)
+	assert.Equal(t, 1, len(keyring.Friends))
+	assert.Equal(t, 0, len(keyring.SubKeyrings))
 
 	err = account.RemoveFriend(friend)
 
 	keyring, err = account.ListFriends()
-	ASSERT_NO_ERROR(t, err)
-	REFUTE_EQUAL(t, nil, keyring)
-	ASSERT_EQUAL(t, path.Join(dir, ".mau"), keyring.Path)
-	ASSERT_EQUAL(t, 0, len(keyring.Friends))
-	ASSERT_EQUAL(t, 0, len(keyring.SubKeyrings))
+	assert.NoError(t, err)
+	assert.NotEqual(t, nil, keyring)
+	assert.Equal(t, path.Join(dir, ".mau"), keyring.Path)
+	assert.Equal(t, 0, len(keyring.Friends))
+	assert.Equal(t, 0, len(keyring.SubKeyrings))
 }
