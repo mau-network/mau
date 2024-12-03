@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 )
@@ -18,12 +17,10 @@ import (
 // Kademlia: A Peer-to-Peer Information System Based on the XOR Metric
 
 const (
-	dht_B              = FINGERPRINT_LEN * 8 // number of buckets
-	dht_K              = 20                  // max length of k bucket (replication parameter)
-	dht_ALPHA          = 3                   // parallelism factor
-	dht_STALL_PERIOD   = time.Hour
-	dht_PING_PATH      = "/kad/ping"
-	dht_FIND_PEER_PATH = "/kad/find_peer/"
+	dht_B            = FINGERPRINT_LEN * 8 // number of buckets
+	dht_K            = 20                  // max length of k bucket (replication parameter)
+	dht_ALPHA        = 3                   // parallelism factor
+	dht_STALL_PERIOD = time.Hour
 )
 
 // Peer is a reference to another instance of the program, identified by the
@@ -49,8 +46,8 @@ func newDHTServer(account *Account, address string) *dhtServer {
 		address: address,
 	}
 
-	d.mux.HandleFunc(dht_PING_PATH, d.receivePing)
-	d.mux.HandleFunc(dht_FIND_PEER_PATH, d.receiveFindPeer)
+	d.mux.HandleFunc("GET /kad/ping", d.receivePing)
+	d.mux.HandleFunc("GET /kad/find_peer/{fpr}", d.receiveFindPeer)
 
 	return d
 }
@@ -71,7 +68,7 @@ func (d *dhtServer) sendPing(peer *Peer) error {
 	u := url.URL{
 		Scheme: uriProtocolName,
 		Host:   peer.Address,
-		Path:   dht_PING_PATH,
+		Path:   "/kad/ping",
 	}
 
 	// TODO add context maybe
@@ -157,7 +154,7 @@ func (d *dhtServer) sendFindPeerWorker(ctx context.Context, fingerprint Fingerpr
 	u := url.URL{
 		Scheme: uriProtocolName,
 		Host:   peer.Address,
-		Path:   dht_FIND_PEER_PATH + fingerprint.String(),
+		Path:   "/kad/find_peer/" + fingerprint.String(),
 	}
 
 	_, err = client.client.
@@ -198,7 +195,7 @@ func (d *dhtServer) receiveFindPeer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fpr := strings.TrimPrefix(r.URL.Path, dht_FIND_PEER_PATH)
+	fpr := r.PathValue("fpr")
 	fingerprint, err := FingerprintFromString(fpr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

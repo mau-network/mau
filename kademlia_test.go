@@ -164,7 +164,7 @@ func TestDHTServer(t *testing.T) {
 		c, _ := bootstrap.Client(bootstrap_peer.Fingerprint, []string{bootstrap_addr})
 		u := url.URL{
 			Scheme: uriProtocolName,
-			Path:   dht_FIND_PEER_PATH + bootstrap.Fingerprint().String(),
+			Path:   "/kad/find_peer/" + bootstrap.Fingerprint().String(),
 			Host:   bootstrap_addr,
 		}
 
@@ -199,7 +199,7 @@ func TestDHTServer(t *testing.T) {
 			c, _ := bootstrap.Client(s.account.Fingerprint(), []string{bootstrap_addr})
 			u := url.URL{
 				Scheme: uriProtocolName,
-				Path:   dht_FIND_PEER_PATH + "0000000000000000000000000000000000000F0F",
+				Path:   "/kad/find_peer/" + "0000000000000000000000000000000000000F0F",
 				Host:   s.dhtServer.address,
 			}
 
