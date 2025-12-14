@@ -14,7 +14,7 @@ func (a *Account) ListFollows() ([]*Friend, error) {
 
 	keyring, err := a.ListFriends()
 	if err != nil {
-		return nil, fmt.Errorf("Error listing friends: %w", err)
+		return nil, fmt.Errorf("failed to list friends while getting follows: %w", err)
 	}
 
 	follows := []*Friend{}
@@ -48,7 +48,7 @@ func (a *Account) Follow(friend *Friend) error {
 		return os.Rename(unfollowed, followed)
 	}
 
-	return os.Mkdir(followed, dirPerm)
+	return os.Mkdir(followed, DirPerm)
 }
 
 func (a *Account) Unfollow(friend *Friend) error {

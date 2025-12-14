@@ -14,7 +14,7 @@ import (
 	"math/big"
 	"os"
 	"path"
-	"sort"
+	"slices"
 	"time"
 
 	_ "crypto/sha256"
@@ -43,7 +43,7 @@ func NewAccount(root, name, email, passphrase string) (*Account, error) {
 
 	dir := mauDir(root)
 
-	err := os.MkdirAll(dir, dirPerm)
+	err := os.MkdirAll(dir, DirPerm)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func NewAccount(root, name, email, passphrase string) (*Account, error) {
 
 func OpenAccount(rootPath, passphrase string) (*Account, error) {
 	dir := mauDir(rootPath)
-	err := os.MkdirAll(dir, dirPerm)
+	err := os.MkdirAll(dir, DirPerm)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (a *Account) Export(w io.Writer) error {
 	err = a.entity.Serialize(armored)
 	armored.Close()
 	if err != nil {
-		return nil
+		return err
 	}
 
 	return nil
@@ -244,7 +244,7 @@ func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File
 
 	fpr := a.Fingerprint().String()
 
-	if err := os.MkdirAll(path.Join(a.path, fpr), dirPerm); err != nil {
+	if err := os.MkdirAll(path.Join(a.path, fpr), DirPerm); err != nil {
 		return nil, err
 	}
 
@@ -256,7 +256,7 @@ func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File
 			return nil, err
 		}
 
-		if err = os.MkdirAll(p+".versions", dirPerm); err != nil {
+		if err = os.MkdirAll(p+".versions", DirPerm); err != nil {
 			return nil, err
 		}
 
@@ -307,16 +307,25 @@ func (a *Account) RemoveFile(file *File) error {
 	return nil
 }
 
-func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint) []*File {
-	followedPath := path.Join(a.path, fingerprint.String())
-	unfollowedPath := path.Join(a.path, "."+fingerprint.String())
-	var dirpath string
+// resolveFriendPath resolves a path for a friend's content, checking both followed and unfollowed directories.
+// Returns the resolved path or os.ErrNotExist if neither exists.
+func (a *Account) resolveFriendPath(fpr Fingerprint, subpath string) (string, error) {
+	followedPath := path.Join(a.path, fpr.String(), subpath)
+	unfollowedPath := path.Join(a.path, "."+fpr.String(), subpath)
 
 	if _, err := os.Stat(followedPath); err == nil {
-		dirpath = followedPath
-	} else if _, err := os.Stat(unfollowedPath); err == nil {
-		dirpath = unfollowedPath
-	} else {
+		return followedPath, nil
+	}
+	if _, err := os.Stat(unfollowedPath); err == nil {
+		return unfollowedPath, nil
+	}
+
+	return "", os.ErrNotExist
+}
+
+func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint) []*File {
+	dirpath, err := a.resolveFriendPath(fingerprint, "")
+	if err != nil {
 		return []*File{}
 	}
 
@@ -353,8 +362,14 @@ func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint
 		})
 	}
 
-	sort.Slice(recent, func(i, j int) bool {
-		return recent[i].modification.Before(recent[j].modification)
+	slices.SortFunc(recent, func(a, b dirEntry) int {
+		if a.modification.Before(b.modification) {
+			return -1
+		}
+		if a.modification.After(b.modification) {
+			return 1
+		}
+		return 0
 	})
 
 	if uint(len(recent)) < limit {

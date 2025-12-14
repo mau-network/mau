@@ -7,7 +7,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -43,7 +43,7 @@ func (a *Account) Client(peer Fingerprint, DNSNames []string) (*Client, error) {
 
 	c.client = resty.New().
 		SetRedirectPolicy(resty.NoRedirectPolicy()).
-		SetTimeout(3 * time.Second).
+		SetTimeout(httpClientTimeout).
 		SetTLSClientConfig(
 			&tls.Config{
 				Certificates:          []tls.Certificate{cert},
@@ -101,11 +101,11 @@ func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, af
 		)
 
 	if err != nil {
-		return fmt.Errorf("Error requesting list of files: %w", err)
+		return fmt.Errorf("failed to request file list from peer %s: %w", fingerprint, err)
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return fmt.Errorf("Peer responded with error: %s", resp.Status())
+		return fmt.Errorf("peer %s responded with error status %s", fingerprint, resp.Status())
 	}
 
 	// Download each file in order
@@ -116,7 +116,7 @@ func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, af
 		default:
 			err = c.DownloadFile(ctx, address, fingerprint, &list[i])
 			if err != nil {
-				log.Printf("Error: Downloading File %s\n\t%s", resp.Request.URL, err)
+				slog.Error("failed to download file", "url", resp.Request.URL, "file", list[i].Name, "error", err)
 			}
 		}
 	}
@@ -152,30 +152,44 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 		)
 
 	if err != nil {
-		return fmt.Errorf("Error getting file: %w", err)
+		return fmt.Errorf("failed to download file %s from peer %s: %w", file.Name, fingerprint, err)
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return fmt.Errorf("Server returned unsuccessful response %s for %s", resp.Status(), resp.Request.URL)
+		return fmt.Errorf("server returned status %s while downloading file %s from %s", resp.Status(), file.Name, resp.Request.URL)
 	}
 
 	if len(resp.Body()) != int(file.Size) {
-		return fmt.Errorf("Size is different for %s\nexpected %d received %d\ncontent:\n%s", resp.Request.URL, file.Size, len(resp.Body()), resp.Body())
+		return fmt.Errorf("file size mismatch for %s: expected %d bytes, received %d bytes", file.Name, file.Size, len(resp.Body()))
 	}
 
 	hash := sha256.Sum256(resp.Body())
 	h := fmt.Sprintf("%x", hash)
 	if h != file.Sum {
-		return fmt.Errorf("Hash sum is different received %s", h)
+		return fmt.Errorf("file hash mismatch for %s: expected %s, received %s", file.Name, file.Sum, h)
 	}
 
-	// TODO: check for file signature
-	// TODO: check for file encrypted to current user
-	// TODO: keep existing version
-
-	err = os.WriteFile(f.Path, resp.Body(), 0600)
+	// Write to temporary file first for verification
+	tmpPath := f.Path + ".tmp"
+	err = os.WriteFile(tmpPath, resp.Body(), FilePerm)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write temporary file: %w", err)
+	}
+
+	// Verify signature before accepting the file
+	tmpFile := &File{Path: tmpPath}
+	err = tmpFile.VerifySignature(c.account, fingerprint)
+	if err != nil {
+		os.Remove(tmpPath) // Clean up temporary file
+		return fmt.Errorf("signature verification failed for %s: %w", file.Name, err)
+	}
+
+	// Signature verified, move temp file to final location
+	// TODO: keep existing version in .versions directory before overwriting
+	err = os.Rename(tmpPath, f.Path)
+	if err != nil {
+		os.Remove(tmpPath) // Clean up temporary file
+		return fmt.Errorf("failed to save verified file: %w", err)
 	}
 
 	return nil

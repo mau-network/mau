@@ -1,5 +1,7 @@
 package mau
 
+import "time"
+
 var (
 	rsaKeyLength = 4096
 )
@@ -9,7 +11,9 @@ const (
 	mDNSServiceName    = "_mau._tcp"
 	mauDirName         = ".mau"
 	accountKeyFilename = "account.pgp"
-	dirPerm            = 0700
+	DirPerm            = 0700
+	FilePerm           = 0600
 	uriProtocolName    = "https"
 	mDNSDomain         = "local"
+	httpClientTimeout  = 3 * time.Second
 )

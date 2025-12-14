@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"math/bits"
 	"math/rand"
 	"net/http"
 	"net/url"
-	"sort"
+	"slices"
 	"sync"
 	"time"
 )
@@ -115,7 +115,7 @@ func (d *dhtServer) sendFindPeer(ctx context.Context, fingerprint Fingerprint) (
 				f, err := d.sendFindPeerWorker(workersCtx, fingerprint, peers)
 
 				if err != nil {
-					log.Printf("Error sendFindPeerWorker: %s", err)
+					slog.Error("failed to find peer", "fingerprint", fingerprint, "error", err)
 				}
 
 				if f != nil {
@@ -327,7 +327,7 @@ func (d *dhtServer) refreshStallBuckets(ctx context.Context) {
 				} else {
 					// if it's not refreshable then calculate when it's gonna
 					// need refresh and move next click earlier if needed
-					stallAfter := dht_STALL_PERIOD - time.Now().Sub(d.buckets[i].lastLookup)
+					stallAfter := dht_STALL_PERIOD - time.Since(d.buckets[i].lastLookup)
 					if stallAfter < nextClick {
 						nextClick = stallAfter
 					}
@@ -511,7 +511,7 @@ func (p *peerRequestSet) add(peers ...*Peer) {
 
 	for i := range peers {
 		if p.added[peers[i].Fingerprint] {
-			return
+			continue
 		}
 
 		p.added[peers[i].Fingerprint] = true
@@ -562,9 +562,9 @@ func prefixLen(a Fingerprint) int {
 
 // sortByDistance sorts ids by ascending XOR distance with respect to fingerprint
 func sortByDistance(fingerprint Fingerprint, peers []*Peer) {
-	sort.Slice(peers, func(i, j int) bool {
-		ixor := xor(peers[i].Fingerprint, fingerprint)
-		jxor := xor(peers[j].Fingerprint, fingerprint)
-		return bytes.Compare(ixor[:], jxor[:]) == -1
+	slices.SortFunc(peers, func(a, b *Peer) int {
+		ixor := xor(a.Fingerprint, fingerprint)
+		jxor := xor(b.Fingerprint, fingerprint)
+		return bytes.Compare(ixor[:], jxor[:])
 	})
 }

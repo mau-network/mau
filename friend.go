@@ -85,8 +85,11 @@ func (a *Account) AddFriend(reader io.Reader) (*Friend, error) {
 		return nil, err
 	}
 
-	entity.Serialize(w)
+	err = entity.Serialize(w)
 	w.Close()
+	if err != nil {
+		return nil, err
+	}
 
 	friend := Friend{
 		entity: entity,

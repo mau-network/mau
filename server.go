@@ -5,8 +5,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -142,11 +143,7 @@ func (s *Server) Close() error {
 	http_err := s.httpServer.Close()
 	s.dhtServer.Leave()
 
-	if mdns_err != nil {
-		return mdns_err
-	}
-
-	return http_err
+	return errors.Join(mdns_err, http_err)
 }
 
 func (s *Server) list(w http.ResponseWriter, r *http.Request) {
@@ -176,13 +173,13 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 	for _, item := range page {
 		hash, err := item.Hash()
 		if err != nil {
-			fmt.Println("There was an error calculating hash: " + err.Error())
+			slog.Error("failed to calculate file hash", "file", item.Name(), "error", err)
 			hash = ""
 		}
 
 		size, err := item.Size()
 		if err != nil {
-			fmt.Println("There was a error calculating size: " + err.Error())
+			slog.Error("failed to calculate file size", "file", item.Name(), "error", err)
 			hash = ""
 		}
 

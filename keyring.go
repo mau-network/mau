@@ -78,7 +78,7 @@ func (k *Keyring) FriendById(id uint64) *Friend {
 func (k *Keyring) read(account *Account) error {
 	files, err := os.ReadDir(k.Path)
 	if err != nil {
-		return fmt.Errorf("Can't read dir: %w", err)
+		return fmt.Errorf("failed to read keyring directory %s: %w", k.Path, err)
 	}
 
 	for _, file := range files {
@@ -108,7 +108,7 @@ func (k *Keyring) read(account *Account) error {
 		friend, err := readFriend(account, reader)
 		reader.Close()
 		if err != nil {
-			return fmt.Errorf("Error reading friend: %w", err)
+			return fmt.Errorf("failed to read friend key from %s: %w", filePath, err)
 		}
 
 		k.Friends = append(k.Friends, friend)

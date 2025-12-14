@@ -68,7 +68,7 @@ func main() {
 
 		account := getAccount()
 
-		out, err := os.OpenFile(*output, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
+		out, err := os.OpenFile(*output, os.O_CREATE|os.O_RDWR|os.O_TRUNC, FilePerm)
 		raise(err)
 		defer out.Close()
 
@@ -268,7 +268,7 @@ func main() {
 		r, err := f.Reader(account)
 		raise(err)
 
-		out, err := os.OpenFile(*output, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+		out, err := os.OpenFile(*output, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, FilePerm)
 		raise(err)
 		defer out.Close()
 
