@@ -3,7 +3,6 @@ package mau
 import (
 	"bytes"
 	"crypto"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
@@ -219,8 +218,9 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 		},
 	}
 
+	// Go 1.26: rand.Reader parameter ignored, always uses secure random source
 	var derBytes []byte
-	derBytes, err = x509.CreateCertificate(rand.Reader, &template, &template, &rsakey.PublicKey, &rsakey)
+	derBytes, err = x509.CreateCertificate(nil, &template, &template, &rsakey.PublicKey, &rsakey)
 	if err != nil {
 		return
 	}
