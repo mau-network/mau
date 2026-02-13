@@ -49,13 +49,13 @@ func (a *Account) Client(peer Fingerprint, DNSNames []string) (*Client, error) {
 				Certificates:          []tls.Certificate{cert},
 				InsecureSkipVerify:    true,
 				VerifyPeerCertificate: c.verifyPeerCertificate,
-				CipherSuites: []uint16{
-					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-					tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_RSA_WITH_AES_256_CBC_SHA,
-					tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-					tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				// Go 1.26: Use secure defaults, removed explicit CipherSuites
+				// Modern Go automatically selects optimal cipher suites
+				MinVersion: tls.VersionTLS13, // TLS 1.3 for better security and performance
+				CurvePreferences: []tls.CurveID{
+					tls.X25519,    // Modern, fast elliptic curve
+					tls.CurveP256,
+					tls.CurveP384,
 				},
 			},
 		)
