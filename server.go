@@ -56,18 +56,20 @@ func (a *Account) Server(knownNodes []*Peer) (*Server, error) {
 				Certificates:       []tls.Certificate{cert},
 				InsecureSkipVerify: true,
 				ClientAuth:         tls.RequestClientCert,
-				CipherSuites: []uint16{
-					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-					tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_RSA_WITH_AES_256_CBC_SHA,
-					tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-					tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				// Go 1.26: Use secure defaults, removed deprecated PreferServerCipherSuites
+				// and explicit CipherSuites (modern Go chooses optimal suites automatically)
+				MinVersion: tls.VersionTLS13, // TLS 1.3 for better security and performance
+				CurvePreferences: []tls.CurveID{
+					tls.X25519,    // Modern, fast elliptic curve
+					tls.CurveP256,
+					tls.CurveP384,
+					tls.CurveP521,
 				},
-				PreferServerCipherSuites: true,
-				MinVersion:               tls.VersionTLS12,
-				CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
 			},
+			ReadTimeout:       30 * time.Second,
+			WriteTimeout:      30 * time.Second,
+			IdleTimeout:       120 * time.Second,
+			ReadHeaderTimeout: 10 * time.Second,
 		},
 	}
 
