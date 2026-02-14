@@ -209,7 +209,9 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(marshaled)
+	if _, err := w.Write(marshaled); err != nil {
+		http.Error(w, "Error writing response", http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {

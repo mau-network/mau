@@ -72,7 +72,9 @@ func TestFile(t *testing.T) {
 		assert.FileExists(t, path.Join(account_dir, account.Fingerprint().String(), "hello.txt.pgp.versions", version.Name()))
 
 		reader, err := version.Reader(account)
+		assert.NoError(t, err)
 		content, err := io.ReadAll(reader)
+		assert.NoError(t, err)
 		assert.Equal(t, "hello world", string(content))
 
 		nameInbytes, err := hex.DecodeString(version.Name())
@@ -90,7 +92,9 @@ func TestFile(t *testing.T) {
 		assert.NoError(t, err)
 
 		reader, err := file.Reader(account)
+		assert.NoError(t, err)
 		content, err := io.ReadAll(reader)
+		assert.NoError(t, err)
 		assert.NoError(t, err)
 		assert.Equal(t, "hello there", string(content))
 	})

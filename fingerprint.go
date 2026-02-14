@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 
+	//nolint:staticcheck // SA1019: openpgp deprecated but required for this project
 	"golang.org/x/crypto/openpgp/packet"
 )
 
@@ -31,7 +32,7 @@ func (f Fingerprint) MarshalJSON() ([]byte, error) {
 }
 
 func (f *Fingerprint) UnmarshalJSON(b []byte) error {
-	if bytes.Compare(b, []byte("null")) == 0 {
+	if bytes.Equal(b, []byte("null")) {
 		return nil
 	}
 
@@ -45,9 +46,7 @@ func (f *Fingerprint) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	for i := range pf {
-		f[i] = pf[i]
-	}
+	*f = pf
 
 	return nil
 }

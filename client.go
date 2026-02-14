@@ -73,7 +73,9 @@ func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, af
 
 	// ask all resolvers for the address concurrently
 	for _, fr := range fingerprintResolvers {
-		go fr(ctx, fingerprint, addresses)
+		go func(resolver FingerprintResolver) {
+			_ = resolver(ctx, fingerprint, addresses)
+		}(fr)
 	}
 
 	var address string

@@ -17,7 +17,9 @@ func TestAddFriend(t *testing.T) {
 	friend_account, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
 	fingerprint := friend_account.Fingerprint()
 	var friend_account_pub bytes.Buffer
-	friend_account.Export(&friend_account_pub)
+	if err := friend_account.Export(&friend_account_pub); err != nil {
+		t.Fatalf("Failed to export friend account: %v", err)
+	}
 	friend, err := account.AddFriend(&friend_account_pub)
 	assert.NoError(t, err)
 	assert.FileExists(t, path.Join(dir, ".mau", fingerprint.String()+".pgp"))
@@ -46,7 +48,9 @@ func TestAddFriend(t *testing.T) {
 		anotherAccount, _ := NewAccount(anotherDir, "Unknown account", "unknow@example.com", "password")
 
 		file_content, _ := os.ReadFile(path.Join(dir, ".mau", fingerprint.String()+".pgp"))
-		os.WriteFile(path.Join(anotherDir, ".mau", fingerprint.String()+".pgp"), file_content, DirPerm)
+		if err := os.WriteFile(path.Join(anotherDir, ".mau", fingerprint.String()+".pgp"), file_content, DirPerm); err != nil {
+			t.Fatalf("Failed to write file: %v", err)
+		}
 
 		friends, err := anotherAccount.ListFriends()
 		assert.Error(t, err, "ListFriends should fail to decrypt a friend")
@@ -61,7 +65,9 @@ func TestRemoveFriend(t *testing.T) {
 	friend_dir := t.TempDir()
 	friend_account, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
 	var friend_account_pub bytes.Buffer
-	friend_account.Export(&friend_account_pub)
+	if err := friend_account.Export(&friend_account_pub); err != nil {
+		t.Fatalf("Failed to export friend account: %v", err)
+	}
 	fingerprint := friend_account.Fingerprint()
 	friend, _ := account.AddFriend(&friend_account_pub)
 
@@ -77,7 +83,9 @@ func TestListFriends(t *testing.T) {
 	friend_dir := t.TempDir()
 	friend_account, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
 	var friend_account_pub bytes.Buffer
-	friend_account.Export(&friend_account_pub)
+	if err := friend_account.Export(&friend_account_pub); err != nil {
+		t.Fatalf("Failed to export friend account: %v", err)
+	}
 	friend, _ := account.AddFriend(&friend_account_pub)
 
 	keyring, err := account.ListFriends()
@@ -88,6 +96,7 @@ func TestListFriends(t *testing.T) {
 	assert.Equal(t, 0, len(keyring.SubKeyrings))
 
 	err = account.RemoveFriend(friend)
+	assert.NoError(t, err)
 
 	keyring, err = account.ListFriends()
 	assert.NoError(t, err)

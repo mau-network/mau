@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -76,7 +77,11 @@ func TestReceivePing(t *testing.T) {
 	t.Run("with mTLS", func(t *testing.T) {
 		listener, bootstrap_addr := TempListener()
 		server, err := account.Server(nil)
-		go server.Serve(*listener, bootstrap_addr)
+		go func() {
+			if err := server.Serve(*listener, bootstrap_addr); err != nil {
+				t.Logf("Server error: %v", err)
+			}
+		}()
 		defer server.Close()
 		for ; server.dhtServer == nil; time.Sleep(time.Millisecond) {
 		}
@@ -120,13 +125,18 @@ func TestDHTServerAddPeer(t *testing.T) {
 
 func TestDHTServer(t *testing.T) {
 	bootstrap, err := NewAccount(t.TempDir(), "Main peer", "main@example.com", "password")
+	assert.NoError(t, err)
 	listener, bootstrap_addr := TempListener()
 	bootstrap_peer := &Peer{bootstrap.Fingerprint(), bootstrap_addr}
 
 	server, err := bootstrap.Server(nil)
 	assert.NoError(t, err)
 	assert.NotEqual(t, nil, server)
-	go server.Serve(*listener, bootstrap_addr)
+	go func() {
+		if err := server.Serve(*listener, bootstrap_addr); err != nil {
+			t.Logf("Bootstrap server error: %v", err)
+		}
+	}()
 	defer server.Close()
 
 	peers := []*Account{}
@@ -145,7 +155,11 @@ func TestDHTServer(t *testing.T) {
 			servers = append(servers, s)
 
 			l, addr := TempListener()
-			go s.Serve(*l, addr)
+			go func(srv *Server, lis *net.Listener, address string) {
+				if err := srv.Serve(*lis, address); err != nil {
+					t.Logf("Server error: %v", err)
+				}
+			}(s, l, addr)
 		}
 	})
 

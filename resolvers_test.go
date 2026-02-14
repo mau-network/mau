@@ -98,7 +98,11 @@ func TestInternetFriendAddress(t *testing.T) {
 		bootstrapServer, _ := bootstrap.Server(nil)
 
 		bootstrapListener, bootstrapAddr := TempListener()
-		go bootstrapServer.Serve(*bootstrapListener, bootstrapAddr)
+		go func() {
+			if err := bootstrapServer.Serve(*bootstrapListener, bootstrapAddr); err != nil {
+				t.Logf("Bootstrap server error: %v", err)
+			}
+		}()
 		defer bootstrapServer.Close()
 
 		// Wait for DHT server to initialize
@@ -113,7 +117,11 @@ func TestInternetFriendAddress(t *testing.T) {
 		}})
 
 		mainListener, mainAddr := TempListener()
-		go mainServer.Serve(*mainListener, mainAddr)
+		go func() {
+			if err := mainServer.Serve(*mainListener, mainAddr); err != nil {
+				t.Logf("Main server error: %v", err)
+			}
+		}()
 		defer mainServer.Close()
 
 		// Wait for DHT to initialize and join
@@ -143,7 +151,11 @@ func TestInternetFriendAddress(t *testing.T) {
 		mainServer, _ := main.Server(nil)
 
 		mainListener, mainAddr := TempListener()
-		go mainServer.Serve(*mainListener, mainAddr)
+		go func() {
+			if err := mainServer.Serve(*mainListener, mainAddr); err != nil {
+				t.Logf("Main server error: %v", err)
+			}
+		}()
 		defer mainServer.Close()
 
 		// Wait for DHT to initialize
@@ -174,7 +186,11 @@ func TestInternetFriendAddress(t *testing.T) {
 		mainServer, _ := main.Server(nil)
 
 		mainListener, mainAddr := TempListener()
-		go mainServer.Serve(*mainListener, mainAddr)
+		go func() {
+			if err := mainServer.Serve(*mainListener, mainAddr); err != nil {
+				t.Logf("Main server error: %v", err)
+			}
+		}()
 		defer mainServer.Close()
 
 		time.Sleep(100 * time.Millisecond)
@@ -205,9 +221,15 @@ func TestFingerprintResolverConcurrency(t *testing.T) {
 		ctx := context.Background()
 
 		// Run all resolvers concurrently (as done in client code)
-		go resolver1(ctx, fpr, addresses)
-		go resolver2(ctx, fpr, addresses)
-		go resolver3(ctx, fpr, addresses)
+		go func() {
+			_ = resolver1(ctx, fpr, addresses)
+		}()
+		go func() {
+			_ = resolver2(ctx, fpr, addresses)
+		}()
+		go func() {
+			_ = resolver3(ctx, fpr, addresses)
+		}()
 
 		// Should receive at least one address
 		select {

@@ -7,8 +7,11 @@ import (
 	"path"
 	"path/filepath"
 
+	//nolint:staticcheck // SA1019: openpgp deprecated but required for this project
 	"golang.org/x/crypto/openpgp"
+	//nolint:staticcheck // SA1019: openpgp deprecated but required for this project
 	"golang.org/x/crypto/openpgp/armor"
+	//nolint:staticcheck // SA1019: openpgp deprecated but required for this project
 	"golang.org/x/crypto/openpgp/packet"
 )
 
