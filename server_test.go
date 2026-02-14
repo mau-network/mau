@@ -269,8 +269,8 @@ func TestServerRangeRequests(t *testing.T) {
 	listener, address := TempListener()
 
 	go func() {
-		err := server.Serve(*listener, "")
-		assert.Error(t, http.ErrServerClosed, err)
+		serveErr := server.Serve(*listener, "")
+		assert.Error(t, http.ErrServerClosed, serveErr)
 	}()
 	defer server.Close()
 
