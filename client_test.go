@@ -24,14 +24,15 @@ func TestClient(t *testing.T) {
 
 func TestDownloadFriend(t *testing.T) {
 	account_dir := t.TempDir()
-	account, _ := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "strong password")
+	account, err := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "strong password")
+	assert.NoError(t, err)
 	var account_key bytes.Buffer
-	if err := account.Export(&account_key); err != nil {
-		t.Fatalf("Failed to export account key: %v", err)
-	}
+	err = account.Export(&account_key)
+	assert.NoError(t, err)
 
 	friend_dir := t.TempDir()
-	friend, _ := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
+	friend, err := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
+	assert.NoError(t, err)
 	var friend_key bytes.Buffer
 	if err := friend.Export(&friend_key); err != nil {
 		t.Fatalf("Failed to export friend key: %v", err)

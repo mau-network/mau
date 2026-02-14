@@ -20,11 +20,11 @@ func TestNewAccount(t *testing.T) {
 		assert.NotNil(t, account, "Account value is nil, expected a value")
 
 		t.Run("Include correct information", func(t T) {
-			identity, _ := account.Identity()
+			identity, err := account.Identity()
+			assert.NoError(t, err)
 			var pgpkey bytes.Buffer
-			if err := account.Export(&pgpkey); err != nil {
-				t.Fatalf("Failed to export account key: %v", err)
-			}
+			err = account.Export(&pgpkey)
+			assert.NoError(t, err)
 
 			assert.Equal(t, "ahmed@example.com", account.Email())
 			assert.Equal(t, "Ahmed Mohamed", account.Name())
@@ -48,9 +48,8 @@ func TestNewAccount(t *testing.T) {
 
 	t.Run("Creating an account in an existing account directory", func(t T) {
 		dir := t.TempDir()
-		if _, err := NewAccount(dir, "Ahmed Mohamed", "ahmed@example.com", "password"); err != nil {
-			t.Fatalf("Failed to create first account: %v", err)
-		}
+		_, err := NewAccount(dir, "Ahmed Mohamed", "ahmed@example.com", "password")
+		assert.NoError(t, err)
 		account, err := NewAccount(dir, "Ahmed Mahmoud", "ahmed.mahmoud@example.com", "password")
 
 		assert.ErrorIs(t, err, ErrAccountAlreadyExists, "Expected an error: %s Got: %s", ErrAccountAlreadyExists, err)
@@ -130,11 +129,11 @@ func TestRemoveFile(t *testing.T) {
 
 func TestListFiles(t *testing.T) {
 	account_dir := t.TempDir()
-	account, _ := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "password value")
+	account, err := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "password value")
+	assert.NoError(t, err)
 
-	if _, err := account.AddFile(strings.NewReader("hello world"), "hello.txt", []*Friend{}); err != nil {
-		t.Fatalf("Failed to add file: %v", err)
-	}
+	_, err = account.AddFile(strings.NewReader("hello world"), "hello.txt", []*Friend{})
+	assert.NoError(t, err)
 
 	t.Run("Asking for 1 second old files", func(t T) {
 		files := account.ListFiles(account.Fingerprint(), time.Now().Add(-time.Second), 10)
