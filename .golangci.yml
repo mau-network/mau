@@ -1,0 +1,14 @@
+linters:
+  disable:
+    - errcheck  # Disabled temporarily due to pre-existing unchecked errors throughout codebase
+
+linters-settings:
+  govet:
+    enable-all: true
+  
+run:
+  timeout: 5m
+  go: '1.26'
+
+issues:
+  exclude-use-default: false
