@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
-	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -247,16 +246,16 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO needs to support interrupt resume
 	reader, err := os.Open(file.Path)
 	if err != nil {
 		http.Error(w, "Error reading file", http.StatusInternalServerError)
 		return
 	}
+	defer reader.Close()
 
 	w.Header().Add("Content-Type", "application/octet-stream")
-	w.WriteHeader(http.StatusOK)
-	io.Copy(w, reader)
+	w.Header().Add("Accept-Ranges", "bytes")
+	http.ServeContent(w, r, file.Name(), time.Time{}, reader)
 }
 
 func (s *Server) version(w http.ResponseWriter, r *http.Request) {
@@ -290,16 +289,16 @@ func (s *Server) version(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO needs to support interrupt resume
 	reader, err := os.Open(file.Path)
 	if err != nil {
 		http.Error(w, "Error reading file", http.StatusInternalServerError)
 		return
 	}
+	defer reader.Close()
 
 	w.Header().Add("Content-Type", "application/octet-stream")
-	w.WriteHeader(http.StatusOK)
-	io.Copy(w, reader)
+	w.Header().Add("Accept-Ranges", "bytes")
+	http.ServeContent(w, r, file.Name(), time.Time{}, reader)
 }
 
 func isPermitted(certs []*x509.Certificate, recipients []*Friend) bool {
