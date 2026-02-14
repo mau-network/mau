@@ -12,39 +12,40 @@ import (
 func TestVerifySignature(t *testing.T) {
 	// Setup: Create two accounts
 	accountDir := t.TempDir()
-	account, _ := NewAccount(accountDir, "Alice", "alice@example.com", "password")
+	account, err := NewAccount(accountDir, "Alice", "alice@example.com", "password")
+	assert.NoError(t, err)
 
 	friendDir := t.TempDir()
-	friend, _ := NewAccount(friendDir, "Bob", "bob@example.com", "password")
+	friend, err := NewAccount(friendDir, "Bob", "bob@example.com", "password")
+	assert.NoError(t, err)
 
 	// Export and add friend's key to account
 	var friendKey bytes.Buffer
-	if err := friend.Export(&friendKey); err != nil {
-		t.Fatalf("Failed to export friend key: %v", err)
-	}
-	_, _ = account.AddFriend(&friendKey)
+	err = friend.Export(&friendKey)
+	assert.NoError(t, err)
+	_, err = account.AddFriend(&friendKey)
+	assert.NoError(t, err)
 
 	t.Run("Valid signature from expected signer", func(t *testing.T) {
 		// Get account's public key
 		var accountKey bytes.Buffer
-		if err := account.Export(&accountKey); err != nil {
-			t.Fatalf("Failed to export account key: %v", err)
-		}
-		accountFriend, _ := friend.AddFriend(&accountKey)
+		err := account.Export(&accountKey)
+		assert.NoError(t, err)
+		accountFriend, err := friend.AddFriend(&accountKey)
+		assert.NoError(t, err)
 
 		// Friend creates a file encrypted for account
 		file, err := friend.AddFile(strings.NewReader("Hello from Bob"), "message.txt", []*Friend{accountFriend})
 		assert.NoError(t, err)
 
 		// Copy file to account's directory
-		data, _ := os.ReadFile(file.Path)
+		data, err := os.ReadFile(file.Path)
+		assert.NoError(t, err)
 		accountFilePath := accountDir + "/" + account.Fingerprint().String() + "/message.txt.pgp"
-		if err := os.MkdirAll(accountDir+"/"+account.Fingerprint().String(), 0700); err != nil {
-			t.Fatalf("Failed to create directory: %v", err)
-		}
-		if err := os.WriteFile(accountFilePath, data, 0600); err != nil {
-			t.Fatalf("Failed to write file: %v", err)
-		}
+		err = os.MkdirAll(accountDir+"/"+account.Fingerprint().String(), 0700)
+		assert.NoError(t, err)
+		err = os.WriteFile(accountFilePath, data, 0600)
+		assert.NoError(t, err)
 
 		// Account verifies the signature from friend
 		accountFile := &File{Path: accountFilePath}
@@ -55,24 +56,23 @@ func TestVerifySignature(t *testing.T) {
 	t.Run("File signed by friend and encrypted for account", func(t *testing.T) {
 		// Get account's public key
 		var accountKey bytes.Buffer
-		if err := account.Export(&accountKey); err != nil {
-			t.Fatalf("Failed to export account key: %v", err)
-		}
-		accountFriend, _ := friend.AddFriend(&accountKey)
+		err := account.Export(&accountKey)
+		assert.NoError(t, err)
+		accountFriend, err := friend.AddFriend(&accountKey)
+		assert.NoError(t, err)
 
 		// Friend creates file encrypted for account
 		file, err := friend.AddFile(strings.NewReader("Encrypted message"), "encrypted.txt", []*Friend{accountFriend})
 		assert.NoError(t, err)
 
 		// Copy file to account's directory for verification
-		data, _ := os.ReadFile(file.Path)
+		data, err := os.ReadFile(file.Path)
+		assert.NoError(t, err)
 		accountFilePath := accountDir + "/" + account.Fingerprint().String() + "/encrypted.txt.pgp"
-		if err := os.MkdirAll(accountDir+"/"+account.Fingerprint().String(), 0700); err != nil {
-			t.Fatalf("Failed to create directory: %v", err)
-		}
-		if err := os.WriteFile(accountFilePath, data, 0600); err != nil {
-			t.Fatalf("Failed to write file: %v", err)
-		}
+		err = os.MkdirAll(accountDir+"/"+account.Fingerprint().String(), 0700)
+		assert.NoError(t, err)
+		err = os.WriteFile(accountFilePath, data, 0600)
+		assert.NoError(t, err)
 
 		accountFile := &File{Path: accountFilePath}
 		err = accountFile.VerifySignature(account, friend.Fingerprint())
@@ -82,38 +82,40 @@ func TestVerifySignature(t *testing.T) {
 	t.Run("Files are always signed by current implementation", func(t *testing.T) {
 		// Get account's public key
 		var accountKey bytes.Buffer
-		if err := account.Export(&accountKey); err != nil {
-			t.Fatalf("Failed to export account key: %v", err)
-		}
-		accountFriend, _ := friend.AddFriend(&accountKey)
+		err := account.Export(&accountKey)
+		assert.NoError(t, err)
+		accountFriend, err := friend.AddFriend(&accountKey)
+		assert.NoError(t, err)
 
 		// Create a file - it's always signed with current implementation
-		file, _ := friend.AddFile(strings.NewReader("Message"), "test.txt", []*Friend{accountFriend})
+		file, err := friend.AddFile(strings.NewReader("Message"), "test.txt", []*Friend{accountFriend})
+		assert.NoError(t, err)
 
 		// Copy to account directory
-		data, _ := os.ReadFile(file.Path)
+		data, err := os.ReadFile(file.Path)
+		assert.NoError(t, err)
 		accountFilePath := accountDir + "/" + account.Fingerprint().String() + "/test.txt.pgp"
-		if err := os.MkdirAll(accountDir+"/"+account.Fingerprint().String(), 0700); err != nil {
-			t.Fatalf("Failed to create directory: %v", err)
-		}
-		if err := os.WriteFile(accountFilePath, data, 0600); err != nil {
-			t.Fatalf("Failed to write file: %v", err)
-		}
+		err = os.MkdirAll(accountDir+"/"+account.Fingerprint().String(), 0700)
+		assert.NoError(t, err)
+		err = os.WriteFile(accountFilePath, data, 0600)
+		assert.NoError(t, err)
 
 		accountFile := &File{Path: accountFilePath}
-		err := accountFile.VerifySignature(account, friend.Fingerprint())
+		err = accountFile.VerifySignature(account, friend.Fingerprint())
 		assert.NoError(t, err, "Files are always signed by current implementation")
 	})
 
 	t.Run("Signer not in friend list", func(t *testing.T) {
 		// Create another account that's not a friend
 		strangerDir := t.TempDir()
-		stranger, _ := NewAccount(strangerDir, "Stranger", "stranger@example.com", "password")
+		stranger, err := NewAccount(strangerDir, "Stranger", "stranger@example.com", "password")
+		assert.NoError(t, err)
 
-		file, _ := stranger.AddFile(strings.NewReader("Message from stranger"), "strange.txt", []*Friend{})
+		file, err := stranger.AddFile(strings.NewReader("Message from stranger"), "strange.txt", []*Friend{})
+		assert.NoError(t, err)
 
 		// Try to verify with account that doesn't have stranger as friend
-		err := file.VerifySignature(account, stranger.Fingerprint())
+		err = file.VerifySignature(account, stranger.Fingerprint())
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not in friend list")
 	})
@@ -121,39 +123,40 @@ func TestVerifySignature(t *testing.T) {
 	t.Run("File signed by wrong person", func(t *testing.T) {
 		// Create a third person
 		thirdDir := t.TempDir()
-		third, _ := NewAccount(thirdDir, "Charlie", "charlie@example.com", "password")
+		third, err := NewAccount(thirdDir, "Charlie", "charlie@example.com", "password")
+		assert.NoError(t, err)
 
 		// Add third to account's friend list
 		var thirdKey bytes.Buffer
-		if err := third.Export(&thirdKey); err != nil {
-			t.Fatalf("Failed to export third key: %v", err)
-		}
-		_, _ = account.AddFriend(&thirdKey)
+		err = third.Export(&thirdKey)
+		assert.NoError(t, err)
+		_, err = account.AddFriend(&thirdKey)
+		assert.NoError(t, err)
 
 		// Get account's public key
 		var accountKey bytes.Buffer
-		if err := account.Export(&accountKey); err != nil {
-			t.Fatalf("Failed to export account key: %v", err)
-		}
-		accountFriend, _ := friend.AddFriend(&accountKey)
+		err = account.Export(&accountKey)
+		assert.NoError(t, err)
+		accountFriend, err := friend.AddFriend(&accountKey)
+		assert.NoError(t, err)
 
 		// Friend signs a file encrypted for account
-		file, _ := friend.AddFile(strings.NewReader("From Bob"), "bob.txt", []*Friend{accountFriend})
+		file, err := friend.AddFile(strings.NewReader("From Bob"), "bob.txt", []*Friend{accountFriend})
+		assert.NoError(t, err)
 
 		// Copy to account directory
-		data, _ := os.ReadFile(file.Path)
+		data, err := os.ReadFile(file.Path)
+		assert.NoError(t, err)
 		accountFilePath := accountDir + "/" + account.Fingerprint().String() + "/bob.txt.pgp"
-		if err := os.MkdirAll(accountDir+"/"+account.Fingerprint().String(), 0700); err != nil {
-			t.Fatalf("Failed to create directory: %v", err)
-		}
-		if err := os.WriteFile(accountFilePath, data, 0600); err != nil {
-			t.Fatalf("Failed to write file: %v", err)
-		}
+		err = os.MkdirAll(accountDir+"/"+account.Fingerprint().String(), 0700)
+		assert.NoError(t, err)
+		err = os.WriteFile(accountFilePath, data, 0600)
+		assert.NoError(t, err)
 
 		accountFile := &File{Path: accountFilePath}
 		// Try to verify expecting a different signer (third instead of friend)
 		// Both friend and third are in account's friend list, but file was signed by friend
-		err := accountFile.VerifySignature(account, third.Fingerprint())
+		err = accountFile.VerifySignature(account, third.Fingerprint())
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "signed by unexpected key")
 	})
@@ -161,31 +164,30 @@ func TestVerifySignature(t *testing.T) {
 	t.Run("Corrupted file data", func(t *testing.T) {
 		// Get account's public key
 		var accountKey bytes.Buffer
-		if err := account.Export(&accountKey); err != nil {
-			t.Fatalf("Failed to export account key: %v", err)
-		}
-		accountFriend, _ := friend.AddFriend(&accountKey)
+		err := account.Export(&accountKey)
+		assert.NoError(t, err)
+		accountFriend, err := friend.AddFriend(&accountKey)
+		assert.NoError(t, err)
 
-		file, _ := friend.AddFile(strings.NewReader("Original message"), "original.txt", []*Friend{accountFriend})
+		file, err := friend.AddFile(strings.NewReader("Original message"), "original.txt", []*Friend{accountFriend})
+		assert.NoError(t, err)
 
 		// Copy to account directory
-		data, _ := os.ReadFile(file.Path)
+		data, err := os.ReadFile(file.Path)
+		assert.NoError(t, err)
 		accountFilePath := accountDir + "/" + account.Fingerprint().String() + "/original.txt.pgp"
-		if err := os.MkdirAll(accountDir+"/"+account.Fingerprint().String(), 0700); err != nil {
-			t.Fatalf("Failed to create directory: %v", err)
-		}
-		if err := os.WriteFile(accountFilePath, data, 0600); err != nil {
-			t.Fatalf("Failed to write file: %v", err)
-		}
+		err = os.MkdirAll(accountDir+"/"+account.Fingerprint().String(), 0700)
+		assert.NoError(t, err)
+		err = os.WriteFile(accountFilePath, data, 0600)
+		assert.NoError(t, err)
 
 		// Corrupt the file
 		data[len(data)/2] ^= 0xFF // Flip bits in the middle
-		if err := os.WriteFile(accountFilePath, data, 0600); err != nil {
-			t.Fatalf("Failed to write corrupted file: %v", err)
-		}
+		err = os.WriteFile(accountFilePath, data, 0600)
+		assert.NoError(t, err)
 
 		accountFile := &File{Path: accountFilePath}
-		err := accountFile.VerifySignature(account, friend.Fingerprint())
+		err = accountFile.VerifySignature(account, friend.Fingerprint())
 		assert.Error(t, err, "Corrupted file should fail verification")
 	})
 

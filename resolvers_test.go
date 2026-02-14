@@ -13,14 +13,16 @@ func TestStaticAddress(t *testing.T) {
 		expectedAddr := "192.168.1.100:8080"
 		resolver := StaticAddress(expectedAddr)
 
-		fpr1, _ := FingerprintFromString("ABAF11C65A2970B130ABE3C479BE3E4300411886")
-		fpr2, _ := FingerprintFromString("1234567890123456789012345678901234567890")
+		fpr1, err := FingerprintFromString("ABAF11C65A2970B130ABE3C479BE3E4300411886")
+		assert.NoError(t, err)
+		fpr2, err := FingerprintFromString("1234567890123456789012345678901234567890")
+		assert.NoError(t, err)
 
 		addresses := make(chan string, 2)
 		ctx := context.Background()
 
 		// Test with first fingerprint
-		err := resolver(ctx, fpr1, addresses)
+		err = resolver(ctx, fpr1, addresses)
 		assert.NoError(t, err)
 		addr1 := <-addresses
 		assert.Equal(t, expectedAddr, addr1)
@@ -34,14 +36,15 @@ func TestStaticAddress(t *testing.T) {
 
 	t.Run("Respects context cancellation", func(t *testing.T) {
 		resolver := StaticAddress("192.168.1.100:8080")
-		fpr, _ := FingerprintFromString("ABAF11C65A2970B130ABE3C479BE3E4300411886")
+		fpr, err := FingerprintFromString("ABAF11C65A2970B130ABE3C479BE3E4300411886")
+		assert.NoError(t, err)
 
 		// Create cancelled context
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
 		addresses := make(chan string, 1)
-		err := resolver(ctx, fpr, addresses)
+		err = resolver(ctx, fpr, addresses)
 		assert.NoError(t, err)
 
 		// Should not send to channel when context is cancelled
@@ -61,7 +64,8 @@ func TestStaticAddress(t *testing.T) {
 			"[::1]:8080", // IPv6
 		}
 
-		fpr, _ := FingerprintFromString("ABAF11C65A2970B130ABE3C479BE3E4300411886")
+		fpr, err := FingerprintFromString("ABAF11C65A2970B130ABE3C479BE3E4300411886")
+		assert.NoError(t, err)
 
 		for _, addr := range testCases {
 			t.Run(addr, func(t *testing.T) {
@@ -78,30 +82,33 @@ func TestStaticAddress(t *testing.T) {
 
 func TestInternetFriendAddress(t *testing.T) {
 	t.Run("Returns error when DHT server is nil", func(t *testing.T) {
-		account, _ := NewAccount(t.TempDir(), "Test", "test@example.com", "password")
-		server, _ := account.Server(nil)
+		account, err := NewAccount(t.TempDir(), "Test", "test@example.com", "password")
+		assert.NoError(t, err)
+		server, err := account.Server(nil)
+		assert.NoError(t, err)
 		// Server created but DHT not initialized (nil by default initially)
 		server.dhtServer = nil
 
 		resolver := InternetFriendAddress(server)
-		fpr, _ := FingerprintFromString("ABAF11C65A2970B130ABE3C479BE3E4300411886")
+		fpr, err := FingerprintFromString("ABAF11C65A2970B130ABE3C479BE3E4300411886")
+		assert.NoError(t, err)
 		addresses := make(chan string, 1)
 
-		err := resolver(context.Background(), fpr, addresses)
+		err = resolver(context.Background(), fpr, addresses)
 		assert.ErrorIs(t, err, ErrServerDoesNotAllowLookUp)
 	})
 
 	t.Run("Returns address when peer is found via DHT", func(t *testing.T) {
 		// Setup bootstrap server
 		bootstrapDir := t.TempDir()
-		bootstrap, _ := NewAccount(bootstrapDir, "Bootstrap", "bootstrap@example.com", "password")
-		bootstrapServer, _ := bootstrap.Server(nil)
+		bootstrap, err := NewAccount(bootstrapDir, "Bootstrap", "bootstrap@example.com", "password")
+		assert.NoError(t, err)
+		bootstrapServer, err := bootstrap.Server(nil)
+		assert.NoError(t, err)
 
 		bootstrapListener, bootstrapAddr := TempListener()
 		go func() {
-			if err := bootstrapServer.Serve(*bootstrapListener, bootstrapAddr); err != nil {
-				t.Logf("Bootstrap server error: %v", err)
-			}
+			_ = bootstrapServer.Serve(*bootstrapListener, bootstrapAddr)
 		}()
 		defer bootstrapServer.Close()
 
@@ -110,17 +117,17 @@ func TestInternetFriendAddress(t *testing.T) {
 
 		// Setup main server
 		mainDir := t.TempDir()
-		main, _ := NewAccount(mainDir, "Main", "main@example.com", "password")
-		mainServer, _ := main.Server([]*Peer{{
+		main, err := NewAccount(mainDir, "Main", "main@example.com", "password")
+		assert.NoError(t, err)
+		mainServer, err := main.Server([]*Peer{{
 			Fingerprint: bootstrap.Fingerprint(),
 			Address:     bootstrapAddr,
 		}})
+		assert.NoError(t, err)
 
 		mainListener, mainAddr := TempListener()
 		go func() {
-			if err := mainServer.Serve(*mainListener, mainAddr); err != nil {
-				t.Logf("Main server error: %v", err)
-			}
+			_ = mainServer.Serve(*mainListener, mainAddr)
 		}()
 		defer mainServer.Close()
 
@@ -133,7 +140,7 @@ func TestInternetFriendAddress(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		err := resolver(ctx, bootstrap.Fingerprint(), addresses)
+		err = resolver(ctx, bootstrap.Fingerprint(), addresses)
 		assert.NoError(t, err)
 
 		select {
@@ -147,14 +154,14 @@ func TestInternetFriendAddress(t *testing.T) {
 	t.Run("Returns nothing when peer is not found", func(t *testing.T) {
 		// Setup server with no bootstrap nodes
 		mainDir := t.TempDir()
-		main, _ := NewAccount(mainDir, "Main", "main@example.com", "password")
-		mainServer, _ := main.Server(nil)
+		main, err := NewAccount(mainDir, "Main", "main@example.com", "password")
+		assert.NoError(t, err)
+		mainServer, err := main.Server(nil)
+		assert.NoError(t, err)
 
 		mainListener, mainAddr := TempListener()
 		go func() {
-			if err := mainServer.Serve(*mainListener, mainAddr); err != nil {
-				t.Logf("Main server error: %v", err)
-			}
+			_ = mainServer.Serve(*mainListener, mainAddr)
 		}()
 		defer mainServer.Close()
 
@@ -162,13 +169,14 @@ func TestInternetFriendAddress(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Try to find a non-existent peer
-		unknownFpr, _ := FingerprintFromString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")
+		unknownFpr, err := FingerprintFromString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")
+		assert.NoError(t, err)
 		resolver := InternetFriendAddress(mainServer)
 		addresses := make(chan string, 1)
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 
-		err := resolver(ctx, unknownFpr, addresses)
+		err = resolver(ctx, unknownFpr, addresses)
 		assert.NoError(t, err)
 
 		// Should not receive any address
@@ -182,20 +190,21 @@ func TestInternetFriendAddress(t *testing.T) {
 
 	t.Run("Respects context cancellation during lookup", func(t *testing.T) {
 		mainDir := t.TempDir()
-		main, _ := NewAccount(mainDir, "Main", "main@example.com", "password")
-		mainServer, _ := main.Server(nil)
+		main, err := NewAccount(mainDir, "Main", "main@example.com", "password")
+		assert.NoError(t, err)
+		mainServer, err := main.Server(nil)
+		assert.NoError(t, err)
 
 		mainListener, mainAddr := TempListener()
 		go func() {
-			if err := mainServer.Serve(*mainListener, mainAddr); err != nil {
-				t.Logf("Main server error: %v", err)
-			}
+			_ = mainServer.Serve(*mainListener, mainAddr)
 		}()
 		defer mainServer.Close()
 
 		time.Sleep(100 * time.Millisecond)
 
-		fpr, _ := FingerprintFromString("ABAF11C65A2970B130ABE3C479BE3E4300411886")
+		fpr, err := FingerprintFromString("ABAF11C65A2970B130ABE3C479BE3E4300411886")
+		assert.NoError(t, err)
 		resolver := InternetFriendAddress(mainServer)
 		addresses := make(chan string, 1)
 
@@ -203,7 +212,7 @@ func TestInternetFriendAddress(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		err := resolver(ctx, fpr, addresses)
+		err = resolver(ctx, fpr, addresses)
 		assert.NoError(t, err)
 	})
 }
@@ -211,7 +220,8 @@ func TestInternetFriendAddress(t *testing.T) {
 func TestFingerprintResolverConcurrency(t *testing.T) {
 	t.Run("Multiple resolvers can be called concurrently", func(t *testing.T) {
 		// This tests the pattern used in client.DownloadFriend where multiple resolvers run concurrently
-		fpr, _ := FingerprintFromString("ABAF11C65A2970B130ABE3C479BE3E4300411886")
+		fpr, err := FingerprintFromString("ABAF11C65A2970B130ABE3C479BE3E4300411886")
+		assert.NoError(t, err)
 		addresses := make(chan string, 3)
 
 		resolver1 := StaticAddress("192.168.1.1:8080")

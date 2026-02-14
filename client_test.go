@@ -34,20 +34,19 @@ func TestDownloadFriend(t *testing.T) {
 	friend, err := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
 	assert.NoError(t, err)
 	var friend_key bytes.Buffer
-	if err := friend.Export(&friend_key); err != nil {
-		t.Fatalf("Failed to export friend key: %v", err)
-	}
-	server, _ := friend.Server(nil)
+	err = friend.Export(&friend_key)
+	assert.NoError(t, err)
+	server, err := friend.Server(nil)
+	assert.NoError(t, err)
 
 	listener, address := TempListener()
 	go func() {
-		if err := server.Serve(*listener, ""); err != nil {
-			t.Logf("Server error: %v", err)
-		}
+		_ = server.Serve(*listener, "") // Error logged if needed
 	}()
 	defer server.Close()
 
-	client, _ := account.Client(friend.Fingerprint(), nil)
+	client, err := account.Client(friend.Fingerprint(), nil)
+	assert.NoError(t, err)
 
 	t.Run("When the fingerprint is not a friend", func(t T) {
 		err := client.DownloadFriend(context.Background(), friend.Fingerprint(), time.Now(), []FingerprintResolver{StaticAddress(address)})
@@ -55,19 +54,17 @@ func TestDownloadFriend(t *testing.T) {
 	})
 
 	t.Run("When friend but not followed", func(t T) {
-		if _, err := account.AddFriend(bytes.NewReader(friend_key.Bytes())); err != nil {
-			t.Fatalf("Failed to add friend: %v", err)
-		}
-		err := client.DownloadFriend(context.Background(), friend.Fingerprint(), time.Now(), []FingerprintResolver{StaticAddress(address)})
+		_, err := account.AddFriend(bytes.NewReader(friend_key.Bytes()))
+		assert.NoError(t, err)
+		err = client.DownloadFriend(context.Background(), friend.Fingerprint(), time.Now(), []FingerprintResolver{StaticAddress(address)})
 		assert.Error(t, ErrFriendNotFollowed, err)
 	})
 
 	t.Run("When friend and followed", func(t T) {
 		f, err := account.AddFriend(bytes.NewReader(friend_key.Bytes()))
 		assert.NoError(t, err)
-		if err := account.Follow(f); err != nil {
-			t.Fatalf("Failed to follow friend: %v", err)
-		}
+		err = account.Follow(f)
+		assert.NoError(t, err)
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
@@ -77,8 +74,9 @@ func TestDownloadFriend(t *testing.T) {
 
 	t.Run("When a file is encrypted for friend", func(t T) {
 		// Create a file in the friend account
-		aFriend, _ := friend.AddFriend(bytes.NewReader(account_key.Bytes()))
-		_, err := friend.AddFile(strings.NewReader("Hello world!"), "hello world.txt", []*Friend{aFriend})
+		aFriend, err := friend.AddFriend(bytes.NewReader(account_key.Bytes()))
+		assert.NoError(t, err)
+		_, err = friend.AddFile(strings.NewReader("Hello world!"), "hello world.txt", []*Friend{aFriend})
 		assert.NoError(t, err)
 		assert.FileExists(t, path.Join(friend_dir, friend.Fingerprint().String(), "hello world.txt.pgp"))
 
@@ -110,11 +108,13 @@ func TestDownloadFriend(t *testing.T) {
 	})
 
 	t.Run("Connecting to an account with wrong peer ID", func(t T) {
-		anotherFriend, _ := NewAccount(t.TempDir(), "Another person", "another@example.com", "password")
-		client, _ := account.Client(anotherFriend.Fingerprint(), nil)
+		anotherFriend, err := NewAccount(t.TempDir(), "Another person", "another@example.com", "password")
+		assert.NoError(t, err)
+		client, err := account.Client(anotherFriend.Fingerprint(), nil)
+		assert.NoError(t, err)
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		err := client.DownloadFriend(ctx, friend.Fingerprint(), time.Now().Add(-time.Second), []FingerprintResolver{StaticAddress(address)})
+		err = client.DownloadFriend(ctx, friend.Fingerprint(), time.Now().Add(-time.Second), []FingerprintResolver{StaticAddress(address)})
 		assert.Error(t, ErrIncorrectPeerCertificate, err)
 	})
 }

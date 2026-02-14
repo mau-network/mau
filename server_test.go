@@ -49,7 +49,8 @@ func TestServer(t *testing.T) {
 		t.Run("With no client cert", func(t T) {
 
 			t.Run("With no files yet", func(t T) {
-				req, _ := http.NewRequest("GET", list_account_files_url, nil)
+				req, err := http.NewRequest("GET", list_account_files_url, nil)
+				assert.NoError(t, err)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
@@ -67,7 +68,8 @@ func TestServer(t *testing.T) {
 				assert.NoError(t, err)
 				defer os.Remove(file.Path)
 
-				req, _ := http.NewRequest("GET", list_account_files_url, nil)
+				req, err := http.NewRequest("GET", list_account_files_url, nil)
+				assert.NoError(t, err)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
@@ -85,7 +87,8 @@ func TestServer(t *testing.T) {
 				assert.NoError(t, err)
 				defer os.Remove(file.Path)
 
-				req, _ := http.NewRequest("GET", list_account_files_url, nil)
+				req, err := http.NewRequest("GET", list_account_files_url, nil)
+				assert.NoError(t, err)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
@@ -100,7 +103,8 @@ func TestServer(t *testing.T) {
 		})
 
 		t.Run("With client cert not a friend", func(t T) {
-			anotherAccount, _ := NewAccount(t.TempDir(), "Unknown", "unknown@example.com", "password")
+			anotherAccount, err := NewAccount(t.TempDir(), "Unknown", "unknown@example.com", "password")
+			assert.NoError(t, err)
 			cert, err := anotherAccount.certificate(nil)
 			assert.NoError(t, err)
 
@@ -121,7 +125,8 @@ func TestServer(t *testing.T) {
 			}
 
 			t.Run("With no files yet", func(t T) {
-				req, _ := http.NewRequest("GET", list_account_files_url, nil)
+				req, err := http.NewRequest("GET", list_account_files_url, nil)
+				assert.NoError(t, err)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
@@ -139,7 +144,8 @@ func TestServer(t *testing.T) {
 				assert.NoError(t, err)
 				defer os.Remove(file.Path)
 
-				req, _ := http.NewRequest("GET", list_account_files_url, nil)
+				req, err := http.NewRequest("GET", list_account_files_url, nil)
+				assert.NoError(t, err)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
@@ -157,7 +163,8 @@ func TestServer(t *testing.T) {
 				assert.NoError(t, err)
 				defer os.Remove(file.Path)
 
-				req, _ := http.NewRequest("GET", list_account_files_url, nil)
+				req, err := http.NewRequest("GET", list_account_files_url, nil)
+				assert.NoError(t, err)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
@@ -192,7 +199,8 @@ func TestServer(t *testing.T) {
 			}
 
 			t.Run("With no files yet", func(t T) {
-				req, _ := http.NewRequest("GET", list_account_files_url, nil)
+				req, err := http.NewRequest("GET", list_account_files_url, nil)
+				assert.NoError(t, err)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
@@ -210,7 +218,8 @@ func TestServer(t *testing.T) {
 				assert.NoError(t, err)
 				defer os.Remove(file.Path)
 
-				req, _ := http.NewRequest("GET", list_account_files_url, nil)
+				req, err := http.NewRequest("GET", list_account_files_url, nil)
+				assert.NoError(t, err)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
@@ -228,7 +237,8 @@ func TestServer(t *testing.T) {
 				assert.NoError(t, err)
 				defer os.Remove(file.Path)
 
-				req, _ := http.NewRequest("GET", list_account_files_url, nil)
+				req, err := http.NewRequest("GET", list_account_files_url, nil)
+				assert.NoError(t, err)
 				req.Header.Add("If-Modified-Since", time.Now().Add(-time.Second).UTC().Format(http.TimeFormat))
 
 				resp, err := http.DefaultClient.Do(req)
@@ -292,7 +302,8 @@ func TestServerRangeRequests(t *testing.T) {
 	fileURL := fmt.Sprintf("%s://%s/p2p/%s/test-range.txt.pgp", uriProtocolName, address, account.Fingerprint())
 
 	t.Run("Accept-Ranges header is set", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", fileURL, nil)
+		req, err := http.NewRequest("GET", fileURL, nil)
+		assert.NoError(t, err)
 		resp, err := http.DefaultClient.Do(req)
 		assert.NoError(t, err)
 		defer resp.Body.Close()
@@ -302,7 +313,8 @@ func TestServerRangeRequests(t *testing.T) {
 	})
 
 	t.Run("Partial content with Range header", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", fileURL, nil)
+		req, err := http.NewRequest("GET", fileURL, nil)
+		assert.NoError(t, err)
 		req.Header.Set("Range", "bytes=0-9")
 
 		resp, err := http.DefaultClient.Do(req)
@@ -314,7 +326,8 @@ func TestServerRangeRequests(t *testing.T) {
 	})
 
 	t.Run("Resume interrupted download", func(t *testing.T) {
-		req1, _ := http.NewRequest("GET", fileURL, nil)
+		req1, err := http.NewRequest("GET", fileURL, nil)
+		assert.NoError(t, err)
 		req1.Header.Set("Range", "bytes=0-49")
 
 		resp1, err := http.DefaultClient.Do(req1)
@@ -324,7 +337,8 @@ func TestServerRangeRequests(t *testing.T) {
 		resp1.Body.Close()
 		assert.NoError(t, err)
 
-		req2, _ := http.NewRequest("GET", fileURL, nil)
+		req2, err := http.NewRequest("GET", fileURL, nil)
+		assert.NoError(t, err)
 		req2.Header.Set("Range", "bytes=50-")
 
 		resp2, err := http.DefaultClient.Do(req2)
