@@ -209,7 +209,9 @@ func (d *dhtServer) receiveFindPeer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Write(output)
+	if _, err := w.Write(output); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // Join joins the network by adding a bootstrap known peers to the routing table

@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
-	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -60,7 +59,7 @@ func (a *Account) Server(knownNodes []*Peer) (*Server, error) {
 				// and explicit CipherSuites (modern Go chooses optimal suites automatically)
 				MinVersion: tls.VersionTLS13, // TLS 1.3 for better security and performance
 				CurvePreferences: []tls.CurveID{
-					tls.X25519,    // Modern, fast elliptic curve
+					tls.X25519, // Modern, fast elliptic curve
 					tls.CurveP256,
 					tls.CurveP384,
 					tls.CurveP521,
@@ -210,7 +209,9 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(marshaled)
+	if _, err := w.Write(marshaled); err != nil {
+		http.Error(w, "Error writing response", http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {
@@ -247,16 +248,16 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO needs to support interrupt resume
 	reader, err := os.Open(file.Path)
 	if err != nil {
 		http.Error(w, "Error reading file", http.StatusInternalServerError)
 		return
 	}
+	defer reader.Close()
 
 	w.Header().Add("Content-Type", "application/octet-stream")
-	w.WriteHeader(http.StatusOK)
-	io.Copy(w, reader)
+	w.Header().Add("Accept-Ranges", "bytes")
+	http.ServeContent(w, r, file.Name(), time.Time{}, reader)
 }
 
 func (s *Server) version(w http.ResponseWriter, r *http.Request) {
@@ -290,16 +291,16 @@ func (s *Server) version(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO needs to support interrupt resume
 	reader, err := os.Open(file.Path)
 	if err != nil {
 		http.Error(w, "Error reading file", http.StatusInternalServerError)
 		return
 	}
+	defer reader.Close()
 
 	w.Header().Add("Content-Type", "application/octet-stream")
-	w.WriteHeader(http.StatusOK)
-	io.Copy(w, reader)
+	w.Header().Add("Accept-Ranges", "bytes")
+	http.ServeContent(w, r, file.Name(), time.Time{}, reader)
 }
 
 func isPermitted(certs []*x509.Certificate, recipients []*Friend) bool {

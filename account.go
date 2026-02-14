@@ -18,8 +18,11 @@ import (
 
 	_ "crypto/sha256"
 
+	//nolint:staticcheck // SA1019: openpgp deprecated but required for this project
 	"golang.org/x/crypto/openpgp"
+	//nolint:staticcheck // SA1019: openpgp deprecated but required for this project
 	"golang.org/x/crypto/openpgp/armor"
+	//nolint:staticcheck // SA1019: openpgp deprecated but required for this project
 	"golang.org/x/crypto/openpgp/packet"
 )
 
@@ -199,6 +202,7 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 	}
 
 	crtvalues := []rsa.CRTValue{}
+	//nolint:staticcheck // SA1019: CRTValues deprecated but needed for backward compatibility
 	for _, i := range privkey.Precomputed.CRTValues {
 		crtvalues = append(crtvalues, rsa.CRTValue(i))
 	}
@@ -229,10 +233,14 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 	certPem := &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}
 
 	var keyPemBytes bytes.Buffer
-	pem.Encode(&keyPemBytes, keyPem)
+	if err := pem.Encode(&keyPemBytes, keyPem); err != nil {
+		return tls.Certificate{}, err
+	}
 
 	var certPemBytes bytes.Buffer
-	pem.Encode(&certPemBytes, certPem)
+	if err := pem.Encode(&certPemBytes, certPem); err != nil {
+		return tls.Certificate{}, err
+	}
 
 	return tls.X509KeyPair(certPemBytes.Bytes(), keyPemBytes.Bytes())
 }
@@ -281,7 +289,9 @@ func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File
 		return nil, err
 	}
 
-	io.Copy(w, r)
+	if _, err := io.Copy(w, r); err != nil {
+		return nil, err
+	}
 	w.Close()
 
 	return &File{Path: p}, nil
@@ -336,7 +346,6 @@ func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint
 
 	type dirEntry struct {
 		entry        fs.DirEntry
-		info         fs.FileInfo
 		modification time.Time
 	}
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -53,7 +54,8 @@ func TestBucket(t *testing.T) {
 }
 
 func TestNewDHTServer(t *testing.T) {
-	account, _ := NewAccount(t.TempDir(), "Main peer", "main@example.com", "password")
+	account, err := NewAccount(t.TempDir(), "Main peer", "main@example.com", "password")
+	assert.NoError(t, err)
 	s := newDHTServer(account, "localhost:80")
 
 	assert.NotEqual(t, nil, s.mux)
@@ -62,7 +64,8 @@ func TestNewDHTServer(t *testing.T) {
 }
 
 func TestReceivePing(t *testing.T) {
-	account, _ := NewAccount(t.TempDir(), "Main peer", "main@example.com", "password")
+	account, err := NewAccount(t.TempDir(), "Main peer", "main@example.com", "password")
+	assert.NoError(t, err)
 	s := newDHTServer(account, "localhost:80")
 
 	t.Run("without mTLS", func(t *testing.T) {
@@ -76,12 +79,15 @@ func TestReceivePing(t *testing.T) {
 	t.Run("with mTLS", func(t *testing.T) {
 		listener, bootstrap_addr := TempListener()
 		server, err := account.Server(nil)
-		go server.Serve(*listener, bootstrap_addr)
+		assert.NoError(t, err)
+		go func() {
+			_ = server.Serve(*listener, bootstrap_addr)
+		}()
 		defer server.Close()
 		for ; server.dhtServer == nil; time.Sleep(time.Millisecond) {
 		}
 
-		peer, _ := NewAccount(t.TempDir(), "Peer", "peer@example.com", "password")
+		peer, err := NewAccount(t.TempDir(), "Peer", "peer@example.com", "password")
 		assert.NoError(t, err)
 
 		client, err := peer.Client(account.Fingerprint(), []string{"localhost:90"})
@@ -99,7 +105,8 @@ func TestReceivePing(t *testing.T) {
 }
 
 func TestDHTServerAddPeer(t *testing.T) {
-	account, _ := NewAccount(t.TempDir(), "Main peer", "main@example.com", "password")
+	account, err := NewAccount(t.TempDir(), "Main peer", "main@example.com", "password")
+	assert.NoError(t, err)
 	s := newDHTServer(account, "localhost:80")
 
 	peerFpr, err := FingerprintFromString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")
@@ -120,13 +127,16 @@ func TestDHTServerAddPeer(t *testing.T) {
 
 func TestDHTServer(t *testing.T) {
 	bootstrap, err := NewAccount(t.TempDir(), "Main peer", "main@example.com", "password")
+	assert.NoError(t, err)
 	listener, bootstrap_addr := TempListener()
 	bootstrap_peer := &Peer{bootstrap.Fingerprint(), bootstrap_addr}
 
 	server, err := bootstrap.Server(nil)
 	assert.NoError(t, err)
 	assert.NotEqual(t, nil, server)
-	go server.Serve(*listener, bootstrap_addr)
+	go func() {
+		_ = server.Serve(*listener, bootstrap_addr)
+	}()
 	defer server.Close()
 
 	peers := []*Account{}
@@ -145,7 +155,9 @@ func TestDHTServer(t *testing.T) {
 			servers = append(servers, s)
 
 			l, addr := TempListener()
-			go s.Serve(*l, addr)
+			go func(srv *Server, lis *net.Listener, address string) {
+				_ = srv.Serve(*lis, address)
+			}(s, l, addr)
 		}
 	})
 
@@ -161,7 +173,8 @@ func TestDHTServer(t *testing.T) {
 	})
 
 	t.Run("Bootstrap contact list", func(t *testing.T) {
-		c, _ := bootstrap.Client(bootstrap_peer.Fingerprint, []string{bootstrap_addr})
+		c, err := bootstrap.Client(bootstrap_peer.Fingerprint, []string{bootstrap_addr})
+		assert.NoError(t, err)
 		u := url.URL{
 			Scheme: uriProtocolName,
 			Path:   "/kad/find_peer/" + bootstrap.Fingerprint().String(),
@@ -169,7 +182,7 @@ func TestDHTServer(t *testing.T) {
 		}
 
 		var peers []Peer
-		_, err := c.client.
+		_, err = c.client.
 			R().
 			ForceContentType("application/json").
 			SetResult(&peers).
@@ -196,7 +209,8 @@ func TestDHTServer(t *testing.T) {
 	t.Run("looking up unknown peer", func(t *testing.T) {
 		for _, s := range servers {
 			s.dhtServer.refreshAllBuckets(context.Background())
-			c, _ := bootstrap.Client(s.account.Fingerprint(), []string{bootstrap_addr})
+			c, err := bootstrap.Client(s.account.Fingerprint(), []string{bootstrap_addr})
+			assert.NoError(t, err)
 			u := url.URL{
 				Scheme: uriProtocolName,
 				Path:   "/kad/find_peer/" + "0000000000000000000000000000000000000F0F",
@@ -204,7 +218,7 @@ func TestDHTServer(t *testing.T) {
 			}
 
 			var peers []Peer
-			_, err := c.client.R().
+			_, err = c.client.R().
 				ForceContentType("application/json").
 				SetResult(&peers).
 				Get(u.String())
@@ -233,10 +247,13 @@ func TestDHTServer(t *testing.T) {
 }
 
 func TestXor(t *testing.T) {
-	fpr1, _ := FingerprintFromString("0000000000000000000000000000000000000F0F")
-	fpr2, _ := FingerprintFromString("00000000000000000000000000000000000000FF")
+	fpr1, err := FingerprintFromString("0000000000000000000000000000000000000F0F")
+	assert.NoError(t, err)
+	fpr2, err := FingerprintFromString("00000000000000000000000000000000000000FF")
+	assert.NoError(t, err)
 
-	res, _ := FingerprintFromString("0000000000000000000000000000000000000FF0")
+	res, err := FingerprintFromString("0000000000000000000000000000000000000FF0")
+	assert.NoError(t, err)
 	assert.Equal(t, res, xor(fpr1, fpr2))
 }
 

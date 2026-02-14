@@ -45,7 +45,9 @@ func main() {
 		initCmd := flag.NewFlagSet("init", flag.ExitOnError)
 		name := initCmd.String("name", "", "name")
 		email := initCmd.String("email", "", "email")
-		initCmd.Parse(os.Args[2:])
+		if err := initCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatalf("Failed to parse init flags: %v", err)
+		}
 
 		passphrase := getPassword()
 
@@ -64,7 +66,9 @@ func main() {
 	case "export":
 		exportCmd := flag.NewFlagSet("export", flag.ExitOnError)
 		output := exportCmd.String("output", "/dev/stdout", "output")
-		exportCmd.Parse(os.Args[2:])
+		if err := exportCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatalf("Failed to parse export flags: %v", err)
+		}
 
 		account := getAccount()
 
@@ -78,7 +82,9 @@ func main() {
 	case "friend":
 		friendCmd := flag.NewFlagSet("friend", flag.ExitOnError)
 		key := friendCmd.String("key", "", "path to key file")
-		friendCmd.Parse(os.Args[2:])
+		if err := friendCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatalf("Failed to parse friend flags: %v", err)
+		}
 
 		account := getAccount()
 
@@ -102,7 +108,9 @@ func main() {
 	case "unfriend":
 		unfriendCmd := flag.NewFlagSet("unfriend", flag.ExitOnError)
 		fingerprint := unfriendCmd.String("fingerprint", "", "fingerprint of the friend account")
-		unfriendCmd.Parse(os.Args[2:])
+		if err := unfriendCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatalf("Failed to parse unfriend flags: %v", err)
+		}
 
 		account := getAccount()
 
@@ -124,7 +132,9 @@ func main() {
 	case "follow":
 		followCmd := flag.NewFlagSet("follow", flag.ExitOnError)
 		fingerprint := followCmd.String("fingerprint", "", "fingerprint of the friend account")
-		followCmd.Parse(os.Args[2:])
+		if err := followCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatalf("Failed to parse follow flags: %v", err)
+		}
 
 		account := getAccount()
 
@@ -146,7 +156,9 @@ func main() {
 	case "unfollow":
 		unfollowCmd := flag.NewFlagSet("unfollow", flag.ExitOnError)
 		fingerprint := unfollowCmd.String("fingerprint", "", "fingerprint of the friend account")
-		unfollowCmd.Parse(os.Args[2:])
+		if err := unfollowCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatalf("Failed to parse unfollow flags: %v", err)
+		}
 
 		account := getAccount()
 
@@ -179,7 +191,9 @@ func main() {
 		shareCmd := flag.NewFlagSet("share", flag.ExitOnError)
 		file := shareCmd.String("file", "", "file path to share")
 		fingerprints := shareCmd.String("fingerprints", "", "comma separated list of fingerprints to share the file with")
-		shareCmd.Parse(os.Args[2:])
+		if err := shareCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatalf("Failed to parse share flags: %v", err)
+		}
 
 		account := getAccount()
 
@@ -212,7 +226,9 @@ func main() {
 	case "files":
 		filesCmd := flag.NewFlagSet("files", flag.ExitOnError)
 		fingerprint := filesCmd.String("fingerprint", "", "fingerprint of the friend account")
-		filesCmd.Parse(os.Args[2:])
+		if err := filesCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatalf("Failed to parse files flags: %v", err)
+		}
 
 		account := getAccount()
 		var fpr Fingerprint
@@ -249,7 +265,9 @@ func main() {
 		file := openCmd.String("file", "", "file path to open")
 		output := openCmd.String("output", "/dev/stdout", "output")
 		fingerprint := openCmd.String("fingerprint", "", "fingerprint of the friend account")
-		openCmd.Parse(os.Args[2:])
+		if err := openCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatalf("Failed to parse open flags: %v", err)
+		}
 
 		account := getAccount()
 		var fpr Fingerprint
@@ -278,7 +296,9 @@ func main() {
 	case "delete":
 		deleteCmd := flag.NewFlagSet("delete", flag.ExitOnError)
 		file := deleteCmd.String("file", "", "file name to delete")
-		deleteCmd.Parse(os.Args[2:])
+		if err := deleteCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatalf("Failed to parse delete flags: %v", err)
+		}
 
 		account := getAccount()
 		f, err := account.GetFile(account.Fingerprint(), *file)
@@ -299,13 +319,17 @@ func main() {
 		fmt.Println("Account: ", account.Name(), account.Fingerprint())
 		fmt.Println("Using port:", port)
 
-		server.Serve(listener, "")
+		if err := server.Serve(listener, ""); err != nil {
+			log.Fatalf("Server error: %v", err)
+		}
 
 	case "sync":
 		syncCmd := flag.NewFlagSet("sync", flag.ExitOnError)
 		fprStr := syncCmd.String("fingerprint", "", "user fingerprint to sync files")
 		address := syncCmd.String("address", "", "source address to sync from")
-		syncCmd.Parse(os.Args[2:])
+		if err := syncCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatalf("Failed to parse sync flags: %v", err)
+		}
 
 		account := getAccount()
 		var fpr Fingerprint
@@ -318,7 +342,8 @@ func main() {
 		// TODO get the latest synced file date
 		t := time.Date(2000, 1, 1, 1, 1, 1, 1, time.UTC)
 
-		ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
 		resolvers := []FingerprintResolver{LocalFriendAddress}
 		if len(*address) > 0 {
 			resolvers = append(resolvers, StaticAddress(*address))

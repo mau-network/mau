@@ -53,7 +53,7 @@ func (a *Account) Client(peer Fingerprint, DNSNames []string) (*Client, error) {
 				// Modern Go automatically selects optimal cipher suites
 				MinVersion: tls.VersionTLS13, // TLS 1.3 for better security and performance
 				CurvePreferences: []tls.CurveID{
-					tls.X25519,    // Modern, fast elliptic curve
+					tls.X25519, // Modern, fast elliptic curve
 					tls.CurveP256,
 					tls.CurveP384,
 				},
@@ -73,7 +73,9 @@ func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, af
 
 	// ask all resolvers for the address concurrently
 	for _, fr := range fingerprintResolvers {
-		go fr(ctx, fingerprint, addresses)
+		go func(resolver FingerprintResolver) {
+			_ = resolver(ctx, fingerprint, addresses)
+		}(fr)
 	}
 
 	var address string
