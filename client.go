@@ -53,7 +53,7 @@ func (a *Account) Client(peer Fingerprint, DNSNames []string) (*Client, error) {
 				// Modern Go automatically selects optimal cipher suites
 				MinVersion: tls.VersionTLS13, // TLS 1.3 for better security and performance
 				CurvePreferences: []tls.CurveID{
-					tls.X25519,    // Modern, fast elliptic curve
+					tls.X25519, // Modern, fast elliptic curve
 					tls.CurveP256,
 					tls.CurveP384,
 				},

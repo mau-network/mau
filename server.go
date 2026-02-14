@@ -59,7 +59,7 @@ func (a *Account) Server(knownNodes []*Peer) (*Server, error) {
 				// and explicit CipherSuites (modern Go chooses optimal suites automatically)
 				MinVersion: tls.VersionTLS13, // TLS 1.3 for better security and performance
 				CurvePreferences: []tls.CurveID{
-					tls.X25519,    // Modern, fast elliptic curve
+					tls.X25519, // Modern, fast elliptic curve
 					tls.CurveP256,
 					tls.CurveP384,
 					tls.CurveP521,

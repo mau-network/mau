@@ -304,7 +304,7 @@ func TestServerRangeRequests(t *testing.T) {
 	t.Run("Partial content with Range header", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", fileURL, nil)
 		req.Header.Set("Range", "bytes=0-9")
-		
+
 		resp, err := http.DefaultClient.Do(req)
 		assert.NoError(t, err)
 		defer resp.Body.Close()
@@ -316,7 +316,7 @@ func TestServerRangeRequests(t *testing.T) {
 	t.Run("Resume interrupted download", func(t *testing.T) {
 		req1, _ := http.NewRequest("GET", fileURL, nil)
 		req1.Header.Set("Range", "bytes=0-49")
-		
+
 		resp1, err := http.DefaultClient.Do(req1)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusPartialContent, resp1.StatusCode)
@@ -326,11 +326,11 @@ func TestServerRangeRequests(t *testing.T) {
 
 		req2, _ := http.NewRequest("GET", fileURL, nil)
 		req2.Header.Set("Range", "bytes=50-")
-		
+
 		resp2, err := http.DefaultClient.Do(req2)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusPartialContent, resp2.StatusCode)
-		
+
 		body2, err := io.ReadAll(resp2.Body)
 		resp2.Body.Close()
 		assert.NoError(t, err)
