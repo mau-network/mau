@@ -126,7 +126,8 @@ func Timeout(p time.Duration) context.Context {
 }
 
 func TempListener() (*net.Listener, string) {
-	listener, err := net.Listen("tcp", "0.0.0.0:0")
+	// Use tcp4 to explicitly bind to IPv4 only, avoiding failures when IPv6 is disabled
+	listener, err := net.Listen("tcp4", "0.0.0.0:0")
 	if err != nil {
 		log.Fatal("Error while creating listener for testing:", err.Error())
 	}
