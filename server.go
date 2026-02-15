@@ -124,7 +124,10 @@ func (s *Server) serveMDNS(port int) error {
 
 	server, err := mdns.NewServer(&mdns.Config{Zone: service})
 	if err != nil {
-		return err
+		// MDNS might fail when IPv6 is disabled - log but don't fail entirely
+		// Discovery will still work via DHT and manual addresses
+		slog.Warn("Failed to start mDNS server", "error", err)
+		return nil
 	}
 
 	s.mdnsServer = server
@@ -140,9 +143,14 @@ func (s *Server) serveDHT(ctx context.Context, externalAddress string) error {
 }
 
 func (s *Server) Close() error {
-	mdns_err := s.mdnsServer.Shutdown()
+	var mdns_err error
+	if s.mdnsServer != nil {
+		mdns_err = s.mdnsServer.Shutdown()
+	}
 	http_err := s.httpServer.Close()
-	s.dhtServer.Leave()
+	if s.dhtServer != nil {
+		s.dhtServer.Leave()
+	}
 
 	return errors.Join(mdns_err, http_err)
 }

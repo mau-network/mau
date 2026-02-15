@@ -312,7 +312,7 @@ func main() {
 		server, err := account.Server(nil)
 		raise(err)
 
-		listener, err := net.Listen("tcp", ":0")
+		listener, err := ListenTCP(":0")
 		raise(err)
 
 		port := listener.Addr().(*net.TCPAddr).Port
