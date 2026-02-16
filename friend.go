@@ -63,6 +63,9 @@ func readFriend(account *Account, reader io.Reader) (*Friend, error) {
 	if err != nil {
 		return nil, err
 	}
+	if decryptedFile == nil {
+		return nil, fmt.Errorf("openpgp.ReadMessage returned nil")
+	}
 
 	entity, err := openpgp.ReadEntity(packet.NewReader(decryptedFile.UnverifiedBody))
 	if err != nil {
@@ -82,6 +85,9 @@ func (a *Account) AddFriend(reader io.Reader) (*Friend, error) {
 	if err != nil {
 		return nil, err
 	}
+	if entity == nil || entity.PrimaryKey == nil {
+		return nil, fmt.Errorf("openpgp.ReadEntity returned nil or incomplete entity")
+	}
 
 	fpr := Fingerprint(entity.PrimaryKey.Fingerprint).String()
 	entities := []*openpgp.Entity{a.entity}
@@ -95,6 +101,9 @@ func (a *Account) AddFriend(reader io.Reader) (*Friend, error) {
 	w, err := openpgp.Encrypt(file, entities, a.entity, nil, nil)
 	if err != nil {
 		return nil, err
+	}
+	if w == nil {
+		return nil, fmt.Errorf("openpgp.Encrypt returned nil writer")
 	}
 
 	err = entity.Serialize(w)

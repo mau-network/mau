@@ -114,6 +114,9 @@ func OpenAccount(rootPath, passphrase string) (*Account, error) {
 	if err != nil {
 		return nil, err
 	}
+	if decryptedFile == nil {
+		return nil, errors.New("openpgp.ReadMessage returned nil")
+	}
 
 	entity, err := openpgp.ReadEntity(packet.NewReader(decryptedFile.UnverifiedBody))
 	if err != nil {
@@ -290,6 +293,9 @@ func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File
 	w, err := openpgp.Encrypt(file, entities, a.entity, nil, nil)
 	if err != nil {
 		return nil, err
+	}
+	if w == nil {
+		return nil, errors.New("openpgp.Encrypt returned nil writer")
 	}
 
 	if _, err := io.Copy(w, r); err != nil {
