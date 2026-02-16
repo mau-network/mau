@@ -46,6 +46,9 @@ type File struct {
 }
 
 func (f *File) Name() string {
+	if f == nil {
+		return ""
+	}
 	return path.Base(f.Path)
 }
 
@@ -184,6 +187,9 @@ func (f *File) Recipients(account *Account) ([]*Friend, error) {
 }
 
 func (f *File) Reader(account *Account) (io.Reader, error) {
+	if f == nil {
+		return nil, errors.New("file cannot be nil")
+	}
 	if account == nil {
 		return nil, errors.New("account cannot be nil")
 	}

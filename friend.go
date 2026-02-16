@@ -28,6 +28,9 @@ func (f *Friend) Identity() (string, error) {
 }
 
 func (f *Friend) Name() string {
+	if f.entity == nil {
+		return ""
+	}
 	for _, i := range f.entity.Identities {
 		return i.UserId.Name
 	}
@@ -36,6 +39,9 @@ func (f *Friend) Name() string {
 }
 
 func (f *Friend) Email() string {
+	if f.entity == nil {
+		return ""
+	}
 	for _, i := range f.entity.Identities {
 		return i.UserId.Email
 	}
@@ -44,6 +50,9 @@ func (f *Friend) Email() string {
 }
 
 func (f *Friend) Fingerprint() Fingerprint {
+	if f.entity == nil || f.entity.PrimaryKey == nil {
+		return Fingerprint{}
+	}
 	return f.entity.PrimaryKey.Fingerprint
 }
 

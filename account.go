@@ -156,6 +156,9 @@ func (a *Account) Email() string {
 }
 
 func (a *Account) Fingerprint() Fingerprint {
+	if a.entity == nil || a.entity.PrimaryKey == nil {
+		return Fingerprint{}
+	}
 	return a.entity.PrimaryKey.Fingerprint
 }
 
@@ -298,6 +301,10 @@ func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File
 }
 
 func (a *Account) RemoveFile(file *File) error {
+	if file == nil {
+		return nil
+	}
+	
 	err := os.Remove(file.Path)
 	if err != nil {
 		return err
