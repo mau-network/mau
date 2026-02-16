@@ -94,6 +94,9 @@ func main() {
 
 		friend, err := account.AddFriend(keyFile)
 		raise(err)
+		if friend == nil {
+			log.Fatal("Failed to add friend")
+		}
 
 		fmt.Println("Friend added: ", friend.Name(), friend.Email(), friend.Fingerprint())
 
@@ -359,6 +362,9 @@ func main() {
 
 		client, err := account.Client(fpr, nil)
 		raise(err)
+		if client == nil {
+			log.Fatal("Failed to create client")
+		}
 
 		// TODO get the latest synced file date
 		t := time.Date(2000, 1, 1, 1, 1, 1, 1, time.UTC)
@@ -381,6 +387,9 @@ func getAccount() *Account {
 	wd, _ := os.Getwd()
 	account, err := OpenAccount(wd, getPassword())
 	raise(err)
+	if account == nil {
+		log.Fatal("Failed to open account")
+	}
 
 	return account
 }

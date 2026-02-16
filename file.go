@@ -113,6 +113,9 @@ func (f *File) VerifySignature(account *Account, expectedSigner Fingerprint) err
 	if err != nil {
 		return fmt.Errorf("failed to read OpenPGP message: %w", err)
 	}
+	if md == nil {
+		return errors.New("openpgp.ReadMessage returned nil")
+	}
 
 	// Check if message is signed
 	if !md.IsSigned {
@@ -203,6 +206,9 @@ func (f *File) Reader(account *Account) (io.Reader, error) {
 	decryptedFile, err := openpgp.ReadMessage(bytes.NewReader(r), keyring, nil, nil)
 	if err != nil {
 		return nil, err
+	}
+	if decryptedFile == nil {
+		return nil, errors.New("openpgp.ReadMessage returned nil")
 	}
 
 	return decryptedFile.UnverifiedBody, nil

@@ -20,6 +20,9 @@ type Friend struct {
 }
 
 func (f *Friend) Identity() (string, error) {
+	if f == nil || f.entity == nil {
+		return "", ErrNoIdentity
+	}
 	for name := range f.entity.Identities {
 		return name, nil
 	}
@@ -28,7 +31,7 @@ func (f *Friend) Identity() (string, error) {
 }
 
 func (f *Friend) Name() string {
-	if f.entity == nil {
+	if f == nil || f.entity == nil {
 		return ""
 	}
 	for _, i := range f.entity.Identities {
@@ -39,7 +42,7 @@ func (f *Friend) Name() string {
 }
 
 func (f *Friend) Email() string {
-	if f.entity == nil {
+	if f == nil || f.entity == nil {
 		return ""
 	}
 	for _, i := range f.entity.Identities {
@@ -50,7 +53,7 @@ func (f *Friend) Email() string {
 }
 
 func (f *Friend) Fingerprint() Fingerprint {
-	if f.entity == nil || f.entity.PrimaryKey == nil {
+	if f == nil || f.entity == nil || f.entity.PrimaryKey == nil {
 		return Fingerprint{}
 	}
 	return f.entity.PrimaryKey.Fingerprint

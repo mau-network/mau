@@ -135,6 +135,9 @@ type Account struct {
 }
 
 func (a *Account) Identity() (string, error) {
+	if a == nil || a.entity == nil {
+		return "", ErrNoIdentity
+	}
 	for _, i := range a.entity.Identities {
 		return i.Name, nil
 	}
@@ -143,6 +146,9 @@ func (a *Account) Identity() (string, error) {
 }
 
 func (a *Account) Name() string {
+	if a == nil || a.entity == nil {
+		return ""
+	}
 	for _, i := range a.entity.Identities {
 		return i.UserId.Name
 	}
@@ -151,6 +157,9 @@ func (a *Account) Name() string {
 }
 
 func (a *Account) Email() string {
+	if a == nil || a.entity == nil {
+		return ""
+	}
 	for _, i := range a.entity.Identities {
 		return i.UserId.Email
 	}
@@ -159,13 +168,16 @@ func (a *Account) Email() string {
 }
 
 func (a *Account) Fingerprint() Fingerprint {
-	if a.entity == nil || a.entity.PrimaryKey == nil {
+	if a == nil || a.entity == nil || a.entity.PrimaryKey == nil {
 		return Fingerprint{}
 	}
 	return a.entity.PrimaryKey.Fingerprint
 }
 
 func (a *Account) Export(w io.Writer) error {
+	if a == nil || a.entity == nil {
+		return errors.New("account or entity is nil")
+	}
 	armored, err := armor.Encode(w, openpgp.PublicKeyType, map[string]string{})
 	if err != nil {
 		return err
@@ -181,6 +193,10 @@ func (a *Account) Export(w io.Writer) error {
 }
 
 func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err error) {
+	if a == nil || a.entity == nil || a.entity.PrimaryKey == nil || a.entity.PrivateKey == nil {
+		err = errors.New("account or entity is incomplete")
+		return
+	}
 	template := x509.Certificate{
 		Version:      3,
 		DNSNames:     DNSNames,
