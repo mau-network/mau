@@ -46,6 +46,9 @@ type File struct {
 }
 
 func (f *File) Name() string {
+	if f == nil {
+		return ""
+	}
 	return path.Base(f.Path)
 }
 
@@ -110,6 +113,9 @@ func (f *File) VerifySignature(account *Account, expectedSigner Fingerprint) err
 	if err != nil {
 		return fmt.Errorf("failed to read OpenPGP message: %w", err)
 	}
+	if md == nil {
+		return errors.New("openpgp.ReadMessage returned nil")
+	}
 
 	// Check if message is signed
 	if !md.IsSigned {
@@ -142,6 +148,10 @@ func (f *File) VerifySignature(account *Account, expectedSigner Fingerprint) err
 }
 
 func (f *File) Recipients(account *Account) ([]*Friend, error) {
+	if account == nil {
+		return nil, errors.New("account cannot be nil")
+	}
+
 	r, err := os.Open(f.Path)
 	if err != nil {
 		return nil, err
@@ -180,6 +190,13 @@ func (f *File) Recipients(account *Account) ([]*Friend, error) {
 }
 
 func (f *File) Reader(account *Account) (io.Reader, error) {
+	if f == nil {
+		return nil, errors.New("file cannot be nil")
+	}
+	if account == nil {
+		return nil, errors.New("account cannot be nil")
+	}
+
 	r, err := os.ReadFile(f.Path)
 	if err != nil {
 		return nil, err
@@ -189,6 +206,9 @@ func (f *File) Reader(account *Account) (io.Reader, error) {
 	decryptedFile, err := openpgp.ReadMessage(bytes.NewReader(r), keyring, nil, nil)
 	if err != nil {
 		return nil, err
+	}
+	if decryptedFile == nil {
+		return nil, errors.New("openpgp.ReadMessage returned nil")
 	}
 
 	return decryptedFile.UnverifiedBody, nil

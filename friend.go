@@ -20,6 +20,9 @@ type Friend struct {
 }
 
 func (f *Friend) Identity() (string, error) {
+	if f == nil || f.entity == nil {
+		return "", ErrNoIdentity
+	}
 	for name := range f.entity.Identities {
 		return name, nil
 	}
@@ -28,6 +31,9 @@ func (f *Friend) Identity() (string, error) {
 }
 
 func (f *Friend) Name() string {
+	if f == nil || f.entity == nil {
+		return ""
+	}
 	for _, i := range f.entity.Identities {
 		return i.UserId.Name
 	}
@@ -36,6 +42,9 @@ func (f *Friend) Name() string {
 }
 
 func (f *Friend) Email() string {
+	if f == nil || f.entity == nil {
+		return ""
+	}
 	for _, i := range f.entity.Identities {
 		return i.UserId.Email
 	}
@@ -44,6 +53,9 @@ func (f *Friend) Email() string {
 }
 
 func (f *Friend) Fingerprint() Fingerprint {
+	if f == nil || f.entity == nil || f.entity.PrimaryKey == nil {
+		return Fingerprint{}
+	}
 	return f.entity.PrimaryKey.Fingerprint
 }
 
@@ -53,6 +65,9 @@ func readFriend(account *Account, reader io.Reader) (*Friend, error) {
 	decryptedFile, err := openpgp.ReadMessage(reader, keyring, nil, nil)
 	if err != nil {
 		return nil, err
+	}
+	if decryptedFile == nil {
+		return nil, fmt.Errorf("openpgp.ReadMessage returned nil")
 	}
 
 	entity, err := openpgp.ReadEntity(packet.NewReader(decryptedFile.UnverifiedBody))
@@ -73,6 +88,9 @@ func (a *Account) AddFriend(reader io.Reader) (*Friend, error) {
 	if err != nil {
 		return nil, err
 	}
+	if entity == nil || entity.PrimaryKey == nil {
+		return nil, fmt.Errorf("openpgp.ReadEntity returned nil or incomplete entity")
+	}
 
 	fpr := Fingerprint(entity.PrimaryKey.Fingerprint).String()
 	entities := []*openpgp.Entity{a.entity}
@@ -86,6 +104,9 @@ func (a *Account) AddFriend(reader io.Reader) (*Friend, error) {
 	w, err := openpgp.Encrypt(file, entities, a.entity, nil, nil)
 	if err != nil {
 		return nil, err
+	}
+	if w == nil {
+		return nil, fmt.Errorf("openpgp.Encrypt returned nil writer")
 	}
 
 	err = entity.Serialize(w)

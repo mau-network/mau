@@ -101,6 +101,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) Serve(l net.Listener, externalAddress string) error {
+	if l == nil || l.Addr() == nil {
+		return errors.New("listener cannot be nil")
+	}
+	
 	port := l.Addr().(*net.TCPAddr).Port
 
 	if err := s.serveMDNS(port); err != nil {

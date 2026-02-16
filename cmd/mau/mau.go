@@ -94,6 +94,9 @@ func main() {
 
 		friend, err := account.AddFriend(keyFile)
 		raise(err)
+		if friend == nil {
+			log.Fatal("Failed to add friend")
+		}
 
 		fmt.Println("Friend added: ", friend.Name(), friend.Email(), friend.Fingerprint())
 
@@ -102,6 +105,9 @@ func main() {
 
 		friends, err := account.ListFriends()
 		raise(err)
+		if friends == nil {
+			log.Fatal("Failed to list friends")
+		}
 
 		printKeyring("", friends)
 
@@ -116,6 +122,9 @@ func main() {
 
 		friends, err := account.ListFriends()
 		raise(err)
+		if friends == nil {
+			log.Fatal("Failed to list friends")
+		}
 
 		fpr, err := FingerprintFromString(*fingerprint)
 		raise(err)
@@ -140,6 +149,9 @@ func main() {
 
 		friends, err := account.ListFriends()
 		raise(err)
+		if friends == nil {
+			log.Fatal("Failed to list friends")
+		}
 
 		fpr, err := FingerprintFromString(*fingerprint)
 		raise(err)
@@ -164,6 +176,9 @@ func main() {
 
 		friends, err := account.ListFriends()
 		raise(err)
+		if friends == nil {
+			log.Fatal("Failed to list friends")
+		}
 
 		fpr, err := FingerprintFromString(*fingerprint)
 		raise(err)
@@ -202,6 +217,9 @@ func main() {
 
 		allFrields, err := account.ListFriends()
 		raise(err)
+		if allFrields == nil {
+			log.Fatal("Failed to list friends")
+		}
 
 		fprs := strings.Split(*fingerprints, ",")
 		friends := []*Friend{}
@@ -311,9 +329,15 @@ func main() {
 		account := getAccount()
 		server, err := account.Server(nil)
 		raise(err)
+		if server == nil {
+			log.Fatal("Failed to create server")
+		}
 
 		listener, err := ListenTCP(":0")
 		raise(err)
+		if listener == nil {
+			log.Fatal("Failed to create TCP listener")
+		}
 
 		port := listener.Addr().(*net.TCPAddr).Port
 		fmt.Println("Account: ", account.Name(), account.Fingerprint())
@@ -338,6 +362,9 @@ func main() {
 
 		client, err := account.Client(fpr, nil)
 		raise(err)
+		if client == nil {
+			log.Fatal("Failed to create client")
+		}
 
 		// TODO get the latest synced file date
 		t := time.Date(2000, 1, 1, 1, 1, 1, 1, time.UTC)
@@ -360,6 +387,9 @@ func getAccount() *Account {
 	wd, _ := os.Getwd()
 	account, err := OpenAccount(wd, getPassword())
 	raise(err)
+	if account == nil {
+		log.Fatal("Failed to open account")
+	}
 
 	return account
 }
@@ -374,6 +404,10 @@ func getPassword() string {
 }
 
 func printKeyring(p string, r *Keyring) {
+	if r == nil {
+		return
+	}
+	
 	fmt.Println(r.Name(), ":")
 	for _, f := range r.Friends {
 		fmt.Println(p+" ", f.Name(), f.Email(), f.Fingerprint())

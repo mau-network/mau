@@ -64,6 +64,10 @@ func (a *Account) Client(peer Fingerprint, DNSNames []string) (*Client, error) {
 }
 
 func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, after time.Time, fingerprintResolvers []FingerprintResolver) error {
+	if c == nil || c.client == nil {
+		return errors.New("client is not initialized")
+	}
+	
 	followed := path.Join(c.account.path, fingerprint.String())
 	if _, err := os.Stat(followed); err != nil {
 		return ErrFriendNotFollowed
