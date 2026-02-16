@@ -311,6 +311,9 @@ func main() {
 		account := getAccount()
 		server, err := account.Server(nil)
 		raise(err)
+		if server == nil {
+			log.Fatal("Failed to create server")
+		}
 
 		listener, err := ListenTCP(":0")
 		raise(err)

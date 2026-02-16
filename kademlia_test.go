@@ -27,21 +27,37 @@ func TestBucket(t *testing.T) {
 	assert.NoError(t, err)
 
 	b.addToTail(&Peer{fpr1, "address"})
-	assert.Equal(t, fpr1, b.get(fpr1).Fingerprint)
-	assert.Equal(t, fpr1, b.leastRecentlySeen().Fingerprint)
+	peer1 := b.get(fpr1)
+	assert.NotNil(t, peer1)
+	assert.Equal(t, fpr1, peer1.Fingerprint)
+	
+	lrs1 := b.leastRecentlySeen()
+	assert.NotNil(t, lrs1)
+	assert.Equal(t, fpr1, lrs1.Fingerprint)
 
 	b.addToTail(&Peer{fpr2, "address2"})
-	assert.Equal(t, fpr1, b.leastRecentlySeen().Fingerprint)
+	lrs2 := b.leastRecentlySeen()
+	assert.NotNil(t, lrs2)
+	assert.Equal(t, fpr1, lrs2.Fingerprint)
 
-	b.moveToTail(b.get(fpr1))
-	assert.Equal(t, fpr2, b.leastRecentlySeen().Fingerprint)
+	peer1Again := b.get(fpr1)
+	assert.NotNil(t, peer1Again)
+	b.moveToTail(peer1Again)
+	lrs3 := b.leastRecentlySeen()
+	assert.NotNil(t, lrs3)
+	assert.Equal(t, fpr2, lrs3.Fingerprint)
 
-	b.moveToTail(b.get(fpr2))
-	assert.Equal(t, fpr1, b.leastRecentlySeen().Fingerprint)
+	peer2 := b.get(fpr2)
+	assert.NotNil(t, peer2)
+	b.moveToTail(peer2)
+	lrs4 := b.leastRecentlySeen()
+	assert.NotNil(t, lrs4)
+	assert.Equal(t, fpr1, lrs4.Fingerprint)
 
 	assert.Equal(t, 2, len(b.dup()))
 
 	rando := b.randomPeer()
+	assert.NotNil(t, rando)
 	assert.True(
 		t,
 		rando.Fingerprint == fpr1 || rando.Fingerprint == fpr2,
@@ -49,8 +65,12 @@ func TestBucket(t *testing.T) {
 		rando.Fingerprint,
 	)
 
-	b.remove(b.get(fpr1))
-	assert.Equal(t, fpr2, b.leastRecentlySeen().Fingerprint)
+	peerToRemove := b.get(fpr1)
+	assert.NotNil(t, peerToRemove)
+	b.remove(peerToRemove)
+	lrs5 := b.leastRecentlySeen()
+	assert.NotNil(t, lrs5)
+	assert.Equal(t, fpr2, lrs5.Fingerprint)
 }
 
 func TestNewDHTServer(t *testing.T) {

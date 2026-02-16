@@ -85,11 +85,16 @@ func TestOpenAccount(t *testing.T) {
 
 func TestGetFile(t *testing.T) {
 	account_dir := t.TempDir()
-	account, _ := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "password value")
+	account, err := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "password value")
+	assert.NoError(t, err)
+	assert.NotNil(t, account)
 
 	file, _ := account.AddFile(strings.NewReader("hello world"), "hello.txt", []*Friend{})
 	opened, _ := account.GetFile(account.Fingerprint(), "hello.txt.pgp")
 
+	assert.NotNil(t, file)
+	assert.NotNil(t, opened)
+	
 	assert.Equal(t, file.Path, opened.Path)
 	assert.Equal(t, file.Name(), opened.Name())
 	assert.Equal(t, file.Deleted(), opened.Deleted())
@@ -109,15 +114,19 @@ func TestGetFile(t *testing.T) {
 
 func TestRemoveFile(t *testing.T) {
 	account_dir := t.TempDir()
-	account, _ := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "password value")
+	account, err := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "password value")
+	assert.NoError(t, err)
+	assert.NotNil(t, account)
 
 	file, _ := account.AddFile(strings.NewReader("hello world"), "hello.txt", []*Friend{})
+	assert.NotNil(t, file)
 	assert.False(t, file.Deleted(), "File should exist (not deleted)")
 
 	file, _ = account.AddFile(strings.NewReader("bye world"), "hello.txt", []*Friend{})
+	assert.NotNil(t, file)
 	assert.Equal(t, 1, len(file.Versions()))
 
-	err := account.RemoveFile(file)
+	err = account.RemoveFile(file)
 	assert.NoError(t, err)
 
 	assert.True(t, file.Deleted(), "File should be deleted")

@@ -142,6 +142,10 @@ func (f *File) VerifySignature(account *Account, expectedSigner Fingerprint) err
 }
 
 func (f *File) Recipients(account *Account) ([]*Friend, error) {
+	if account == nil {
+		return nil, errors.New("account cannot be nil")
+	}
+
 	r, err := os.Open(f.Path)
 	if err != nil {
 		return nil, err
@@ -180,6 +184,10 @@ func (f *File) Recipients(account *Account) ([]*Friend, error) {
 }
 
 func (f *File) Reader(account *Account) (io.Reader, error) {
+	if account == nil {
+		return nil, errors.New("account cannot be nil")
+	}
+
 	r, err := os.ReadFile(f.Path)
 	if err != nil {
 		return nil, err
