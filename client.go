@@ -187,7 +187,28 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 	}
 
 	// Signature verified, move temp file to final location
-	// TODO: keep existing version in .versions directory before overwriting
+	// Before overwriting, save existing version if it exists
+	if _, err := os.Stat(f.Path); err == nil {
+		// File exists, create version backup
+		existingHash, err := f.Hash()
+		if err != nil {
+			os.Remove(tmpPath)
+			return fmt.Errorf("failed to hash existing file for versioning: %w", err)
+		}
+
+		versionsDir := f.Path + ".versions"
+		if err := os.MkdirAll(versionsDir, DirPerm); err != nil {
+			os.Remove(tmpPath)
+			return fmt.Errorf("failed to create versions directory: %w", err)
+		}
+
+		versionPath := path.Join(versionsDir, existingHash)
+		if err := os.Rename(f.Path, versionPath); err != nil {
+			os.Remove(tmpPath)
+			return fmt.Errorf("failed to save file version: %w", err)
+		}
+	}
+
 	err = os.Rename(tmpPath, f.Path)
 	if err != nil {
 		os.Remove(tmpPath) // Clean up temporary file
