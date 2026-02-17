@@ -120,9 +120,11 @@ func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, af
 		case <-ctx.Done():
 			return nil
 		default:
-			err = c.DownloadFile(ctx, address, fingerprint, &list[i])
+			// Extract filename from path (format: /p2p/{FPR}/{filename})
+			filename := path.Base(list[i].Path)
+			err = c.DownloadFile(ctx, address, fingerprint, filename, &list[i])
 			if err != nil {
-				slog.Error("failed to download file", "url", resp.Request.URL, "file", list[i].Name, "error", err)
+				slog.Error("failed to download file", "url", resp.Request.URL, "file", filename, "error", err)
 			}
 		}
 	}
@@ -130,9 +132,9 @@ func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, af
 	return nil
 }
 
-func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint Fingerprint, file *FileListItem) error {
+func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint Fingerprint, filename string, file *FileListItem) error {
 	f := File{
-		Path:    path.Join(c.account.path, fingerprint.String(), file.Name),
+		Path:    path.Join(c.account.path, fingerprint.String(), filename),
 		version: false,
 	}
 
@@ -153,26 +155,26 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 			(&url.URL{
 				Scheme: uriProtocolName,
 				Host:   address,
-				Path:   fmt.Sprintf("/p2p/%s/%s", fingerprint, file.Name),
+				Path:   fmt.Sprintf("/p2p/%s/%s", fingerprint, filename),
 			}).String(),
 		)
 
 	if err != nil {
-		return fmt.Errorf("failed to download file %s from peer %s: %w", file.Name, fingerprint, err)
+		return fmt.Errorf("failed to download file %s from peer %s: %w", filename, fingerprint, err)
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return fmt.Errorf("server returned status %s while downloading file %s from %s", resp.Status(), file.Name, resp.Request.URL)
+		return fmt.Errorf("server returned status %s while downloading file %s from %s", resp.Status(), filename, resp.Request.URL)
 	}
 
 	if len(resp.Body()) != int(file.Size) {
-		return fmt.Errorf("file size mismatch for %s: expected %d bytes, received %d bytes", file.Name, file.Size, len(resp.Body()))
+		return fmt.Errorf("file size mismatch for %s: expected %d bytes, received %d bytes", filename, file.Size, len(resp.Body()))
 	}
 
 	hash := sha256.Sum256(resp.Body())
 	h := fmt.Sprintf("%x", hash)
 	if h != file.Sum {
-		return fmt.Errorf("file hash mismatch for %s: expected %s, received %s", file.Name, file.Sum, h)
+		return fmt.Errorf("file hash mismatch for %s: expected %s, received %s", filename, file.Sum, h)
 	}
 
 	// Write to temporary file first for verification
@@ -187,7 +189,7 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 	err = tmpFile.VerifySignature(c.account, fingerprint)
 	if err != nil {
 		os.Remove(tmpPath) // Clean up temporary file
-		return fmt.Errorf("signature verification failed for %s: %w", file.Name, err)
+		return fmt.Errorf("signature verification failed for %s: %w", filename, err)
 	}
 
 	// Signature verified, move temp file to final location
