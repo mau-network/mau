@@ -31,7 +31,7 @@ type Server struct {
 }
 
 type FileListItem struct {
-	Name string `json:"name"`
+	Path string `json:"path"`
 	Size int64  `json:"size"`
 	Sum  string `json:"sum"`
 }
@@ -207,7 +207,7 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 		}
 
 		list = append(list, FileListItem{
-			Name: item.Name(),
+			Path: "/p2p/" + fpr.String() + "/" + item.Name(),
 			Size: size,
 			Sum:  hash,
 		})
