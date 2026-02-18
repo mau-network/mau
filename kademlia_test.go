@@ -187,7 +187,7 @@ func TestDHTServer(t *testing.T) {
 			}
 			b := s.dhtServer.sendFindPeer(context.Background(), bootstrap.Fingerprint())
 			assert.Equal(t, bootstrap.Fingerprint(), b.Fingerprint)
-			err := s.dhtServer.sendPing(b)
+			err := s.dhtServer.sendPing(context.Background(), b)
 			assert.NoError(t, err)
 		}
 	})

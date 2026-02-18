@@ -17,10 +17,11 @@ import (
 // Kademlia: A Peer-to-Peer Information System Based on the XOR Metric
 
 const (
-	dht_B            = FINGERPRINT_LEN * 8 // number of buckets
-	dht_K            = 20                  // max length of k bucket (replication parameter)
-	dht_ALPHA        = 3                   // parallelism factor
-	dht_STALL_PERIOD = time.Hour
+	dht_B                = FINGERPRINT_LEN * 8 // number of buckets
+	dht_K                = 20                  // max length of k bucket (replication parameter)
+	dht_ALPHA            = 3                   // parallelism factor
+	dht_STALL_PERIOD     = time.Hour
+	dht_PING_MIN_BACKOFF = 30 * time.Second // minimum time between pings to the same peer
 )
 
 // Peer is a reference to another instance of the program, identified by the
@@ -37,13 +38,16 @@ type dhtServer struct {
 	address       string
 	buckets       [dht_B]bucket
 	cancelRefresh context.CancelFunc
+	lastPing      map[Fingerprint]time.Time
+	lastPingMutex sync.RWMutex
 }
 
 func newDHTServer(account *Account, address string) *dhtServer {
 	d := &dhtServer{
-		mux:     http.NewServeMux(),
-		account: account,
-		address: address,
+		mux:      http.NewServeMux(),
+		account:  account,
+		address:  address,
+		lastPing: make(map[Fingerprint]time.Time),
 	}
 
 	d.mux.HandleFunc("GET /kad/ping", d.receivePing)
@@ -57,9 +61,17 @@ func (d *dhtServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // sendPing sends a ping to a peer and returns true if the peer response status isn't 2xx
-func (d *dhtServer) sendPing(peer *Peer) error {
-	// TODO limit pinging a peer in a period of time, we don't want to ping a
-	// peer multiple times per second for example, it's too much
+func (d *dhtServer) sendPing(ctx context.Context, peer *Peer) error {
+	// Rate limit pings to avoid excessive network traffic
+	d.lastPingMutex.RLock()
+	lastPingTime, exists := d.lastPing[peer.Fingerprint]
+	d.lastPingMutex.RUnlock()
+
+	if exists && time.Since(lastPingTime) < dht_PING_MIN_BACKOFF {
+		// Too soon since last ping, return nil (success) to avoid removing peer
+		return nil
+	}
+
 	client, err := d.account.Client(peer.Fingerprint, []string{d.address})
 	if err != nil {
 		return err
@@ -71,8 +83,14 @@ func (d *dhtServer) sendPing(peer *Peer) error {
 		Path:   "/kad/ping",
 	}
 
-	// TODO add context maybe
-	_, err = client.client.R().Get(u.String())
+	_, err = client.client.R().SetContext(ctx).Get(u.String())
+
+	if err == nil {
+		// Update last ping time on success
+		d.lastPingMutex.Lock()
+		d.lastPing[peer.Fingerprint] = time.Now()
+		d.lastPingMutex.Unlock()
+	}
 
 	return err
 }
@@ -280,7 +298,7 @@ func (d *dhtServer) addPeer(peer *Peer) {
 	} else if !bucket.isFull() {
 		bucket.addToTail(peer)
 	} else if existing := bucket.leastRecentlySeen(); existing != nil {
-		if d.sendPing(existing) == nil {
+		if d.sendPing(context.Background(), existing) == nil {
 			bucket.moveToTail(existing)
 		} else {
 			bucket.remove(existing)
