@@ -285,7 +285,12 @@ func (s *Server) version(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, err := s.account.GetFileVersion(fpr, segments[1], segments[2])
+	// Strip .version suffix from filename
+	// URL format: /p2p/{fpr}/{filename}.version/{hash}
+	// But GetFileVersion expects just {filename}
+	filename := strings.TrimSuffix(segments[1], ".version")
+
+	file, err := s.account.GetFileVersion(fpr, filename, segments[2])
 	if err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
