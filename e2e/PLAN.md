@@ -23,9 +23,15 @@
 
 ## Executive Summary
 
-This document outlines a comprehensive end-to-end (E2E) testing framework for **Mau**, a P2P file synchronization system built on Kademlia DHT. The framework enables testing of multi-peer scenarios including peer discovery, friend relationship formation, data synchronization, and resilience under adverse network conditions.
+This document outlines a comprehensive end-to-end (E2E) testing framework for **Mau**, a P2P file synchronization system built on Kademlia DHT. The framework provides **two complementary modes**:
+
+1. **Interactive CLI Mode** (`mau-e2e` tool) - Manual control and exploratory testing
+2. **Automated Testing Mode** (`go test`) - CI/CD integration and regression detection
+
+Both modes share the same core `testenv` library, ensuring consistency between manual exploration and automated validation.
 
 **Key Design Principles:**
+- **Interactive-first design** - Developers can see P2P behavior, not just assert it worked
 - **Deterministic by default, chaos-ready by design**
 - **Easy to add new test cases** with minimal boilerplate
 - **Rich observability** with comprehensive logging, tracing, and state inspection
@@ -34,12 +40,15 @@ This document outlines a comprehensive end-to-end (E2E) testing framework for **
 - **Production-grade reliability** for long-term maintenance
 
 **Primary Goals:**
-1. Test N Mau instances discovering each other via Kademlia DHT
-2. Verify friend relationship establishment and maintenance
-3. Validate file synchronization across peers
-4. Simulate network failures and verify recovery
-5. Stress test with varying peer counts (2-100+)
-6. Detect regressions before they reach production
+1. **[Interactive]** Enable manual exploration of P2P synchronization behavior
+2. **[Automated]** Test N Mau instances discovering each other via Kademlia DHT
+3. **[Automated]** Verify friend relationship establishment and maintenance
+4. **[Automated]** Validate file synchronization across peers
+5. **[Both]** Simulate network failures and verify recovery
+6. **[Automated]** Stress test with varying peer counts (2-100+)
+7. **[Automated]** Detect regressions before they reach production
+
+> **See Also:** [CLI_DESIGN.md](CLI_DESIGN.md) for detailed interactive CLI specifications
 
 ---
 
@@ -193,19 +202,36 @@ This document outlines a comprehensive end-to-end (E2E) testing framework for **
 
 ## Architecture Overview
 
-### High-Level Design
+### Dual-Mode Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Test Coordinator                         │
-│  (Go test harness using Testcontainers)                        │
-│                                                                 │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
-│  │  Test Setup  │→ │ Test Execute │→ │Test Teardown │         │
-│  └──────────────┘  └──────────────┘  └──────────────┘         │
-└────────────┬────────────────────────────────────────────────────┘
-             │
-             ▼
+┌────────────────────────────────────────────────────────────────┐
+│                     Mau E2E Framework                          │
+│                                                                │
+│  ┌──────────────────────┐    ┌──────────────────────┐         │
+│  │  Interactive Mode    │    │   Automated Mode     │         │
+│  │  (mau-e2e CLI)       │    │   (go test)          │         │
+│  │                      │    │                      │         │
+│  │  - Manual control    │    │  - CI/CD testing     │         │
+│  │  - Exploration       │    │  - Regression detect │         │
+│  │  - Debugging         │    │  - Assertions        │         │
+│  │  - Demonstrations    │    │  - Coverage tracking │         │
+│  └──────────┬───────────┘    └──────────┬───────────┘         │
+│             │                           │                     │
+│             └────────┬──────────────────┘                     │
+│                      ▼                                        │
+│           ┌──────────────────────┐                           │
+│           │   Shared Core        │                           │
+│           │   (testenv library)  │                           │
+│           │                      │                           │
+│           │  - Peer management   │                           │
+│           │  - Network control   │                           │
+│           │  - State persistence │                           │
+│           │  - Assertions        │                           │
+│           └──────────┬───────────┘                           │
+└──────────────────────┼───────────────────────────────────────┘
+                       │
+                       ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Docker Network (mau-test-net)               │
 │                                                                 │
@@ -731,21 +757,27 @@ mau/
 ## Implementation Phases
 
 ### Phase 1: Foundation (Weeks 1-2)
-**Goal:** Basic framework with simple 2-peer tests
+**Goal:** Basic framework with simple 2-peer tests + interactive CLI foundation
 
 **Deliverables:**
 - [ ] Docker image for Mau peer (`e2e/docker/Dockerfile.mau`)
-- [ ] Testcontainers integration (`e2e/framework/testenv/`)
-- [ ] Basic peer orchestration (start/stop/logs)
-- [ ] TC-001: Two-peer discovery
-- [ ] TC-002: Two-peer friend sync
+- [ ] Shared testenv library (`e2e/framework/testenv/`)
+- [ ] **Interactive CLI structure** (`e2e/cmd/mau-e2e/`)
+- [ ] **`mau-e2e up/down` commands**
+- [ ] **`mau-e2e peer add/list` commands**
+- [ ] State persistence (`~/.mau-e2e/`)
+- [ ] TC-001: Two-peer discovery (automated test)
+- [ ] TC-002: Two-peer friend sync (automated test)
 - [ ] Makefile for building and running tests
 - [ ] CI workflow (GitHub Actions)
 
 **Success Criteria:**
+- **Can start 2 peers with `mau-e2e up --peers 2`**
+- **Can list peers with `mau-e2e peer list`**
 - Tests run locally with `make test-e2e`
 - Tests pass in CI
 - Logs captured on failure
+- Same `testenv` library used by both CLI and tests
 
 **Key Files:**
 ```
@@ -795,31 +827,40 @@ func (e *TestEnv) Cleanup() {
 
 ---
 
-### Phase 2: Multi-Peer & Assertions (Weeks 3-4)
-**Goal:** Expand to multi-peer scenarios with rich assertions
+### Phase 2: Multi-Peer & Peer Interaction (Weeks 3-4)
+**Goal:** Expand to multi-peer scenarios + file/friend CLI commands
 
 **Deliverables:**
 - [ ] Custom assertion library (`e2e/framework/assertions/`)
   - `AssertFilesSynced(peers []*MauPeer, filename string, timeout time.Duration)`
   - `AssertDHTLookup(peer *MauPeer, targetFingerprint string, timeout time.Duration)`
   - `AssertFriendRelationship(peer1, peer2 *MauPeer)`
+- [ ] **`mau-e2e friend add/list` commands**
+- [ ] **`mau-e2e file add/list/cat` commands**
+- [ ] **`mau-e2e peer inspect` command**
 - [ ] TC-003: Multi-peer sync (5 peers)
 - [ ] TC-004: Version conflict resolution
 - [ ] Helper for complex friend graph setup
 - [ ] Documentation: `docs/writing-tests.md`
 
 **Success Criteria:**
+- **Can manually test 2-peer sync via CLI**
 - 5-peer test completes in < 2 minutes
 - Assertions provide clear failure messages
 - New test cases easy to write (< 50 lines)
 
 ---
 
-### Phase 3: Chaos Engineering (Weeks 5-6)
-**Goal:** Introduce Toxiproxy and resilience tests
+### Phase 3: Real-time Monitoring + Chaos (Weeks 5-6)
+**Goal:** Introduce Toxiproxy and real-time observability
 
 **Deliverables:**
 - [ ] Toxiproxy integration (`e2e/framework/testenv/toxiproxy.go`)
+- [ ] **`mau-e2e file watch` command (real-time sync events)**
+- [ ] **`mau-e2e status --watch` command (live dashboard)**
+- [ ] **`mau-e2e net partition/heal` commands**
+- [ ] **`mau-e2e net latency/limit` commands**
+- [ ] **Color-coded CLI output**
 - [ ] Proxy configuration per peer
 - [ ] TC-101: Peer crash during sync
 - [ ] TC-102: Network partition
@@ -829,6 +870,8 @@ func (e *TestEnv) Cleanup() {
 - [ ] Documentation: `docs/toxiproxy-guide.md`
 
 **Success Criteria:**
+- **Can observe sync happening in real-time via CLI**
+- **Can create network partitions interactively**
 - Toxiproxy dynamically controlled during tests
 - Chaos tests reproducible (same seed → same result)
 - Tests detect real bugs (validate against known issues)
@@ -894,10 +937,14 @@ func TestNetworkPartition(t *testing.T) {
 
 ---
 
-### Phase 5: Observability & Debugging (Weeks 9-10)
-**Goal:** Make failures easy to diagnose
+### Phase 5: Advanced CLI Features (Weeks 9-10)
+**Goal:** Complete interactive feature set
 
 **Deliverables:**
+- [ ] **Interactive shell mode (`mau-e2e shell`)**
+- [ ] **Predefined scenarios (`mau-e2e scenario <name>`)**
+- [ ] **Snapshot/restore (`mau-e2e snapshot/restore`)**
+- [ ] **DHT commands (`dht lookup/table`)**
 - [ ] Structured logging with trace IDs
 - [ ] Log aggregation script (`scripts/parse-logs.sh`)
 - [ ] State snapshot capture on failure (peer file trees, DHT tables)
@@ -906,6 +953,8 @@ func TestNetworkPartition(t *testing.T) {
 - [ ] Automatic log upload to CI artifacts
 
 **Success Criteria:**
+- **Interactive shell provides seamless workflow**
+- **Can prototype test scenarios interactively**
 - Failed test produces:
   - Full logs for all peers
   - File system state snapshots
@@ -931,19 +980,25 @@ func TestNetworkPartition(t *testing.T) {
 
 ---
 
-### Phase 6: CI/CD Integration & Security (Weeks 11-12)
-**Goal:** Production-ready testing pipeline and security validation
+### Phase 6: Polish & Documentation (Weeks 11-12)
+**Goal:** Production-ready framework with excellent docs
 
 **Deliverables:**
 - [ ] TC-301: Unauthorized file access
 - [ ] TC-302: DHT Sybil attack (basic version)
+- [ ] **Comprehensive CLI documentation**
+- [ ] **Video tutorial (screencast of interactive usage)**
+- [ ] **Example demo scripts**
 - [ ] Parallel test execution in CI
 - [ ] Test result caching (skip unchanged tests)
 - [ ] Nightly stress test runs
 - [ ] Security test suite in separate workflow
 - [ ] Badge generation (test pass rate, coverage)
+- [ ] Integration verification (ensure CLI + tests share code)
 
 **Success Criteria:**
+- **New developer can use CLI productively in < 15 minutes**
+- **Video tutorial demonstrates P2P sync visually**
 - CI pipeline completes in < 15 minutes (basic tests)
 - Nightly stress tests run without supervision
 - Security tests detect unauthorized access attempts
