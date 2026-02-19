@@ -344,7 +344,7 @@ func TestServerVersionEndpointWithDeletedFile(t *testing.T) {
 
 	resp, err := http.DefaultClient.Do(req)
 	assert.NoError(t, err)
-	if err != nil {
+	if resp == nil {
 		return // Make nilaway happy
 	}
 	// Should return 404 since file metadata is gone
