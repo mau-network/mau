@@ -299,7 +299,8 @@ func TestServerVersionEndpointWithDeletedFile(t *testing.T) {
 	defer server.Close()
 
 	// Add and update a file to create a version
-	file, err := account.AddFile(strings.NewReader("version 1"), "deleted.txt", []*Friend{friend})
+	var file *File
+	_, err = account.AddFile(strings.NewReader("version 1"), "deleted.txt", []*Friend{friend})
 	assert.NoError(t, err)
 	
 	file, err = account.AddFile(strings.NewReader("version 2"), "deleted.txt", []*Friend{friend})
@@ -343,6 +344,9 @@ func TestServerVersionEndpointWithDeletedFile(t *testing.T) {
 
 	resp, err := http.DefaultClient.Do(req)
 	assert.NoError(t, err)
+	if err != nil {
+		return // Make nilaway happy
+	}
 	// Should return 404 since file metadata is gone
 	// Even though the .versions directory might still exist physically
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
