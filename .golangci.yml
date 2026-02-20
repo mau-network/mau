@@ -1,0 +1,58 @@
+linters-settings:
+  gocyclo:
+    # Minimal cyclomatic complexity to report
+    min-complexity: 8
+  
+  cyclop:
+    # Maximum cyclomatic complexity of a function
+    max-complexity: 8
+    # Should ignore tests
+    skip-tests: true
+
+linters:
+  enable:
+    - gocyclo      # Checks function complexity
+    - cyclop       # Alternative cyclomatic complexity checker
+    - gocognit     # Checks cognitive complexity (similar to cyclomatic)
+  
+  disable:
+    - errcheck
+    - staticcheck
+    - unused
+
+run:
+  # Timeout for analysis
+  timeout: 5m
+  
+  # Include test files
+  tests: true
+
+issues:
+  # Maximum count of issues with the same text
+  max-same-issues: 0
+  
+  # Maximum issues count per one linter
+  max-issues-per-linter: 0
+  
+  # Which dirs to exclude
+  exclude-dirs:
+    - vendor
+    - .git
+    - .github
+    - gui-poc
+    - gotk4-adwaita
+  
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - cyclop
+        - gocognit
+    
+    # Exclude cmd/mau/mau.go - it's a CLI dispatcher that needs refactoring separately
+    - path: cmd/mau/mau\.go
+      linters:
+        - gocyclo
+        - cyclop
+        - gocognit

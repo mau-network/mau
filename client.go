@@ -63,29 +63,25 @@ func (a *Account) Client(peer Fingerprint, DNSNames []string) (*Client, error) {
 	return c, nil
 }
 
-func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, after time.Time, fingerprintResolvers []FingerprintResolver) error {
-	followed := path.Join(c.account.path, fingerprint.String())
-	if _, err := os.Stat(followed); err != nil {
-		return ErrFriendNotFollowed
-	}
-
+func (c *Client) resolveFingerprintAddress(ctx context.Context, fingerprint Fingerprint, resolvers []FingerprintResolver) (string, error) {
 	addresses := make(chan string, 1)
 
 	// ask all resolvers for the address concurrently
-	for _, fr := range fingerprintResolvers {
+	for _, fr := range resolvers {
 		go func(resolver FingerprintResolver) {
 			_ = resolver(ctx, fingerprint, addresses)
 		}(fr)
 	}
 
-	var address string
 	select {
-	case address = <-addresses:
+	case address := <-addresses:
+		return address, nil
 	case <-ctx.Done():
-		return ErrCantFindFriend
+		return "", ErrCantFindFriend
 	}
+}
 
-	// Get list of remote files since the last modification we have
+func (c *Client) fetchFileList(ctx context.Context, fingerprint Fingerprint, address string, after time.Time) ([]FileListItem, error) {
 	var list []FileListItem
 
 	resp, err := c.client.
@@ -103,24 +99,128 @@ func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, af
 		)
 
 	if err != nil {
-		return fmt.Errorf("failed to request file list from peer %s: %w", fingerprint, err)
+		return nil, fmt.Errorf("failed to request file list from peer %s: %w", fingerprint, err)
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return fmt.Errorf("peer %s responded with error status %s", fingerprint, resp.Status())
+		return nil, fmt.Errorf("peer %s responded with error status %s", fingerprint, resp.Status())
 	}
 
-	// Download each file in order
+	return list, nil
+}
+
+func (c *Client) downloadFiles(ctx context.Context, address string, fingerprint Fingerprint, list []FileListItem) error {
 	for i := range list {
 		select {
 		case <-ctx.Done():
 			return nil
 		default:
-			err = c.DownloadFile(ctx, address, fingerprint, &list[i])
+			err := c.DownloadFile(ctx, address, fingerprint, &list[i])
 			if err != nil {
-				slog.Error("failed to download file", "url", resp.Request.URL, "file", list[i].Name, "error", err)
+				slog.Error("failed to download file", "file", list[i].Name, "error", err)
 			}
 		}
+	}
+	return nil
+}
+
+func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, after time.Time, fingerprintResolvers []FingerprintResolver) error {
+	followed := path.Join(c.account.path, fingerprint.String())
+	if _, err := os.Stat(followed); err != nil {
+		return ErrFriendNotFollowed
+	}
+
+	address, err := c.resolveFingerprintAddress(ctx, fingerprint, fingerprintResolvers)
+	if err != nil {
+		return err
+	}
+
+	list, err := c.fetchFileList(ctx, fingerprint, address, after)
+	if err != nil {
+		return err
+	}
+
+	return c.downloadFiles(ctx, address, fingerprint, list)
+}
+
+func (c *Client) fileAlreadyExists(f *File, expectedSize int64, expectedHash string) bool {
+	s, err := f.Size()
+	if err != nil || s != expectedSize {
+		return false
+	}
+
+	h, err := f.Hash()
+	return err == nil && h == expectedHash
+}
+
+func (c *Client) downloadFileContent(ctx context.Context, address string, fingerprint Fingerprint, fileName string) ([]byte, error) {
+	resp, err := c.client.
+		R().
+		SetContext(ctx).
+		Get(
+			(&url.URL{
+				Scheme: uriProtocolName,
+				Host:   address,
+				Path:   fmt.Sprintf("/p2p/%s/%s", fingerprint, fileName),
+			}).String(),
+		)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to download file %s from peer %s: %w", fileName, fingerprint, err)
+	}
+
+	if resp.StatusCode() != http.StatusOK {
+		return nil, fmt.Errorf("server returned status %s while downloading file %s from %s", resp.Status(), fileName, resp.Request.URL)
+	}
+
+	return resp.Body(), nil
+}
+
+func validateDownloadedContent(data []byte, file *FileListItem) error {
+	if len(data) != int(file.Size) {
+		return fmt.Errorf("file size mismatch for %s: expected %d bytes, received %d bytes", file.Name, file.Size, len(data))
+	}
+
+	hash := sha256.Sum256(data)
+	h := fmt.Sprintf("%x", hash)
+	if h != file.Sum {
+		return fmt.Errorf("file hash mismatch for %s: expected %s, received %s", file.Name, file.Sum, h)
+	}
+
+	return nil
+}
+
+func (c *Client) writeAndVerifyTemp(data []byte, tmpPath string, fingerprint Fingerprint) error {
+	if err := os.WriteFile(tmpPath, data, FilePerm); err != nil {
+		return fmt.Errorf("failed to write temporary file: %w", err)
+	}
+
+	tmpFile := &File{Path: tmpPath}
+	if err := tmpFile.VerifySignature(c.account, fingerprint); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("signature verification failed: %w", err)
+	}
+
+	return nil
+}
+
+func createVersionBackup(f *File, tmpPath string) error {
+	existingHash, err := f.Hash()
+	if err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to hash existing file for versioning: %w", err)
+	}
+
+	versionsDir := f.Path + ".versions"
+	if err := os.MkdirAll(versionsDir, DirPerm); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to create versions directory: %w", err)
+	}
+
+	versionPath := path.Join(versionsDir, existingHash)
+	if err := os.Rename(f.Path, versionPath); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to save file version: %w", err)
 	}
 
 	return nil
@@ -132,86 +232,38 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 		version: false,
 	}
 
-	// check if it's the same file first by checking the size if it's not the same size then we can download it
-	// if it's the same size then lets double check by summing it
-	s, err := f.Size()
-	if err == nil && s == file.Size {
-		h, err := f.Hash()
-		if err == nil && h == file.Sum {
-			return nil
-		}
+	// Check if file already exists with same content
+	if c.fileAlreadyExists(&f, file.Size, file.Sum) {
+		return nil
 	}
 
-	resp, err := c.client.
-		R().
-		SetContext(ctx).
-		Get(
-			(&url.URL{
-				Scheme: uriProtocolName,
-				Host:   address,
-				Path:   fmt.Sprintf("/p2p/%s/%s", fingerprint, file.Name),
-			}).String(),
-		)
-
+	// Download file content
+	data, err := c.downloadFileContent(ctx, address, fingerprint, file.Name)
 	if err != nil {
-		return fmt.Errorf("failed to download file %s from peer %s: %w", file.Name, fingerprint, err)
+		return err
 	}
 
-	if resp.StatusCode() != http.StatusOK {
-		return fmt.Errorf("server returned status %s while downloading file %s from %s", resp.Status(), file.Name, resp.Request.URL)
+	// Validate downloaded content
+	if err := validateDownloadedContent(data, file); err != nil {
+		return err
 	}
 
-	if len(resp.Body()) != int(file.Size) {
-		return fmt.Errorf("file size mismatch for %s: expected %d bytes, received %d bytes", file.Name, file.Size, len(resp.Body()))
-	}
-
-	hash := sha256.Sum256(resp.Body())
-	h := fmt.Sprintf("%x", hash)
-	if h != file.Sum {
-		return fmt.Errorf("file hash mismatch for %s: expected %s, received %s", file.Name, file.Sum, h)
-	}
-
-	// Write to temporary file first for verification
+	// Write to temporary file and verify signature
 	tmpPath := f.Path + ".tmp"
-	err = os.WriteFile(tmpPath, resp.Body(), FilePerm)
-	if err != nil {
-		return fmt.Errorf("failed to write temporary file: %w", err)
+	if err := c.writeAndVerifyTemp(data, tmpPath, fingerprint); err != nil {
+		return err
 	}
 
-	// Verify signature before accepting the file
-	tmpFile := &File{Path: tmpPath}
-	err = tmpFile.VerifySignature(c.account, fingerprint)
-	if err != nil {
-		os.Remove(tmpPath) // Clean up temporary file
-		return fmt.Errorf("signature verification failed for %s: %w", file.Name, err)
-	}
-
-	// Signature verified, move temp file to final location
-	// Before overwriting, save existing version if it exists
+	// Create version backup if file exists
 	if _, err := os.Stat(f.Path); err == nil {
-		// File exists, create version backup
-		existingHash, err := f.Hash()
-		if err != nil {
-			os.Remove(tmpPath)
-			return fmt.Errorf("failed to hash existing file for versioning: %w", err)
-		}
-
-		versionsDir := f.Path + ".versions"
-		if err := os.MkdirAll(versionsDir, DirPerm); err != nil {
-			os.Remove(tmpPath)
-			return fmt.Errorf("failed to create versions directory: %w", err)
-		}
-
-		versionPath := path.Join(versionsDir, existingHash)
-		if err := os.Rename(f.Path, versionPath); err != nil {
-			os.Remove(tmpPath)
-			return fmt.Errorf("failed to save file version: %w", err)
+		if err := createVersionBackup(&f, tmpPath); err != nil {
+			return err
 		}
 	}
 
-	err = os.Rename(tmpPath, f.Path)
-	if err != nil {
-		os.Remove(tmpPath) // Clean up temporary file
+	// Move verified temp file to final location
+	if err := os.Rename(tmpPath, f.Path); err != nil {
+		os.Remove(tmpPath)
 		return fmt.Errorf("failed to save verified file: %w", err)
 	}
 
