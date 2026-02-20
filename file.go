@@ -117,6 +117,9 @@ func readAndVerifyMessage(data []byte, keyring openpgp.EntityList) (*openpgp.Mes
 	if err != nil {
 		return nil, fmt.Errorf("failed to read OpenPGP message: %w", err)
 	}
+	if md == nil {
+		return nil, errors.New("ReadMessage returned nil message details")
+	}
 
 	if !md.IsSigned {
 		return nil, errors.New("file is not signed")
