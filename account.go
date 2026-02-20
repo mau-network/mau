@@ -198,12 +198,28 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 		err = errors.New("account or entity is incomplete")
 		return
 	}
-	template := x509.Certificate{
+
+	template := buildCertificateTemplate(DNSNames, a.entity.PrimaryKey.CreationTime)
+	rsakey, err := extractRSAKeyFromEntity(a.entity)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+
+	derBytes, err := x509.CreateCertificate(nil, &template, &template, &rsakey.PublicKey, rsakey)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+
+	return encodeCertificateAndKey(rsakey, derBytes)
+}
+
+func buildCertificateTemplate(dnsNames []string, creationTime time.Time) x509.Certificate {
+	return x509.Certificate{
 		Version:      3,
-		DNSNames:     DNSNames,
+		DNSNames:     dnsNames,
 		SerialNumber: big.NewInt(1),
-		NotBefore:    a.entity.PrimaryKey.CreationTime,
-		NotAfter:     a.entity.PrimaryKey.CreationTime.AddDate(100, 0, 0),
+		NotBefore:    creationTime,
+		NotAfter:     creationTime.AddDate(100, 0, 0),
 		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{
 			x509.ExtKeyUsageServerAuth,
@@ -211,17 +227,17 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 		},
 		BasicConstraintsValid: true,
 	}
+}
 
-	privkey, ok := a.entity.PrivateKey.PrivateKey.(*rsa.PrivateKey)
+func extractRSAKeyFromEntity(entity *openpgp.Entity) (*rsa.PrivateKey, error) {
+	privkey, ok := entity.PrivateKey.PrivateKey.(*rsa.PrivateKey)
 	if !ok {
-		err = ErrCannotConvertPrivateKey
-		return
+		return nil, ErrCannotConvertPrivateKey
 	}
 
-	pubkey, ok := a.entity.PrimaryKey.PublicKey.(*rsa.PublicKey)
+	pubkey, ok := entity.PrimaryKey.PublicKey.(*rsa.PublicKey)
 	if !ok {
-		err = ErrCannotConvertPublicKey
-		return
+		return nil, ErrCannotConvertPublicKey
 	}
 
 	crtvalues := []rsa.CRTValue{}
@@ -230,7 +246,7 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 		crtvalues = append(crtvalues, rsa.CRTValue(i))
 	}
 
-	rsakey := rsa.PrivateKey{
+	return &rsa.PrivateKey{
 		PublicKey: rsa.PublicKey{
 			N: pubkey.N,
 			E: int(pubkey.E),
@@ -243,16 +259,11 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 			Qinv:      privkey.Precomputed.Qinv,
 			CRTValues: crtvalues,
 		},
-	}
+	}, nil
+}
 
-	// Go 1.26: rand.Reader parameter ignored, always uses secure random source
-	var derBytes []byte
-	derBytes, err = x509.CreateCertificate(nil, &template, &template, &rsakey.PublicKey, &rsakey)
-	if err != nil {
-		return
-	}
-
-	keyPem := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(&rsakey)}
+func encodeCertificateAndKey(rsakey *rsa.PrivateKey, derBytes []byte) (tls.Certificate, error) {
+	keyPem := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(rsakey)}
 	certPem := &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}
 
 	var keyPemBytes bytes.Buffer
@@ -268,59 +279,79 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 	return tls.X509KeyPair(certPemBytes.Bytes(), keyPemBytes.Bytes())
 }
 
+func (a *Account) handleFileVersioning(filePath string) error {
+	file := File{Path: filePath}
+	hash, err := file.Hash()
+	if err != nil {
+		return err
+	}
+
+	versionsDir := filePath + ".versions"
+	if err = os.MkdirAll(versionsDir, DirPerm); err != nil {
+		return err
+	}
+
+	return os.Rename(filePath, path.Join(versionsDir, hash))
+}
+
+func (a *Account) prepareEncryptionEntities(recipients []*Friend) []*openpgp.Entity {
+	entities := []*openpgp.Entity{a.entity}
+	for _, f := range recipients {
+		entities = append(entities, f.entity)
+	}
+	return entities
+}
+
 func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File, error) {
 	if path.Ext(name) != ".pgp" {
 		name += ".pgp"
 	}
 
 	fpr := a.Fingerprint().String()
-
 	if err := os.MkdirAll(path.Join(a.path, fpr), DirPerm); err != nil {
 		return nil, err
 	}
 
 	p := path.Join(a.path, fpr, name)
+	if err := a.handleExistingFile(p); err != nil {
+		return nil, err
+	}
+
+	if err := a.writeEncryptedFile(p, r, recipients); err != nil {
+		return nil, err
+	}
+
+	return &File{Path: p}, nil
+}
+
+func (a *Account) handleExistingFile(p string) error {
 	if _, err := os.Stat(p); err == nil {
-		file := File{Path: p}
-		np, err := file.Hash()
-		if err != nil {
-			return nil, err
-		}
-
-		if err = os.MkdirAll(p+".versions", DirPerm); err != nil {
-			return nil, err
-		}
-
-		if err = os.Rename(p, path.Join(p+".versions", np)); err != nil {
-			return nil, err
-		}
+		return a.handleFileVersioning(p)
 	}
+	return nil
+}
 
-	entities := []*openpgp.Entity{a.entity}
-	for _, f := range recipients {
-		entities = append(entities, f.entity)
-	}
+func (a *Account) writeEncryptedFile(p string, r io.Reader, recipients []*Friend) error {
+	entities := a.prepareEncryptionEntities(recipients)
 
 	file, err := os.Create(p)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer file.Close()
 
 	w, err := openpgp.Encrypt(file, entities, a.entity, nil, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if w == nil {
-		return nil, errors.New("openpgp.Encrypt returned nil writer")
+		return errors.New("openpgp.Encrypt returned nil writer")
 	}
 
 	if _, err := io.Copy(w, r); err != nil {
-		return nil, err
+		return err
 	}
-	w.Close()
-
-	return &File{Path: p}, nil
+	return w.Close()
 }
 
 func (a *Account) RemoveFile(file *File) error {
@@ -363,22 +394,12 @@ func (a *Account) resolveFriendPath(fpr Fingerprint, subpath string) (string, er
 	return "", os.ErrNotExist
 }
 
-func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint) []*File {
-	dirpath, err := a.resolveFriendPath(fingerprint, "")
-	if err != nil {
-		return []*File{}
-	}
+type dirEntry struct {
+	entry        fs.DirEntry
+	modification time.Time
+}
 
-	files, err := os.ReadDir(dirpath)
-	if err != nil {
-		return []*File{}
-	}
-
-	type dirEntry struct {
-		entry        fs.DirEntry
-		modification time.Time
-	}
-
+func filterRecentFiles(files []fs.DirEntry, after time.Time) []dirEntry {
 	recent := []dirEntry{}
 	for _, f := range files {
 		if !f.Type().IsRegular() {
@@ -400,8 +421,11 @@ func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint
 			modification: mod,
 		})
 	}
+	return recent
+}
 
-	slices.SortFunc(recent, func(a, b dirEntry) int {
+func sortByModificationTime(entries []dirEntry) {
+	slices.SortFunc(entries, func(a, b dirEntry) int {
 		if a.modification.Before(b.modification) {
 			return -1
 		}
@@ -410,17 +434,29 @@ func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint
 		}
 		return 0
 	})
+}
 
-	if uint(len(recent)) < limit {
-		limit = uint(len(recent))
+func applyLimit(entries []dirEntry, limit uint) []dirEntry {
+	if limit == 0 || uint(len(entries)) <= limit {
+		return entries
+	}
+	return entries[:limit]
+}
+
+func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint) []*File {
+	dirpath, err := a.resolveFriendPath(fingerprint, "")
+	if err != nil {
+		return []*File{}
 	}
 
-	page := recent
-
-	// if limit was 0 then it's unlimited
-	if limit > 0 {
-		page = recent[:limit]
+	files, err := os.ReadDir(dirpath)
+	if err != nil {
+		return []*File{}
 	}
+
+	recent := filterRecentFiles(files, after)
+	sortByModificationTime(recent)
+	page := applyLimit(recent, limit)
 
 	list := make([]*File, 0, len(page))
 	for _, item := range page {

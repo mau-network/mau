@@ -22,18 +22,31 @@ var (
 )
 
 // validateFileName checks if a filename is safe and doesn't contain path traversal attempts
+func containsPathSeparator(name string) bool {
+	return strings.Contains(name, string(filepath.Separator)) ||
+		strings.Contains(name, "/") ||
+		strings.Contains(name, "\\")
+}
+
+func isRelativePathComponent(name string) bool {
+	return name == "." ||
+		name == ".." ||
+		strings.HasPrefix(name, "."+string(filepath.Separator)) ||
+		strings.HasPrefix(name, ".."+string(filepath.Separator))
+}
+
 func validateFileName(name string) error {
 	if name == "" {
 		return fmt.Errorf("%w: empty filename", ErrInvalidFileName)
 	}
 
 	// Check for path separators
-	if strings.Contains(name, string(filepath.Separator)) || strings.Contains(name, "/") || strings.Contains(name, "\\") {
+	if containsPathSeparator(name) {
 		return fmt.Errorf("%w: contains path separators", ErrInvalidFileName)
 	}
 
 	// Check for relative path components
-	if name == "." || name == ".." || strings.HasPrefix(name, "."+string(filepath.Separator)) || strings.HasPrefix(name, ".."+string(filepath.Separator)) {
+	if isRelativePathComponent(name) {
 		return fmt.Errorf("%w: contains relative path components", ErrInvalidFileName)
 	}
 
@@ -83,6 +96,62 @@ func (f *File) Versions() []*File {
 	return versions
 }
 
+func buildVerificationKeyring(account *Account, friends *Keyring) openpgp.EntityList {
+	keyring := openpgp.EntityList{account.entity}
+	for _, friend := range friends.FriendsSet() {
+		keyring = append(keyring, friend.entity)
+	}
+	return keyring
+}
+
+func verifyExpectedSigner(friends *Keyring, expectedSigner Fingerprint) error {
+	expectedSignerFriend := friends.FindByFingerprint(expectedSigner)
+	if expectedSignerFriend == nil {
+		return fmt.Errorf("signer %s not in friend list", expectedSigner)
+	}
+	return nil
+}
+
+func readAndVerifyMessage(data []byte, keyring openpgp.EntityList) (*openpgp.MessageDetails, error) {
+	md, err := openpgp.ReadMessage(bytes.NewReader(data), keyring, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read OpenPGP message: %w", err)
+	}
+	if md == nil {
+		return nil, errors.New("ReadMessage returned nil message details")
+	}
+
+	if !md.IsSigned {
+		return nil, errors.New("file is not signed")
+	}
+
+	// Read the entire message to trigger signature verification
+	_, err = io.ReadAll(md.UnverifiedBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read message body: %w", err)
+	}
+
+	if md.SignatureError != nil {
+		return nil, fmt.Errorf("invalid signature: %w", md.SignatureError)
+	}
+
+	return md, nil
+}
+
+func checkSignerIdentity(md *openpgp.MessageDetails, expectedSigner Fingerprint) error {
+	if md.SignedBy == nil || md.SignedBy.PublicKey == nil {
+		return errors.New("no valid signature found")
+	}
+
+	actualSigner := Fingerprint(md.SignedBy.PublicKey.Fingerprint)
+	if actualSigner != expectedSigner {
+		return fmt.Errorf("file signed by unexpected key: got %s, expected %s",
+			actualSigner, expectedSigner)
+	}
+
+	return nil
+}
+
 // VerifySignature verifies that a file was signed by the expected peer and is encrypted for the account
 func (f *File) VerifySignature(account *Account, expectedSigner Fingerprint) error {
 	data, err := os.ReadFile(f.Path)
@@ -96,55 +165,48 @@ func (f *File) VerifySignature(account *Account, expectedSigner Fingerprint) err
 		return fmt.Errorf("failed to list friends for signature verification: %w", err)
 	}
 
-	// Verify expected signer is in friend list
-	expectedSignerFriend := friends.FindByFingerprint(expectedSigner)
-	if expectedSignerFriend == nil {
-		return fmt.Errorf("signer %s not in friend list", expectedSigner)
+	if err := verifyExpectedSigner(friends, expectedSigner); err != nil {
+		return err
 	}
 
-	// Create keyring with account's private key (for decryption) and all friends' public keys (for signature verification)
-	keyring := openpgp.EntityList{account.entity}
-	for _, friend := range friends.FriendsSet() {
-		keyring = append(keyring, friend.entity)
-	}
-
-	// Try to read and verify the message
-	md, err := openpgp.ReadMessage(bytes.NewReader(data), keyring, nil, nil)
+	keyring := buildVerificationKeyring(account, friends)
+	md, err := readAndVerifyMessage(data, keyring)
 	if err != nil {
-		return fmt.Errorf("failed to read OpenPGP message: %w", err)
+		return err
 	}
 	if md == nil {
 		return errors.New("openpgp.ReadMessage returned nil")
 	}
 
-	// Check if message is signed
-	if !md.IsSigned {
-		return errors.New("file is not signed")
+	return checkSignerIdentity(md, expectedSigner)
+}
+
+func extractEncryptedKeyIDs(r io.Reader) ([]uint64, error) {
+	packets := packet.NewReader(r)
+	keysIDs := []uint64{}
+
+	for {
+		p, err := packets.Next()
+		if err != nil {
+			break
+		}
+
+		if encKey, ok := p.(*packet.EncryptedKey); ok {
+			keysIDs = append(keysIDs, encKey.KeyId)
+		}
 	}
 
-	// Read the entire message to trigger signature verification
-	_, err = io.ReadAll(md.UnverifiedBody)
-	if err != nil {
-		return fmt.Errorf("failed to read message body: %w", err)
-	}
+	return keysIDs, nil
+}
 
-	// Check signature validity
-	if md.SignatureError != nil {
-		return fmt.Errorf("invalid signature: %w", md.SignatureError)
+func friendsByKeyIDs(keyring *Keyring, keyIDs []uint64) []*Friend {
+	recipients := []*Friend{}
+	for _, id := range keyIDs {
+		if friend := keyring.FriendById(id); friend != nil {
+			recipients = append(recipients, friend)
+		}
 	}
-
-	// Verify the signer is who we expect
-	if md.SignedBy == nil || md.SignedBy.PublicKey == nil {
-		return errors.New("no valid signature found")
-	}
-
-	actualSigner := Fingerprint(md.SignedBy.PublicKey.Fingerprint)
-	if actualSigner != expectedSigner {
-		return fmt.Errorf("file signed by unexpected key: got %s, expected %s",
-			actualSigner, expectedSigner)
-	}
-
-	return nil
+	return recipients
 }
 
 func (f *File) Recipients(account *Account) ([]*Friend, error) {
@@ -163,30 +225,12 @@ func (f *File) Recipients(account *Account) ([]*Friend, error) {
 		return nil, err
 	}
 
-	packets := packet.NewReader(r)
-	keysIDs := []uint64{}
-
-	for {
-		p, err := packets.Next()
-		if err != nil {
-			break
-		}
-
-		switch p := p.(type) {
-		case *packet.EncryptedKey:
-			keysIDs = append(keysIDs, p.KeyId)
-		}
+	keysIDs, err := extractEncryptedKeyIDs(r)
+	if err != nil {
+		return nil, err
 	}
 
-	recipients := []*Friend{}
-	for _, id := range keysIDs {
-		friend := k.FriendById(id)
-		if friend != nil {
-			recipients = append(recipients, friend)
-		}
-	}
-
-	return recipients, nil
+	return friendsByKeyIDs(k, keysIDs), nil
 }
 
 func (f *File) Reader(account *Account) (io.Reader, error) {

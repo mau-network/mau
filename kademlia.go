@@ -105,6 +105,31 @@ func (d *dhtServer) receivePing(w http.ResponseWriter, r *http.Request) {
 }
 
 // Lookup a peer by fingerprint
+func (d *dhtServer) findPeerInNearest(nearest []*Peer, fingerprint Fingerprint) *Peer {
+	for _, n := range nearest {
+		if n.Fingerprint == fingerprint {
+			return n
+		}
+	}
+	return nil
+}
+
+func (d *dhtServer) runFindPeerWorker(ctx context.Context, fingerprint Fingerprint, peers *peerRequestSet, found **Peer, cancel context.CancelFunc) {
+	for peers.len() > 0 && *found == nil {
+		f, err := d.sendFindPeerWorker(ctx, fingerprint, peers)
+
+		if err != nil {
+			slog.Error("failed to find peer", "fingerprint", fingerprint, "error", err)
+		}
+
+		if f != nil {
+			*found = f
+			cancel()
+			break
+		}
+	}
+}
+
 func (d *dhtServer) sendFindPeer(ctx context.Context, fingerprint Fingerprint) (found *Peer) {
 	nearest := d.nearest(fingerprint, dht_ALPHA)
 	nearest_count := len(nearest)
@@ -114,10 +139,8 @@ func (d *dhtServer) sendFindPeer(ctx context.Context, fingerprint Fingerprint) (
 	}
 
 	// if we already have it return it
-	for _, n := range nearest {
-		if n.Fingerprint == fingerprint {
-			return n
-		}
+	if existing := d.findPeerInNearest(nearest, fingerprint); existing != nil {
+		return existing
 	}
 
 	peers := newPeerRequestSet(fingerprint, nearest)
@@ -129,19 +152,7 @@ func (d *dhtServer) sendFindPeer(ctx context.Context, fingerprint Fingerprint) (
 
 	for i := 0; i < nearest_count; i++ {
 		go func() {
-			for peers.len() > 0 && found == nil {
-				f, err := d.sendFindPeerWorker(workersCtx, fingerprint, peers)
-
-				if err != nil {
-					slog.Error("failed to find peer", "fingerprint", fingerprint, "error", err)
-				}
-
-				if f != nil {
-					found = f
-					cancel()
-					break
-				}
-			}
+			d.runFindPeerWorker(workersCtx, fingerprint, peers, &found, cancel)
 			wg.Done()
 		}()
 	}
@@ -320,6 +331,18 @@ func (d *dhtServer) refreshAllBuckets(ctx context.Context) {
 }
 
 // Refresh stall buckets
+func (d *dhtServer) calculateNextRefreshTime(bucketIdx int, currentNextClick time.Duration) time.Duration {
+	stallAfter := dht_STALL_PERIOD - time.Since(d.buckets[bucketIdx].lastLookup)
+	if stallAfter < currentNextClick {
+		return stallAfter
+	}
+	return currentNextClick
+}
+
+func (d *dhtServer) shouldRefreshBucket(bucketIdx int) bool {
+	return time.Since(d.buckets[bucketIdx].lastLookup) >= dht_STALL_PERIOD
+}
+
 func (d *dhtServer) refreshStallBuckets(ctx context.Context) {
 	nextClick := time.Duration(0)
 
@@ -336,24 +359,17 @@ func (d *dhtServer) refreshStallBuckets(ctx context.Context) {
 			// we'll go over all buckets and refresh the bucket or exit
 			for i := range d.buckets {
 				// if it's refreshable we'll refresh it
-				if time.Since(d.buckets[i].lastLookup) >= dht_STALL_PERIOD {
+				if d.shouldRefreshBucket(i) {
 					select {
 					case <-ctx.Done():
 						return
 					default:
 						d.refreshBucket(ctx, i)
 					}
-
 				} else {
-					// if it's not refreshable then calculate when it's gonna
-					// need refresh and move next click earlier if needed
-					stallAfter := dht_STALL_PERIOD - time.Since(d.buckets[i].lastLookup)
-					if stallAfter < nextClick {
-						nextClick = stallAfter
-					}
+					nextClick = d.calculateNextRefreshTime(i, nextClick)
 				}
 			}
-
 		}
 	}
 }
