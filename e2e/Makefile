@@ -16,10 +16,12 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
 
 # Docker Image Build
-build-image: ## Build Mau E2E Docker image
+docker-build: ## Build Mau E2E Docker image
 	@echo "Building Mau E2E Docker image..."
-	docker build -t $(DOCKER_IMAGE) -f docker/Dockerfile.mau ..
+	docker build -t $(DOCKER_IMAGE) -f docker/Dockerfile ..
 	@echo "✓ Image built: $(DOCKER_IMAGE)"
+
+build-image: docker-build ## Alias for docker-build
 
 build-image-dev: ## Build development image with debug symbols
 	@echo "Building Mau E2E development image..."
@@ -31,16 +33,24 @@ push-image: build-image ## Push image to registry (requires login)
 	docker push ghcr.io/mau-network/mau-e2e:latest
 
 # CLI Installation
-install-cli: ## Install mau-e2e CLI tool
+cli: ## Build mau-e2e CLI tool
+	@echo "Building mau-e2e CLI..."
+	cd cmd/mau-e2e && go build -o ../../bin/mau-e2e .
+	@echo "✓ CLI built: bin/mau-e2e"
+	@echo "  Run './bin/mau-e2e --help' to get started"
+
+install-cli: ## Install mau-e2e CLI tool to GOPATH
 	@echo "Installing mau-e2e CLI..."
-	go install ./cmd/mau-e2e
+	cd cmd/mau-e2e && go install .
 	@echo "✓ CLI installed to $(shell go env GOPATH)/bin/mau-e2e"
 	@echo "  Run 'mau-e2e --help' to get started"
 
 # Testing - Automated
-test-e2e: build-image ## Run all E2E tests
-	@echo "Running all E2E tests..."
-	MAU_E2E_IMAGE=$(DOCKER_IMAGE) go test -v -timeout 60m ./scenarios/...
+test: docker-build ## Run basic E2E tests
+	@echo "Running basic E2E tests..."
+	MAU_E2E_IMAGE=$(DOCKER_IMAGE) go test -v -timeout 10m ./tests/...
+
+test-e2e: test ## Alias for test
 
 test-e2e-ci: build-image ## Run E2E tests optimized for CI
 	@echo "Running E2E tests (CI mode)..."

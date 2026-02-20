@@ -1,0 +1,9 @@
+# E2E Testing Framework Build Artifacts
+bin/
+*.test
+*.out
+coverage.*
+test-results/
+
+# State files
+.mau-e2e/
