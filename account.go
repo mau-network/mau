@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"io"
@@ -429,4 +430,68 @@ func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint
 	}
 
 	return list
+}
+
+// syncState tracks the last successful sync time for each friend
+type syncState struct {
+	LastSync map[string]time.Time `json:"last_sync"`
+}
+
+func syncStateFile(d string) string { return path.Join(mauDir(d), syncStateFilename) }
+
+// GetLastSyncTime returns the last successful sync time for a friend
+// Returns zero time if no sync has occurred
+func (a *Account) GetLastSyncTime(fpr Fingerprint) time.Time {
+	state, err := a.loadSyncState()
+	if err != nil {
+		return time.Time{}
+	}
+	
+	if lastSync, exists := state.LastSync[fpr.String()]; exists {
+		return lastSync
+	}
+	
+	return time.Time{}
+}
+
+// UpdateLastSyncTime records the time of the last successful sync for a friend
+func (a *Account) UpdateLastSyncTime(fpr Fingerprint, syncTime time.Time) error {
+	state, err := a.loadSyncState()
+	if err != nil {
+		// If file doesn't exist, create new state
+		state = &syncState{
+			LastSync: make(map[string]time.Time),
+		}
+	}
+	
+	state.LastSync[fpr.String()] = syncTime
+	
+	return a.saveSyncState(state)
+}
+
+func (a *Account) loadSyncState() (*syncState, error) {
+	filePath := syncStateFile(a.path)
+	
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	
+	var state syncState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return nil, err
+	}
+	
+	return &state, nil
+}
+
+func (a *Account) saveSyncState(state *syncState) error {
+	filePath := syncStateFile(a.path)
+	
+	data, err := json.Marshal(state)
+	if err != nil {
+		return err
+	}
+	
+	return os.WriteFile(filePath, data, FilePerm)
 }

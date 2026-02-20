@@ -11,6 +11,7 @@ const (
 	mDNSServiceName    = "_mau._tcp"
 	mauDirName         = ".mau"
 	accountKeyFilename = "account.pgp"
+	syncStateFilename  = "sync_state.json"
 	DirPerm            = 0700
 	FilePerm           = 0600
 	uriProtocolName    = "https"

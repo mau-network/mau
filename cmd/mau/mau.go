@@ -351,6 +351,7 @@ func main() {
 		syncCmd := flag.NewFlagSet("sync", flag.ExitOnError)
 		fprStr := syncCmd.String("fingerprint", "", "user fingerprint to sync files")
 		address := syncCmd.String("address", "", "source address to sync from")
+		full := syncCmd.Bool("full", false, "perform full sync instead of incremental")
 		if err := syncCmd.Parse(os.Args[2:]); err != nil {
 			log.Fatalf("Failed to parse sync flags: %v", err)
 		}
@@ -366,9 +367,22 @@ func main() {
 			log.Fatal("Failed to create client")
 		}
 
-		// TODO get the latest synced file date
-		t := time.Date(2000, 1, 1, 1, 1, 1, 1, time.UTC)
+		// Get the latest synced file date for incremental sync
+		// Use zero time for full sync or first-time sync
+		var t time.Time
+		if *full {
+			t = time.Time{}
+			fmt.Println("Performing full sync...")
+		} else {
+			t = account.GetLastSyncTime(fpr)
+			if t.IsZero() {
+				fmt.Println("No previous sync found, performing full sync...")
+			} else {
+				fmt.Printf("Performing incremental sync (since %s)...\n", t.Format(time.RFC3339))
+			}
+		}
 
+		syncStartTime := time.Now()
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
 		resolvers := []FingerprintResolver{LocalFriendAddress}
@@ -376,6 +390,10 @@ func main() {
 			resolvers = append(resolvers, StaticAddress(*address))
 		}
 		err = client.DownloadFriend(ctx, fpr, t, resolvers)
+		raise(err)
+		
+		// Update last sync time on successful sync
+		err = account.UpdateLastSyncTime(fpr, syncStartTime)
 		raise(err)
 
 	default:
