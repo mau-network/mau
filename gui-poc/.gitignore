@@ -1,0 +1,35 @@
+# Compiled binaries
+mau-gui
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+*.out
+
+# Go workspace file
+go.work
+
+# Dependency directories
+vendor/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Debug files
+debug.log
+*.log
+
+# Application data (for development)
+.mau-gui-poc/
+
+# OS files
+.DS_Store
+Thumbs.db
