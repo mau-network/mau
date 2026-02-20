@@ -79,6 +79,20 @@ func readFriend(account *Account, reader io.Reader) (*Friend, error) {
 }
 
 func (a *Account) AddFriend(reader io.Reader) (*Friend, error) {
+	entity, err := readAndValidateEntity(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	fpr := Fingerprint(entity.PrimaryKey.Fingerprint).String()
+	if err := a.saveFriendEntity(fpr, entity); err != nil {
+		return nil, err
+	}
+
+	return &Friend{entity: entity}, nil
+}
+
+func readAndValidateEntity(reader io.Reader) (*openpgp.Entity, error) {
 	block, err := armor.Decode(reader)
 	if err != nil {
 		return nil, err
@@ -88,38 +102,37 @@ func (a *Account) AddFriend(reader io.Reader) (*Friend, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if entity == nil || entity.PrimaryKey == nil {
 		return nil, fmt.Errorf("openpgp.ReadEntity returned nil or incomplete entity")
 	}
 
-	fpr := Fingerprint(entity.PrimaryKey.Fingerprint).String()
-	entities := []*openpgp.Entity{a.entity}
+	return entity, nil
+}
 
+func (a *Account) saveFriendEntity(fpr string, entity *openpgp.Entity) error {
 	filePath := path.Join(mauDir(a.path), fpr+".pgp")
 	file, err := os.Create(filePath)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	defer file.Close()
 
+	entities := []*openpgp.Entity{a.entity}
 	w, err := openpgp.Encrypt(file, entities, a.entity, nil, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if w == nil {
-		return nil, fmt.Errorf("openpgp.Encrypt returned nil writer")
+		return fmt.Errorf("openpgp.Encrypt returned nil writer")
 	}
 
-	err = entity.Serialize(w)
-	w.Close()
-	if err != nil {
-		return nil, err
+	if err := entity.Serialize(w); err != nil {
+		w.Close()
+		return err
 	}
 
-	friend := Friend{
-		entity: entity,
-	}
-
-	return &friend, nil
+	return w.Close()
 }
 
 func (a *Account) RemoveFriend(friend *Friend) error {

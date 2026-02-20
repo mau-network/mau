@@ -198,12 +198,28 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 		err = errors.New("account or entity is incomplete")
 		return
 	}
-	template := x509.Certificate{
+
+	template := buildCertificateTemplate(DNSNames, a.entity.PrimaryKey.CreationTime)
+	rsakey, err := extractRSAKeyFromEntity(a.entity)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+
+	derBytes, err := x509.CreateCertificate(nil, &template, &template, &rsakey.PublicKey, rsakey)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+
+	return encodeCertificateAndKey(rsakey, derBytes)
+}
+
+func buildCertificateTemplate(dnsNames []string, creationTime time.Time) x509.Certificate {
+	return x509.Certificate{
 		Version:      3,
-		DNSNames:     DNSNames,
+		DNSNames:     dnsNames,
 		SerialNumber: big.NewInt(1),
-		NotBefore:    a.entity.PrimaryKey.CreationTime,
-		NotAfter:     a.entity.PrimaryKey.CreationTime.AddDate(100, 0, 0),
+		NotBefore:    creationTime,
+		NotAfter:     creationTime.AddDate(100, 0, 0),
 		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{
 			x509.ExtKeyUsageServerAuth,
@@ -211,17 +227,17 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 		},
 		BasicConstraintsValid: true,
 	}
+}
 
-	privkey, ok := a.entity.PrivateKey.PrivateKey.(*rsa.PrivateKey)
+func extractRSAKeyFromEntity(entity *openpgp.Entity) (*rsa.PrivateKey, error) {
+	privkey, ok := entity.PrivateKey.PrivateKey.(*rsa.PrivateKey)
 	if !ok {
-		err = ErrCannotConvertPrivateKey
-		return
+		return nil, ErrCannotConvertPrivateKey
 	}
 
-	pubkey, ok := a.entity.PrimaryKey.PublicKey.(*rsa.PublicKey)
+	pubkey, ok := entity.PrimaryKey.PublicKey.(*rsa.PublicKey)
 	if !ok {
-		err = ErrCannotConvertPublicKey
-		return
+		return nil, ErrCannotConvertPublicKey
 	}
 
 	crtvalues := []rsa.CRTValue{}
@@ -230,7 +246,7 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 		crtvalues = append(crtvalues, rsa.CRTValue(i))
 	}
 
-	rsakey := rsa.PrivateKey{
+	return &rsa.PrivateKey{
 		PublicKey: rsa.PublicKey{
 			N: pubkey.N,
 			E: int(pubkey.E),
@@ -243,16 +259,11 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 			Qinv:      privkey.Precomputed.Qinv,
 			CRTValues: crtvalues,
 		},
-	}
+	}, nil
+}
 
-	// Go 1.26: rand.Reader parameter ignored, always uses secure random source
-	var derBytes []byte
-	derBytes, err = x509.CreateCertificate(nil, &template, &template, &rsakey.PublicKey, &rsakey)
-	if err != nil {
-		return
-	}
-
-	keyPem := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(&rsakey)}
+func encodeCertificateAndKey(rsakey *rsa.PrivateKey, derBytes []byte) (tls.Certificate, error) {
+	keyPem := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(rsakey)}
 	certPem := &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}
 
 	var keyPemBytes bytes.Buffer
@@ -297,40 +308,50 @@ func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File
 	}
 
 	fpr := a.Fingerprint().String()
-
 	if err := os.MkdirAll(path.Join(a.path, fpr), DirPerm); err != nil {
 		return nil, err
 	}
 
 	p := path.Join(a.path, fpr, name)
-	if _, err := os.Stat(p); err == nil {
-		if err := a.handleFileVersioning(p); err != nil {
-			return nil, err
-		}
+	if err := a.handleExistingFile(p); err != nil {
+		return nil, err
 	}
 
+	if err := a.writeEncryptedFile(p, r, recipients); err != nil {
+		return nil, err
+	}
+
+	return &File{Path: p}, nil
+}
+
+func (a *Account) handleExistingFile(p string) error {
+	if _, err := os.Stat(p); err == nil {
+		return a.handleFileVersioning(p)
+	}
+	return nil
+}
+
+func (a *Account) writeEncryptedFile(p string, r io.Reader, recipients []*Friend) error {
 	entities := a.prepareEncryptionEntities(recipients)
 
 	file, err := os.Create(p)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer file.Close()
 
 	w, err := openpgp.Encrypt(file, entities, a.entity, nil, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if w == nil {
-		return nil, errors.New("openpgp.Encrypt returned nil writer")
+		return errors.New("openpgp.Encrypt returned nil writer")
 	}
 
 	if _, err := io.Copy(w, r); err != nil {
-		return nil, err
+		return err
 	}
-	w.Close()
-
-	return &File{Path: p}, nil
+	return w.Close()
 }
 
 func (a *Account) RemoveFile(file *File) error {
