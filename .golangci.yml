@@ -39,7 +39,7 @@ issues:
     - vendor
     - .git
     - .github
-    - gui-poc
+    - gui
     - gotk4-adwaita
   
   exclude-rules:
