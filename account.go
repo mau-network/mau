@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"io"
@@ -114,6 +115,9 @@ func OpenAccount(rootPath, passphrase string) (*Account, error) {
 	if err != nil {
 		return nil, err
 	}
+	if decryptedFile == nil {
+		return nil, errors.New("openpgp.ReadMessage returned nil")
+	}
 
 	entity, err := openpgp.ReadEntity(packet.NewReader(decryptedFile.UnverifiedBody))
 	if err != nil {
@@ -132,6 +136,9 @@ type Account struct {
 }
 
 func (a *Account) Identity() (string, error) {
+	if a == nil || a.entity == nil {
+		return "", ErrNoIdentity
+	}
 	for _, i := range a.entity.Identities {
 		return i.Name, nil
 	}
@@ -140,6 +147,9 @@ func (a *Account) Identity() (string, error) {
 }
 
 func (a *Account) Name() string {
+	if a == nil || a.entity == nil {
+		return ""
+	}
 	for _, i := range a.entity.Identities {
 		return i.UserId.Name
 	}
@@ -148,6 +158,9 @@ func (a *Account) Name() string {
 }
 
 func (a *Account) Email() string {
+	if a == nil || a.entity == nil {
+		return ""
+	}
 	for _, i := range a.entity.Identities {
 		return i.UserId.Email
 	}
@@ -156,10 +169,16 @@ func (a *Account) Email() string {
 }
 
 func (a *Account) Fingerprint() Fingerprint {
+	if a == nil || a.entity == nil || a.entity.PrimaryKey == nil {
+		return Fingerprint{}
+	}
 	return a.entity.PrimaryKey.Fingerprint
 }
 
 func (a *Account) Export(w io.Writer) error {
+	if a == nil || a.entity == nil {
+		return errors.New("account or entity is nil")
+	}
 	armored, err := armor.Encode(w, openpgp.PublicKeyType, map[string]string{})
 	if err != nil {
 		return err
@@ -175,6 +194,10 @@ func (a *Account) Export(w io.Writer) error {
 }
 
 func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err error) {
+	if a == nil || a.entity == nil || a.entity.PrimaryKey == nil || a.entity.PrivateKey == nil {
+		err = errors.New("account or entity is incomplete")
+		return
+	}
 	template := x509.Certificate{
 		Version:      3,
 		DNSNames:     DNSNames,
@@ -298,6 +321,9 @@ func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File
 	if err != nil {
 		return nil, err
 	}
+	if w == nil {
+		return nil, errors.New("openpgp.Encrypt returned nil writer")
+	}
 
 	if _, err := io.Copy(w, r); err != nil {
 		return nil, err
@@ -308,6 +334,10 @@ func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File
 }
 
 func (a *Account) RemoveFile(file *File) error {
+	if file == nil {
+		return nil
+	}
+	
 	err := os.Remove(file.Path)
 	if err != nil {
 		return err
@@ -415,4 +445,68 @@ func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint
 	}
 
 	return list
+}
+
+// syncState tracks the last successful sync time for each friend
+type syncState struct {
+	LastSync map[string]time.Time `json:"last_sync"`
+}
+
+func syncStateFile(d string) string { return path.Join(mauDir(d), syncStateFilename) }
+
+// GetLastSyncTime returns the last successful sync time for a friend
+// Returns zero time if no sync has occurred
+func (a *Account) GetLastSyncTime(fpr Fingerprint) time.Time {
+	state, err := a.loadSyncState()
+	if err != nil {
+		return time.Time{}
+	}
+	
+	if lastSync, exists := state.LastSync[fpr.String()]; exists {
+		return lastSync
+	}
+	
+	return time.Time{}
+}
+
+// UpdateLastSyncTime records the time of the last successful sync for a friend
+func (a *Account) UpdateLastSyncTime(fpr Fingerprint, syncTime time.Time) error {
+	state, err := a.loadSyncState()
+	if err != nil {
+		// If file doesn't exist, create new state
+		state = &syncState{
+			LastSync: make(map[string]time.Time),
+		}
+	}
+	
+	state.LastSync[fpr.String()] = syncTime
+	
+	return a.saveSyncState(state)
+}
+
+func (a *Account) loadSyncState() (*syncState, error) {
+	filePath := syncStateFile(a.path)
+	
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	
+	var state syncState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return nil, err
+	}
+	
+	return &state, nil
+}
+
+func (a *Account) saveSyncState(state *syncState) error {
+	filePath := syncStateFile(a.path)
+	
+	data, err := json.Marshal(state)
+	if err != nil {
+		return err
+	}
+	
+	return os.WriteFile(filePath, data, FilePerm)
 }

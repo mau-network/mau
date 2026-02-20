@@ -31,7 +31,7 @@ type Server struct {
 }
 
 type FileListItem struct {
-	Name string `json:"name"`
+	Path string `json:"path"`
 	Size int64  `json:"size"`
 	Sum  string `json:"sum"`
 }
@@ -101,6 +101,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) Serve(l net.Listener, externalAddress string) error {
+	if l == nil || l.Addr() == nil {
+		return errors.New("listener cannot be nil")
+	}
+	
 	port := l.Addr().(*net.TCPAddr).Port
 
 	if err := s.serveMDNS(port); err != nil {
@@ -179,9 +183,10 @@ func extractFileInfo(item *File) (hash string, size int64, err error) {
 	return hash, size, err
 }
 
-func (s *Server) buildFileListItem(item *File, r *http.Request) (*FileListItem, bool) {
+func (s *Server) buildFileListItem(item *File, r *http.Request, fpr Fingerprint) (*FileListItem, bool) {
 	hash, size, err := extractFileInfo(item)
 	if err != nil {
+		slog.Error("failed to calculate file size", "file", item.Name(), "error", err)
 		return nil, false
 	}
 
@@ -195,7 +200,7 @@ func (s *Server) buildFileListItem(item *File, r *http.Request) (*FileListItem, 
 	}
 
 	return &FileListItem{
-		Name: item.Name(),
+		Path: "/p2p/" + fpr.String() + "/" + item.Name(),
 		Size: size,
 		Sum:  hash,
 	}, true
@@ -219,7 +224,7 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 
 	list := make([]FileListItem, 0, len(page))
 	for _, item := range page {
-		if fileItem, ok := s.buildFileListItem(item, r); ok {
+		if fileItem, ok := s.buildFileListItem(item, r, fpr); ok {
 			list = append(list, *fileItem)
 		}
 	}
@@ -296,7 +301,12 @@ func (s *Server) version(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, err := s.account.GetFileVersion(fpr, segments[1], segments[2])
+	// Strip .version suffix from filename
+	// URL format: /p2p/{fpr}/{filename}.version/{hash}
+	// But GetFileVersion expects just {filename}
+	filename := strings.TrimSuffix(segments[1], ".version")
+
+	file, err := s.account.GetFileVersion(fpr, filename, segments[2])
 	if err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return

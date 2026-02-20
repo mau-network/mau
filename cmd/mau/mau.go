@@ -94,6 +94,9 @@ func main() {
 
 		friend, err := account.AddFriend(keyFile)
 		raise(err)
+		if friend == nil {
+			log.Fatal("Failed to add friend")
+		}
 
 		fmt.Println("Friend added: ", friend.Name(), friend.Email(), friend.Fingerprint())
 
@@ -102,6 +105,9 @@ func main() {
 
 		friends, err := account.ListFriends()
 		raise(err)
+		if friends == nil {
+			log.Fatal("Failed to list friends")
+		}
 
 		printKeyring("", friends)
 
@@ -116,6 +122,9 @@ func main() {
 
 		friends, err := account.ListFriends()
 		raise(err)
+		if friends == nil {
+			log.Fatal("Failed to list friends")
+		}
 
 		fpr, err := FingerprintFromString(*fingerprint)
 		raise(err)
@@ -140,6 +149,9 @@ func main() {
 
 		friends, err := account.ListFriends()
 		raise(err)
+		if friends == nil {
+			log.Fatal("Failed to list friends")
+		}
 
 		fpr, err := FingerprintFromString(*fingerprint)
 		raise(err)
@@ -164,6 +176,9 @@ func main() {
 
 		friends, err := account.ListFriends()
 		raise(err)
+		if friends == nil {
+			log.Fatal("Failed to list friends")
+		}
 
 		fpr, err := FingerprintFromString(*fingerprint)
 		raise(err)
@@ -202,6 +217,9 @@ func main() {
 
 		allFrields, err := account.ListFriends()
 		raise(err)
+		if allFrields == nil {
+			log.Fatal("Failed to list friends")
+		}
 
 		fprs := strings.Split(*fingerprints, ",")
 		friends := []*Friend{}
@@ -317,6 +335,9 @@ func main() {
 
 		listener, err := ListenTCP(":0")
 		raise(err)
+		if listener == nil {
+			log.Fatal("Failed to create TCP listener")
+		}
 
 		port := listener.Addr().(*net.TCPAddr).Port
 		fmt.Println("Account: ", account.Name(), account.Fingerprint())
@@ -330,6 +351,7 @@ func main() {
 		syncCmd := flag.NewFlagSet("sync", flag.ExitOnError)
 		fprStr := syncCmd.String("fingerprint", "", "user fingerprint to sync files")
 		address := syncCmd.String("address", "", "source address to sync from")
+		full := syncCmd.Bool("full", false, "perform full sync instead of incremental")
 		if err := syncCmd.Parse(os.Args[2:]); err != nil {
 			log.Fatalf("Failed to parse sync flags: %v", err)
 		}
@@ -341,10 +363,26 @@ func main() {
 
 		client, err := account.Client(fpr, nil)
 		raise(err)
+		if client == nil {
+			log.Fatal("Failed to create client")
+		}
 
-		// TODO get the latest synced file date
-		t := time.Date(2000, 1, 1, 1, 1, 1, 1, time.UTC)
+		// Get the latest synced file date for incremental sync
+		// Use zero time for full sync or first-time sync
+		var t time.Time
+		if *full {
+			t = time.Time{}
+			fmt.Println("Performing full sync...")
+		} else {
+			t = account.GetLastSyncTime(fpr)
+			if t.IsZero() {
+				fmt.Println("No previous sync found, performing full sync...")
+			} else {
+				fmt.Printf("Performing incremental sync (since %s)...\n", t.Format(time.RFC3339))
+			}
+		}
 
+		syncStartTime := time.Now()
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
 		resolvers := []FingerprintResolver{LocalFriendAddress}
@@ -352,6 +390,10 @@ func main() {
 			resolvers = append(resolvers, StaticAddress(*address))
 		}
 		err = client.DownloadFriend(ctx, fpr, t, resolvers)
+		raise(err)
+		
+		// Update last sync time on successful sync
+		err = account.UpdateLastSyncTime(fpr, syncStartTime)
 		raise(err)
 
 	default:
@@ -363,6 +405,9 @@ func getAccount() *Account {
 	wd, _ := os.Getwd()
 	account, err := OpenAccount(wd, getPassword())
 	raise(err)
+	if account == nil {
+		log.Fatal("Failed to open account")
+	}
 
 	return account
 }
@@ -377,6 +422,10 @@ func getPassword() string {
 }
 
 func printKeyring(p string, r *Keyring) {
+	if r == nil {
+		return
+	}
+	
 	fmt.Println(r.Name(), ":")
 	for _, f := range r.Friends {
 		fmt.Println(p+" ", f.Name(), f.Email(), f.Fingerprint())

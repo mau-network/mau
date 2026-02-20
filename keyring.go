@@ -13,6 +13,9 @@ type Keyring struct {
 }
 
 func (k *Keyring) Name() string {
+	if k == nil {
+		return ""
+	}
 	return path.Base(k.Path)
 }
 
@@ -37,6 +40,10 @@ func (k *Keyring) FriendsSet() []*Friend {
 }
 
 func (k *Keyring) FindByFingerprint(fingerprint Fingerprint) *Friend {
+	if k == nil {
+		return nil
+	}
+	
 	for _, friend := range k.Friends {
 		if friend.Fingerprint() == fingerprint {
 			return friend

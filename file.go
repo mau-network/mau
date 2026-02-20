@@ -59,6 +59,9 @@ type File struct {
 }
 
 func (f *File) Name() string {
+	if f == nil {
+		return ""
+	}
 	return path.Base(f.Path)
 }
 
@@ -168,6 +171,9 @@ func (f *File) VerifySignature(account *Account, expectedSigner Fingerprint) err
 	if err != nil {
 		return err
 	}
+	if md == nil {
+		return errors.New("openpgp.ReadMessage returned nil")
+	}
 
 	return checkSignerIdentity(md, expectedSigner)
 }
@@ -225,6 +231,9 @@ func (f *File) Recipients(account *Account) ([]*Friend, error) {
 }
 
 func (f *File) Reader(account *Account) (io.Reader, error) {
+	if f == nil {
+		return nil, errors.New("file cannot be nil")
+	}
 	if account == nil {
 		return nil, errors.New("account cannot be nil")
 	}
@@ -238,6 +247,9 @@ func (f *File) Reader(account *Account) (io.Reader, error) {
 	decryptedFile, err := openpgp.ReadMessage(bytes.NewReader(r), keyring, nil, nil)
 	if err != nil {
 		return nil, err
+	}
+	if decryptedFile == nil {
+		return nil, errors.New("openpgp.ReadMessage returned nil")
 	}
 
 	return decryptedFile.UnverifiedBody, nil
