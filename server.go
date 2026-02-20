@@ -155,18 +155,57 @@ func (s *Server) Close() error {
 	return errors.Join(mdns_err, http_err)
 }
 
-func (s *Server) list(w http.ResponseWriter, r *http.Request) {
-	var lastModified time.Time
-	var err error
-
+func parseIfModifiedSince(r *http.Request) (time.Time, error) {
 	ifModifiedSince := r.Header.Get("If-Modified-Since")
-	if ifModifiedSince != "" {
+	if ifModifiedSince == "" {
+		return time.Time{}, nil
+	}
 
-		lastModified, err = http.ParseTime(ifModifiedSince)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
+	return http.ParseTime(ifModifiedSince)
+}
+
+func extractFileInfo(item *File) (hash string, size int64, err error) {
+	hash, err = item.Hash()
+	if err != nil {
+		slog.Error("failed to calculate file hash", "file", item.Name(), "error", err)
+		hash = ""
+	}
+
+	size, err = item.Size()
+	if err != nil {
+		slog.Error("failed to calculate file size", "file", item.Name(), "error", err)
+	}
+
+	return hash, size, err
+}
+
+func (s *Server) buildFileListItem(item *File, r *http.Request) (*FileListItem, bool) {
+	hash, size, err := extractFileInfo(item)
+	if err != nil {
+		return nil, false
+	}
+
+	recipients, err := item.Recipients(s.account)
+	if err != nil {
+		return nil, false
+	}
+
+	if !isPermitted(r.TLS.PeerCertificates, recipients) {
+		return nil, false
+	}
+
+	return &FileListItem{
+		Name: item.Name(),
+		Size: size,
+		Sum:  hash,
+	}, true
+}
+
+func (s *Server) list(w http.ResponseWriter, r *http.Request) {
+	lastModified, err := parseIfModifiedSince(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	fprStr := strings.TrimPrefix(r.URL.Path, "/p2p/")
@@ -180,33 +219,9 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 
 	list := make([]FileListItem, 0, len(page))
 	for _, item := range page {
-		hash, err := item.Hash()
-		if err != nil {
-			slog.Error("failed to calculate file hash", "file", item.Name(), "error", err)
-			hash = ""
+		if fileItem, ok := s.buildFileListItem(item, r); ok {
+			list = append(list, *fileItem)
 		}
-
-		size, err := item.Size()
-		if err != nil {
-			slog.Error("failed to calculate file size", "file", item.Name(), "error", err)
-			hash = ""
-		}
-
-		recipients, err := item.Recipients(s.account)
-		if err != nil {
-			continue
-		}
-
-		permitted := isPermitted(r.TLS.PeerCertificates, recipients)
-		if !permitted {
-			continue
-		}
-
-		list = append(list, FileListItem{
-			Name: item.Name(),
-			Size: size,
-			Sum:  hash,
-		})
 	}
 
 	marshaled, err := json.Marshal(list)

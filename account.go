@@ -245,6 +245,29 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 	return tls.X509KeyPair(certPemBytes.Bytes(), keyPemBytes.Bytes())
 }
 
+func (a *Account) handleFileVersioning(filePath string) error {
+	file := File{Path: filePath}
+	hash, err := file.Hash()
+	if err != nil {
+		return err
+	}
+
+	versionsDir := filePath + ".versions"
+	if err = os.MkdirAll(versionsDir, DirPerm); err != nil {
+		return err
+	}
+
+	return os.Rename(filePath, path.Join(versionsDir, hash))
+}
+
+func (a *Account) prepareEncryptionEntities(recipients []*Friend) []*openpgp.Entity {
+	entities := []*openpgp.Entity{a.entity}
+	for _, f := range recipients {
+		entities = append(entities, f.entity)
+	}
+	return entities
+}
+
 func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File, error) {
 	if path.Ext(name) != ".pgp" {
 		name += ".pgp"
@@ -258,25 +281,12 @@ func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File
 
 	p := path.Join(a.path, fpr, name)
 	if _, err := os.Stat(p); err == nil {
-		file := File{Path: p}
-		np, err := file.Hash()
-		if err != nil {
-			return nil, err
-		}
-
-		if err = os.MkdirAll(p+".versions", DirPerm); err != nil {
-			return nil, err
-		}
-
-		if err = os.Rename(p, path.Join(p+".versions", np)); err != nil {
+		if err := a.handleFileVersioning(p); err != nil {
 			return nil, err
 		}
 	}
 
-	entities := []*openpgp.Entity{a.entity}
-	for _, f := range recipients {
-		entities = append(entities, f.entity)
-	}
+	entities := a.prepareEncryptionEntities(recipients)
 
 	file, err := os.Create(p)
 	if err != nil {
@@ -333,22 +343,12 @@ func (a *Account) resolveFriendPath(fpr Fingerprint, subpath string) (string, er
 	return "", os.ErrNotExist
 }
 
-func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint) []*File {
-	dirpath, err := a.resolveFriendPath(fingerprint, "")
-	if err != nil {
-		return []*File{}
-	}
+type dirEntry struct {
+	entry        fs.DirEntry
+	modification time.Time
+}
 
-	files, err := os.ReadDir(dirpath)
-	if err != nil {
-		return []*File{}
-	}
-
-	type dirEntry struct {
-		entry        fs.DirEntry
-		modification time.Time
-	}
-
+func filterRecentFiles(files []fs.DirEntry, after time.Time) []dirEntry {
 	recent := []dirEntry{}
 	for _, f := range files {
 		if !f.Type().IsRegular() {
@@ -370,8 +370,11 @@ func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint
 			modification: mod,
 		})
 	}
+	return recent
+}
 
-	slices.SortFunc(recent, func(a, b dirEntry) int {
+func sortByModificationTime(entries []dirEntry) {
+	slices.SortFunc(entries, func(a, b dirEntry) int {
 		if a.modification.Before(b.modification) {
 			return -1
 		}
@@ -380,17 +383,29 @@ func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint
 		}
 		return 0
 	})
+}
 
-	if uint(len(recent)) < limit {
-		limit = uint(len(recent))
+func applyLimit(entries []dirEntry, limit uint) []dirEntry {
+	if limit == 0 || uint(len(entries)) <= limit {
+		return entries
+	}
+	return entries[:limit]
+}
+
+func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint) []*File {
+	dirpath, err := a.resolveFriendPath(fingerprint, "")
+	if err != nil {
+		return []*File{}
 	}
 
-	page := recent
-
-	// if limit was 0 then it's unlimited
-	if limit > 0 {
-		page = recent[:limit]
+	files, err := os.ReadDir(dirpath)
+	if err != nil {
+		return []*File{}
 	}
+
+	recent := filterRecentFiles(files, after)
+	sortByModificationTime(recent)
+	page := applyLimit(recent, limit)
 
 	list := make([]*File, 0, len(page))
 	for _, item := range page {
