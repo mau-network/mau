@@ -61,7 +61,7 @@ type MauApp struct {
 // NewMauApp creates a new application instance
 func NewMauApp(dataDir string) *MauApp {
 	app := adw.NewApplication(appID, 0)
-	
+
 	return &MauApp{
 		app:     app,
 		dataDir: dataDir,
@@ -143,7 +143,7 @@ func (m *MauApp) buildUI() {
 	m.mainStack = adw.NewViewStack()
 	viewSwitcher.SetStack(m.mainStack)
 	headerBar.SetTitleWidget(viewSwitcher)
-	
+
 	// Add loading spinner to header
 	m.spinner = gtk.NewSpinner()
 	m.spinner.SetVisible(false)
@@ -171,9 +171,9 @@ func (m *MauApp) buildUI() {
 	m.mainStack.AddTitledWithIcon(m.settingsView.Build(), "settings", "Settings", "preferences-system-symbolic")
 
 	window.SetContent(m.toastOverlay)
-	
+
 	window.Show()
-	
+
 	// Load CSS after window is shown
 	m.loadCSS()
 }
@@ -235,7 +235,7 @@ func (m *MauApp) loadCSS() {
 
 	provider := gtk.NewCSSProvider()
 	provider.LoadFromData(css)
-	
+
 	// Apply CSS to the default display (works for all windows)
 	display := gdk.DisplayGetDefault()
 	if display != nil {
@@ -250,7 +250,7 @@ func (m *MauApp) loadCSS() {
 func (m *MauApp) showToast(message string) {
 	// Queue toast messages to prevent overflow
 	m.toastQueue = append(m.toastQueue, message)
-	
+
 	// If not already processing, start showing toasts
 	if !m.toastActive {
 		m.processToastQueue()
@@ -262,18 +262,18 @@ func (m *MauApp) processToastQueue() {
 		m.toastActive = false
 		return
 	}
-	
+
 	m.toastActive = true
-	
+
 	// Get next toast
 	message := m.toastQueue[0]
 	m.toastQueue = m.toastQueue[1:]
-	
+
 	// Show toast
 	toast := adw.NewToast(message)
 	toast.SetTimeout(toastTimeout)
 	m.toastOverlay.AddToast(toast)
-	
+
 	// Process next toast after delay
 	glib.TimeoutSecondsAdd(toastDisplayTime, func() bool {
 		m.processToastQueue()
@@ -298,13 +298,13 @@ func (m *MauApp) showConfirmDialog(title, message string, onConfirm func()) {
 	dialog.SetDefaultResponse("cancel")
 	dialog.SetCloseResponse("cancel")
 	dialog.SetResponseAppearance("confirm", adw.ResponseDestructive)
-	
+
 	dialog.ConnectResponse(func(response string) {
 		if response == "confirm" && onConfirm != nil {
 			onConfirm()
 		}
 	})
-	
+
 	dialog.Show()
 }
 
@@ -335,7 +335,7 @@ func (m *MauApp) startServer() error {
 			m.serverRunning = false
 			m.server = nil
 			startupErr <- err
-			
+
 			// Show error dialog with retry option (using glib.IdleAdd for GTK thread safety)
 			glib.IdleAdd(func() bool {
 				m.handleServerStartupFailure(err, serverAddr)
@@ -349,7 +349,7 @@ func (m *MauApp) startServer() error {
 
 		if err := m.server.Serve(listener, externalAddr); err != nil {
 			log.Printf("Server error on %s: %v", serverAddr, err)
-			
+
 			// Show error if server fails during operation
 			glib.IdleAdd(func() bool {
 				m.showToast(fmt.Sprintf("Server stopped unexpectedly: %v", err))
@@ -407,7 +407,7 @@ func (m *MauApp) handleServerStartupFailure(err error, addr string) {
 	dialog := adw.NewMessageDialog(
 		window,
 		dialogNetworkError,
-		friendlyMsg + "\n\n" + suggestion,
+		friendlyMsg+"\n\n"+suggestion,
 	)
 	dialog.AddResponse("retry", "Retry")
 	dialog.AddResponse("offline", "Continue Offline")
@@ -561,7 +561,7 @@ func main() {
 	}
 
 	app := NewMauApp(dataDir)
-	
+
 	if code := app.Run(os.Args); code > 0 {
 		os.Exit(code)
 	}

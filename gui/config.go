@@ -17,7 +17,7 @@ type AppConfig struct {
 	AutoStartServer bool          `json:"autoStartServer"`
 	AutoSync        bool          `json:"autoSync"`
 	AutoSyncMinutes int           `json:"autoSyncMinutes"`
-	ServerPort      int           `json:"serverPort"`      // Configurable server port (default: 8080)
+	ServerPort      int           `json:"serverPort"` // Configurable server port (default: 8080)
 	LastAccount     string        `json:"lastAccount"`
 	Accounts        []AccountInfo `json:"accounts"`
 }

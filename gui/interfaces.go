@@ -41,9 +41,9 @@ type ServerController interface {
 
 // Ensure concrete types implement interfaces
 var (
-	_ ConfigStore     = (*ConfigManager)(nil)
-	_ AccountStore    = (*AccountManager)(nil)
-	_ PostStore       = (*PostManager)(nil)
-	_ ToastNotifier   = (*MauApp)(nil)
+	_ ConfigStore      = (*ConfigManager)(nil)
+	_ AccountStore     = (*AccountManager)(nil)
+	_ PostStore        = (*PostManager)(nil)
+	_ ToastNotifier    = (*MauApp)(nil)
 	_ ServerController = (*MauApp)(nil)
 )

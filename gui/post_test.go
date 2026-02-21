@@ -299,7 +299,7 @@ func TestPost_WithAttachments(t *testing.T) {
 func TestPost_TimeFormat(t *testing.T) {
 	author := Author{Type: "Person", Name: "Test", Email: "test@test"}
 	post := NewPost("Test", author, nil)
-	
+
 	// Set specific time
 	testTime := time.Date(2026, 2, 21, 12, 0, 0, 0, time.UTC)
 	post.Published = testTime
