@@ -8,6 +8,7 @@ import (
 
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
+	"github.com/mau-network/mau"
 )
 
 // timelinePost represents a post with its author info
@@ -144,30 +145,72 @@ func (tv *TimelineView) Refresh() {
 
 	keyring, err := tv.app.accountMgr.Account().ListFriends()
 	if err != nil {
-		row := adw.NewActionRow()
-		row.SetTitle("Error loading friends")
-		row.SetSubtitle(err.Error())
-		tv.timelineList.Append(row)
-		tv.loadMoreBtn.SetVisible(false)
+		tv.showError("Error loading friends", err.Error())
 		return
 	}
 
 	friends := keyring.FriendsSet()
 	if len(friends) == 0 {
-		row := adw.NewActionRow()
-		row.SetTitle("No friends yet")
-		row.SetSubtitle("Add friends to see their posts")
-		tv.timelineList.Append(row)
-		tv.loadMoreBtn.SetVisible(false)
+		tv.showNoFriends()
 		return
 	}
 
-	// Get filter values
-	filterAuthorText := strings.TrimSpace(tv.filterStart.Text()) // Reusing start field for author
+	// Load and filter posts
+	tv.allPosts = tv.loadPostsFromFriends(friends)
+
+	if len(tv.allPosts) == 0 {
+		tv.showNoPosts()
+		return
+	}
+
+	// Sort by newest first
+	sort.Slice(tv.allPosts, func(i, j int) bool {
+		return tv.allPosts[i].post.Published.After(tv.allPosts[j].post.Published)
+	})
+
+	// Display first page
+	tv.displayPage()
+}
+
+func (tv *TimelineView) showError(title, message string) {
+	row := adw.NewActionRow()
+	row.SetTitle(title)
+	row.SetSubtitle(message)
+	tv.timelineList.Append(row)
+	tv.loadMoreBtn.SetVisible(false)
+}
+
+func (tv *TimelineView) showNoFriends() {
+	row := adw.NewActionRow()
+	row.SetTitle("No friends yet")
+	row.SetSubtitle("Add friends to see their posts")
+	tv.timelineList.Append(row)
+	tv.loadMoreBtn.SetVisible(false)
+}
+
+func (tv *TimelineView) showNoPosts() {
+	row := adw.NewActionRow()
+	filterAuthorText := strings.TrimSpace(tv.filterStart.Text())
 	filterStartDate := tv.parseDate(tv.filterStart.Text())
 	filterEndDate := tv.parseDate(tv.filterEnd.Text())
 
-	tv.allPosts = []timelinePost{}
+	if filterAuthorText != "" || !filterStartDate.IsZero() || !filterEndDate.IsZero() {
+		row.SetTitle("No posts match filters")
+		row.SetSubtitle("Try adjusting your filter criteria")
+	} else {
+		row.SetTitle("No posts from friends yet")
+	}
+	tv.timelineList.Append(row)
+	tv.loadMoreBtn.SetVisible(false)
+}
+
+func (tv *TimelineView) loadPostsFromFriends(friends []*mau.Friend) []timelinePost {
+	// Get filter values
+	filterAuthorText := strings.TrimSpace(tv.filterStart.Text())
+	filterStartDate := tv.parseDate(tv.filterStart.Text())
+	filterEndDate := tv.parseDate(tv.filterEnd.Text())
+
+	var posts []timelinePost
 
 	for _, friend := range friends {
 		fpr := friend.Fingerprint()
@@ -184,33 +227,14 @@ func (tv *TimelineView) Refresh() {
 				continue
 			}
 
-			tv.allPosts = append(tv.allPosts, timelinePost{
+			posts = append(posts, timelinePost{
 				post:       post,
 				friendName: friend.Name(),
 			})
 		}
 	}
 
-	if len(tv.allPosts) == 0 {
-		row := adw.NewActionRow()
-		if filterAuthorText != "" || !filterStartDate.IsZero() || !filterEndDate.IsZero() {
-			row.SetTitle("No posts match filters")
-			row.SetSubtitle("Try adjusting your filter criteria")
-		} else {
-			row.SetTitle("No posts from friends yet")
-		}
-		tv.timelineList.Append(row)
-		tv.loadMoreBtn.SetVisible(false)
-		return
-	}
-
-	// Sort by newest first
-	sort.Slice(tv.allPosts, func(i, j int) bool {
-		return tv.allPosts[i].post.Published.After(tv.allPosts[j].post.Published)
-	})
-
-	// Display first page
-	tv.displayPage()
+	return posts
 }
 
 func (tv *TimelineView) loadMore() {
