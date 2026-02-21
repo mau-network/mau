@@ -231,10 +231,14 @@ func ParseTags(tagText string) []string {
 // ValidatePostBody validates post body content
 func ValidatePostBody(body string) error {
 	if body == "" {
-		return fmt.Errorf("post body cannot be empty")
+		return fmt.Errorf(toastNoContent)
 	}
 	if len(body) > maxPostBodyLength {
-		return fmt.Errorf("post body too long (max %d characters, got %d)", maxPostBodyLength, len(body))
+		return fmt.Errorf(errPostTooLong)
+	}
+	// Check for invalid characters (null bytes)
+	if strings.Contains(body, "\x00") {
+		return fmt.Errorf(errInvalidCharacters)
 	}
 	return nil
 }

@@ -49,6 +49,7 @@ const (
 	dialogSaveError     = "Save Error"
 	dialogConfirmDelete = "Confirm Deletion"
 	dialogConfirmClear  = "Confirm Clear"
+	dialogNetworkError  = "Network Error"
 	
 	// Placeholder text
 	placeholderPostBody = "What's on your mind?"
@@ -73,4 +74,44 @@ const (
 	descDarkMode          = "Use dark color scheme"
 	descServerPort        = "Port for P2P server (requires restart)"
 	descSyncInterval      = "Minutes between automatic syncs"
+)
+
+// User-Friendly Error Messages
+const (
+	// Network errors
+	errNetworkUnavailable = "Network connection unavailable. Please check your internet connection and try again."
+	errServerNotRunning   = "P2P server is not running. Start the server in the Network tab."
+	errPortInUse          = "The configured server port is already in use. Try changing the port in Settings."
+	errConnectionTimeout  = "Connection timed out. The server may be unreachable or offline."
+	
+	// Friend errors
+	errInvalidPGPKey      = "Invalid PGP key format. Please paste a valid PGP public key block."
+	errPGPKeyTooShort     = "PGP key appears truncated (too short). Please paste the complete key."
+	errPGPKeyTooLarge     = "PGP key is too large (max 50KB). Please verify you pasted only the public key."
+	errMissingPGPHeaders  = "Missing PGP armor headers. The key must start with '-----BEGIN PGP PUBLIC KEY BLOCK-----'."
+	errFriendAlreadyAdded = "This friend is already in your network."
+	
+	// Post errors
+	errPostTooLong        = "Post is too long (max 10,000 characters). Please shorten your post."
+	errTooManyTags        = "Too many tags (max 20). Please remove some tags."
+	errTagTooLong         = "One or more tags are too long (max 50 characters each)."
+	errInvalidCharacters  = "Post contains invalid characters. Please remove null bytes or control characters."
+	
+	// Sync errors
+	errSyncFailed         = "Failed to sync with friends. This may be a temporary network issue. Retrying..."
+	errNoFriendsToSync    = "You haven't added any friends yet. Add friends in the Friends tab to see their posts."
+	
+	// Config errors
+	errConfigLoadFailed   = "Failed to load configuration. Using default settings."
+	errConfigSaveFailed   = "Failed to save configuration. Your changes may not persist."
+	errInvalidPort        = "Invalid port number. Please choose a port between 1024 and 65535."
+	
+	// File errors
+	errFileNotFound       = "File not found. It may have been moved or deleted."
+	errPermissionDenied   = "Permission denied. Check file permissions in ~/.mau-gui directory."
+	errDiskFull           = "Disk is full. Free up space and try again."
+	
+	// General errors
+	errUnknown            = "An unexpected error occurred. Please try again."
+	errOperationCancelled = "Operation was cancelled."
 )

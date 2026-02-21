@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
 	"github.com/diamondburned/gotk4/pkg/gdk/v4"
@@ -382,28 +383,52 @@ func (m *MauApp) startAutoSync() {
 func (m *MauApp) syncFriends() {
 	m.setLoading(true)
 	defer m.setLoading(false)
-	
-	keyring, err := m.accountMgr.Account().ListFriends()
+
+	// Use retry logic for sync operation
+	cfg := RetryConfig{
+		MaxAttempts:  3,
+		InitialDelay: 2 * time.Second,
+		MaxDelay:     10 * time.Second,
+		Multiplier:   2.0,
+	}
+
+	err := RetryWithContext(cfg, func(attempt int, err error) {
+		// Show retry notification
+		m.showToast(fmt.Sprintf("Sync failed (attempt %d/3), retrying...", attempt))
+	}, func() error {
+		return m.performSync()
+	})
+
 	if err != nil {
 		m.showToast(toastSyncFailed + ": " + err.Error())
 		return
 	}
 
+	m.showToast(toastSyncComplete)
+}
+
+func (m *MauApp) performSync() error {
+	keyring, err := m.accountMgr.Account().ListFriends()
+	if err != nil {
+		return fmt.Errorf("failed to list friends: %w", err)
+	}
+
 	friends := keyring.FriendsSet()
 	if len(friends) == 0 {
+		// Not an error, just no friends
 		m.showToast(toastNoFriends)
-		return
+		return nil
 	}
 
 	m.showToast(fmt.Sprintf("%s (%d friends)", toastSyncStarted, len(friends)))
-	
+
 	// Actual sync would happen here via P2P
 	// For now, just refresh the timeline
 	if m.timelineView != nil {
 		m.timelineView.Refresh()
 	}
-	
-	m.showToast(toastSyncComplete)
+
+	return nil
 }
 
 func (m *MauApp) setLoading(loading bool) {
