@@ -43,6 +43,7 @@ type MauApp struct {
 	toastQueue     []string
 	toastActive    bool
 	spinner        *gtk.Spinner
+	statusIndicator *gtk.Label
 
 	// Views
 	homeView     *HomeView
@@ -141,6 +142,13 @@ func (m *MauApp) buildUI() {
 	m.spinner.SetVisible(false)
 	headerBar.PackEnd(m.spinner)
 
+	// Add network status indicator
+	statusBox := gtk.NewBox(gtk.OrientationHorizontal, 4)
+	m.statusIndicator = gtk.NewLabel("🔴 Offline")
+	m.statusIndicator.AddCSSClass("status-label")
+	statusBox.Append(m.statusIndicator)
+	headerBar.PackEnd(statusBox)
+
 	// Toolbar view
 	toolbarView := adw.NewToolbarView()
 	toolbarView.AddTopBar(headerBar)
@@ -164,4 +172,7 @@ func (m *MauApp) buildUI() {
 
 	// Load CSS after window is shown
 	m.loadCSS()
+	
+	// Initialize network status display
+	m.updateNetworkStatus()
 }

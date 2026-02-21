@@ -102,8 +102,25 @@ func (m *MauApp) notifyServerStarted(serverAddr string) {
 	glib.IdleAdd(func() bool {
 		m.serverRunning = true
 		m.showToast(fmt.Sprintf("Server started on %s", serverAddr))
+		m.updateNetworkStatus()
 		return false
 	})
+}
+
+// updateNetworkStatus updates the network status indicator in the header
+func (m *MauApp) updateNetworkStatus() {
+	if m.statusIndicator == nil {
+		return
+	}
+	
+	if m.serverRunning {
+		config := m.configMgr.Get()
+		m.statusIndicator.SetText(fmt.Sprintf("🟢 Online:%d", config.ServerPort))
+		m.statusIndicator.SetTooltipText("P2P server running")
+	} else {
+		m.statusIndicator.SetText("🔴 Offline")
+		m.statusIndicator.SetTooltipText("P2P server not running")
+	}
 }
 
 // handleServerStartupFailure shows error dialog with retry option
@@ -181,6 +198,7 @@ func (m *MauApp) stopServer() error {
 	m.serverRunning = false
 	m.server = nil
 	m.showToast("Server stopped")
+	m.updateNetworkStatus()
 	return nil
 }
 
