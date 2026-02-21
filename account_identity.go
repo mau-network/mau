@@ -83,17 +83,17 @@ func (a *Account) SetPrimaryIdentity(identityName, passphrase string) error {
 		return errors.New("identity not found: " + identityName)
 	}
 
-	// Mark this identity as primary
-	isPrimary := true
-	identity.SelfSignature.IsPrimaryId = &isPrimary
-
-	// Unmark all other identities
-	for name, ident := range a.entity.Identities {
-		if name != identityName && ident.SelfSignature.IsPrimaryId != nil {
+	// Unmark all identities first
+	for _, ident := range a.entity.Identities {
+		if ident.SelfSignature.IsPrimaryId != nil {
 			notPrimary := false
 			ident.SelfSignature.IsPrimaryId = &notPrimary
 		}
 	}
+
+	// Mark the selected identity as primary
+	isPrimary := true
+	identity.SelfSignature.IsPrimaryId = &isPrimary
 
 	return a.saveEntity(passphrase)
 }
@@ -117,21 +117,14 @@ func (a *Account) saveEntity(passphrase string) error {
 		return ErrPassphraseRequired
 	}
 
-	// Verify passphrase by trying to decrypt the existing account file
-	acc := accountFile(a.path)
-	file, err := os.Open(acc)
-	if err != nil {
-		return err
-	}
-	
-	_, err = openpgp.ReadMessage(file, nil, func(keys []openpgp.Key, symmetric bool) ([]byte, error) {
-		return []byte(passphrase), nil
-	}, nil)
-	file.Close()
-	
+	// Verify passphrase by attempting to open the account
+	// This is the correct way to validate - try to decrypt the key
+	testAccount, err := OpenAccount(a.path, passphrase)
 	if err != nil {
 		return errors.New("incorrect passphrase")
 	}
+	// Ensure we're not leaking the test account
+	_ = testAccount
 
 	// Serialize entity to buffer
 	var buf bytes.Buffer
@@ -141,6 +134,7 @@ func (a *Account) saveEntity(passphrase string) error {
 	}
 
 	// Write encrypted to account file (atomic write pattern)
+	acc := accountFile(a.path)
 	tmpFile := acc + ".tmp"
 	plainFile, err := os.Create(tmpFile)
 	if err != nil {

@@ -150,6 +150,15 @@ func (a *Account) Name() string {
 	if a == nil || a.entity == nil {
 		return ""
 	}
+	
+	// First, look for primary identity
+	for _, i := range a.entity.Identities {
+		if i.SelfSignature.IsPrimaryId != nil && *i.SelfSignature.IsPrimaryId {
+			return i.UserId.Name
+		}
+	}
+	
+	// Fallback to first identity
 	for _, i := range a.entity.Identities {
 		return i.UserId.Name
 	}
@@ -161,6 +170,15 @@ func (a *Account) Email() string {
 	if a == nil || a.entity == nil {
 		return ""
 	}
+	
+	// First, look for primary identity
+	for _, i := range a.entity.Identities {
+		if i.SelfSignature.IsPrimaryId != nil && *i.SelfSignature.IsPrimaryId {
+			return i.UserId.Email
+		}
+	}
+	
+	// Fallback to first identity
 	for _, i := range a.entity.Identities {
 		return i.UserId.Email
 	}

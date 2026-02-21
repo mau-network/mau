@@ -47,13 +47,13 @@ func TestAccount_AddIdentity(t *testing.T) {
 }
 
 func TestAccount_AddIdentity_WrongPassphrase(t *testing.T) {
-	t.Skip("TODO: Passphrase validation causing test to hang - needs investigation")
 	tmpDir := t.TempDir()
 	acc, err := NewAccount(tmpDir, "Test", "test@example.com", "correct-pass")
 	require.NoError(t, err)
 
 	err = acc.AddIdentity("New", "new@example.com", "wrong-pass")
 	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "incorrect passphrase")
 }
 
 func TestAccount_AddIdentity_EmptyPassphrase(t *testing.T) {
@@ -66,7 +66,6 @@ func TestAccount_AddIdentity_EmptyPassphrase(t *testing.T) {
 }
 
 func TestAccount_SetPrimaryIdentity(t *testing.T) {
-	t.Skip("TODO: Primary identity flag not persisting correctly - needs investigation")
 	tmpDir := t.TempDir()
 	passphrase := "test-pass"
 	
@@ -79,13 +78,18 @@ func TestAccount_SetPrimaryIdentity(t *testing.T) {
 
 	// Initially first identity should be primary
 	assert.Equal(t, "First", acc.Name())
+	assert.Equal(t, "first@example.com", acc.Email())
 
 	// Set second as primary
 	secondIdentity := "Second <second@example.com>"
 	err = acc.SetPrimaryIdentity(secondIdentity, passphrase)
 	require.NoError(t, err)
 
-	// Reload and verify
+	// After setting, should immediately return new primary
+	assert.Equal(t, "Second", acc.Name())
+	assert.Equal(t, "second@example.com", acc.Email())
+
+	// Reload and verify it persisted
 	acc2, err := OpenAccount(tmpDir, passphrase)
 	require.NoError(t, err)
 	
