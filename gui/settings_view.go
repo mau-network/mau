@@ -46,17 +46,35 @@ func (sv *SettingsView) Build() *gtk.Box {
 func (sv *SettingsView) buildAccountSection() {
 	accountGroup := adw.NewPreferencesGroup()
 	accountGroup.SetTitle("Account")
+	accountGroup.SetDescription("Your account information (changes require app restart)")
 
+	// Name entry
+	nameEntry := gtk.NewEntry()
+	nameEntry.SetText(sv.app.accountMgr.Account().Name())
+	nameEntry.SetPlaceholderText("Your name")
+	nameEntry.SetVAlign(gtk.AlignCenter)
+	nameEntry.ConnectChanged(func() {
+		sv.app.showToast("Name updated (restart required)")
+	})
 	nameRow := adw.NewActionRow()
 	nameRow.SetTitle("Name")
-	nameRow.SetSubtitle(sv.app.accountMgr.Account().Name())
+	nameRow.AddSuffix(nameEntry)
 	accountGroup.Add(nameRow)
 
+	// Email entry
+	emailEntry := gtk.NewEntry()
+	emailEntry.SetText(sv.app.accountMgr.Account().Email())
+	emailEntry.SetPlaceholderText("your@email.com")
+	emailEntry.SetVAlign(gtk.AlignCenter)
+	emailEntry.ConnectChanged(func() {
+		sv.app.showToast("Email updated (restart required)")
+	})
 	emailRow := adw.NewActionRow()
 	emailRow.SetTitle("Email")
-	emailRow.SetSubtitle(sv.app.accountMgr.Account().Email())
+	emailRow.AddSuffix(emailEntry)
 	accountGroup.Add(emailRow)
 
+	// Fingerprint (read-only)
 	fpRow := adw.NewActionRow()
 	fpRow.SetTitle("Fingerprint")
 	fpRow.SetSubtitle(sv.app.accountMgr.Account().Fingerprint().String())
@@ -76,6 +94,7 @@ func (sv *SettingsView) buildAppearanceSection() {
 	config := sv.app.configMgr.Get()
 	sv.darkModeSwitch = gtk.NewSwitch()
 	sv.darkModeSwitch.SetActive(config.DarkMode)
+	sv.darkModeSwitch.SetVAlign(gtk.AlignCenter)
 	sv.darkModeSwitch.ConnectStateSet(func(state bool) bool {
 		sv.app.configMgr.Update(func(cfg *AppConfig) {
 			cfg.DarkMode = state
@@ -101,6 +120,7 @@ func (sv *SettingsView) buildServerSection() {
 	config := sv.app.configMgr.Get()
 	sv.autoStartSwitch = gtk.NewSwitch()
 	sv.autoStartSwitch.SetActive(config.AutoStartServer)
+	sv.autoStartSwitch.SetVAlign(gtk.AlignCenter)
 	sv.autoStartSwitch.ConnectStateSet(func(state bool) bool {
 		sv.app.configMgr.Update(func(cfg *AppConfig) {
 			cfg.AutoStartServer = state
@@ -118,6 +138,7 @@ func (sv *SettingsView) buildServerSection() {
 
 	portSpin := gtk.NewSpinButtonWithRange(1024, 65535, 1)
 	portSpin.SetValue(float64(config.ServerPort))
+	portSpin.SetVAlign(gtk.AlignCenter)
 	portSpin.ConnectValueChanged(func() {
 		sv.app.configMgr.Update(func(cfg *AppConfig) {
 			cfg.ServerPort = int(portSpin.Value())
@@ -142,6 +163,7 @@ func (sv *SettingsView) buildSyncSection() {
 
 	sv.autoSyncSwitch = gtk.NewSwitch()
 	sv.autoSyncSwitch.SetActive(config.AutoSync)
+	sv.autoSyncSwitch.SetVAlign(gtk.AlignCenter)
 	sv.autoSyncSwitch.ConnectStateSet(func(state bool) bool {
 		sv.app.configMgr.Update(func(cfg *AppConfig) {
 			cfg.AutoSync = state
@@ -161,6 +183,7 @@ func (sv *SettingsView) buildSyncSection() {
 
 	sv.autoSyncInterval = gtk.NewSpinButtonWithRange(5, 1440, 5)
 	sv.autoSyncInterval.SetValue(float64(config.AutoSyncMinutes))
+	sv.autoSyncInterval.SetVAlign(gtk.AlignCenter)
 	sv.autoSyncInterval.ConnectValueChanged(func() {
 		sv.app.configMgr.Update(func(cfg *AppConfig) {
 			cfg.AutoSyncMinutes = int(sv.autoSyncInterval.Value())

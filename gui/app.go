@@ -52,7 +52,6 @@ type MauApp struct {
 
 	// Views
 	homeView     *HomeView
-	timelineView *TimelineView
 	friendsView  *FriendsView
 	networkView  *NetworkView
 	settingsView *SettingsView
@@ -158,14 +157,12 @@ func (m *MauApp) buildUI() {
 
 	// Build views
 	m.homeView = NewHomeView(m)
-	m.timelineView = NewTimelineView(m)
 	m.friendsView = NewFriendsView(m)
 	m.networkView = NewNetworkView(m)
 	m.settingsView = NewSettingsView(m)
 
 	// Add to stack
 	m.mainStack.AddTitledWithIcon(m.homeView.Build(), "home", "Home", "user-home-symbolic")
-	m.mainStack.AddTitledWithIcon(m.timelineView.Build(), "timeline", "Timeline", "view-list-symbolic")
 	m.mainStack.AddTitledWithIcon(m.friendsView.Build(), "friends", "Friends", "system-users-symbolic")
 	m.mainStack.AddTitledWithIcon(m.networkView.Build(), "network", "Network", "network-workgroup-symbolic")
 	m.mainStack.AddTitledWithIcon(m.settingsView.Build(), "settings", "Settings", "preferences-system-symbolic")
@@ -533,9 +530,9 @@ func (m *MauApp) performSync() error {
 	m.showToast(fmt.Sprintf("%s (%d friends)", toastSyncStarted, len(friends)))
 
 	// Actual sync would happen here via P2P
-	// For now, just refresh the timeline
-	if m.timelineView != nil {
-		m.timelineView.Refresh()
+	// Refresh the home view to show new posts
+	if m.homeView != nil {
+		m.homeView.Refresh()
 	}
 
 	return nil

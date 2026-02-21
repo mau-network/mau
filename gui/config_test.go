@@ -216,7 +216,7 @@ func TestAppConfig_Defaults(t *testing.T) {
 		expected interface{}
 	}{
 		{"DarkMode", cfg.DarkMode, false},
-		{"AutoStartServer", cfg.AutoStartServer, false},
+		{"AutoStartServer", cfg.AutoStartServer, true},
 		{"AutoSync", cfg.AutoSync, false},
 		{"AutoSyncMinutes", cfg.AutoSyncMinutes, 30},
 		{"LastAccount", cfg.LastAccount, ""},
