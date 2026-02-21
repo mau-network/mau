@@ -26,6 +26,10 @@ type MauApp struct {
 	toastOverlay   *adw.ToastOverlay
 	mainStack      *adw.ViewStack
 	draftSaveTimer glib.SourceHandle
+	syncTimer      glib.SourceHandle
+	toastQueue     []string
+	toastActive    bool
+	spinner        *gtk.Spinner
 
 	// Views
 	homeView     *HomeView
@@ -120,6 +124,11 @@ func (m *MauApp) buildUI() {
 	m.mainStack = adw.NewViewStack()
 	viewSwitcher.SetStack(m.mainStack)
 	headerBar.SetTitleWidget(viewSwitcher)
+	
+	// Add loading spinner to header
+	m.spinner = gtk.NewSpinner()
+	m.spinner.SetVisible(false)
+	headerBar.PackEnd(m.spinner)
 
 	// Toolbar view
 	toolbarView := adw.NewToolbarView()
@@ -220,9 +229,37 @@ func (m *MauApp) loadCSS() {
 }
 
 func (m *MauApp) showToast(message string) {
+	// Queue toast messages to prevent overflow
+	m.toastQueue = append(m.toastQueue, message)
+	
+	// If not already processing, start showing toasts
+	if !m.toastActive {
+		m.processToastQueue()
+	}
+}
+
+func (m *MauApp) processToastQueue() {
+	if len(m.toastQueue) == 0 {
+		m.toastActive = false
+		return
+	}
+	
+	m.toastActive = true
+	
+	// Get next toast
+	message := m.toastQueue[0]
+	m.toastQueue = m.toastQueue[1:]
+	
+	// Show toast
 	toast := adw.NewToast(message)
 	toast.SetTimeout(3)
 	m.toastOverlay.AddToast(toast)
+	
+	// Process next toast after delay (3.5s: 3s timeout + 0.5s buffer)
+	glib.TimeoutSecondsAdd(4, func() bool {
+		m.processToastQueue()
+		return false
+	})
 }
 
 func (m *MauApp) showErrorDialog(title, message string) {
@@ -231,6 +268,24 @@ func (m *MauApp) showErrorDialog(title, message string) {
 	dialog.AddResponse("ok", "OK")
 	dialog.SetDefaultResponse("ok")
 	dialog.SetCloseResponse("ok")
+	dialog.Show()
+}
+
+func (m *MauApp) showConfirmDialog(title, message string, onConfirm func()) {
+	window := m.app.ActiveWindow()
+	dialog := adw.NewMessageDialog(window, title, message)
+	dialog.AddResponse("cancel", "Cancel")
+	dialog.AddResponse("confirm", "Confirm")
+	dialog.SetDefaultResponse("cancel")
+	dialog.SetCloseResponse("cancel")
+	dialog.SetResponseAppearance("confirm", adw.ResponseDestructive)
+	
+	dialog.ConnectResponse(func(response string) {
+		if response == "confirm" && onConfirm != nil {
+			onConfirm()
+		}
+	})
+	
 	dialog.Show()
 }
 
@@ -325,21 +380,41 @@ func (m *MauApp) startAutoSync() {
 }
 
 func (m *MauApp) syncFriends() {
+	m.setLoading(true)
+	defer m.setLoading(false)
+	
 	keyring, err := m.accountMgr.Account().ListFriends()
 	if err != nil {
-		m.showToast("Failed to load friends")
+		m.showToast(toastSyncFailed + ": " + err.Error())
 		return
 	}
 
 	friends := keyring.FriendsSet()
 	if len(friends) == 0 {
+		m.showToast(toastNoFriends)
 		return
 	}
 
-	m.showToast(fmt.Sprintf("Syncing with %d friends...", len(friends)))
+	m.showToast(fmt.Sprintf("%s (%d friends)", toastSyncStarted, len(friends)))
+	
 	// Actual sync would happen here via P2P
+	// For now, just refresh the timeline
 	if m.timelineView != nil {
 		m.timelineView.Refresh()
+	}
+	
+	m.showToast(toastSyncComplete)
+}
+
+func (m *MauApp) setLoading(loading bool) {
+	if m.spinner != nil {
+		if loading {
+			m.spinner.Start()
+			m.spinner.SetVisible(true)
+		} else {
+			m.spinner.Stop()
+			m.spinner.SetVisible(false)
+		}
 	}
 }
 
