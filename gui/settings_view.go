@@ -111,6 +111,20 @@ func (sv *SettingsView) buildIdentitiesSection() {
 }
 
 func (sv *SettingsView) setPrimaryIdentity(identityName string) {
+	// Check for cached passphrase first
+	cachedPass, hasCached := sv.app.accountMgr.GetCachedPassphrase()
+	
+	if hasCached {
+		// Try with cached passphrase
+		err := sv.app.accountMgr.Account().SetPrimaryIdentity(identityName, cachedPass)
+		if err == nil {
+			sv.app.showToast("Primary identity updated!")
+			sv.refreshAccountSection()
+			return
+		}
+		// If failed, fall through to prompt (might be wrong cached passphrase)
+	}
+
 	// Prompt for passphrase
 	window := sv.app.app.ActiveWindow()
 	dialog := adw.NewMessageDialog(window, "Set Primary Identity", "")
@@ -149,6 +163,9 @@ func (sv *SettingsView) setPrimaryIdentity(identityName string) {
 				sv.app.ShowError("Failed to Set Primary", err.Error())
 				return
 			}
+
+			// Cache passphrase on success
+			sv.app.accountMgr.CachePassphrase(passphrase)
 
 			sv.app.showToast("Primary identity updated!")
 			sv.refreshAccountSection()
@@ -243,6 +260,9 @@ func (sv *SettingsView) addIdentity(name, email, passphrase string) {
 		sv.app.ShowError("Failed to Add Identity", err.Error())
 		return
 	}
+
+	// Cache passphrase on success for future operations
+	sv.app.accountMgr.CachePassphrase(passphrase)
 
 	sv.app.showToast("Identity added successfully!")
 	sv.refreshAccountSection()

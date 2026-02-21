@@ -110,9 +110,10 @@ func (cm *ConfigManager) Update(updater func(*AppConfig)) error {
 
 // AccountManager handles account operations
 type AccountManager struct {
-	dataDir  string
-	account  *mau.Account
-	password string
+	dataDir         string
+	account         *mau.Account
+	password        string
+	passphraseCache string // Session-only passphrase cache
 }
 
 // NewAccountManager creates an account manager
@@ -176,6 +177,24 @@ func (am *AccountManager) Info() AccountInfo {
 		Fingerprint: am.account.Fingerprint().String(),
 		DataDir:     am.dataDir,
 	}
+}
+
+// CachePassphrase stores passphrase in memory for the session
+func (am *AccountManager) CachePassphrase(passphrase string) {
+	am.passphraseCache = passphrase
+}
+
+// GetCachedPassphrase retrieves the cached passphrase if available
+func (am *AccountManager) GetCachedPassphrase() (string, bool) {
+	if am.passphraseCache != "" {
+		return am.passphraseCache, true
+	}
+	return "", false
+}
+
+// ClearPassphraseCache clears the in-memory passphrase cache
+func (am *AccountManager) ClearPassphraseCache() {
+	am.passphraseCache = ""
 }
 
 // ApplyTheme applies dark/light theme
