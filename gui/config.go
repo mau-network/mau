@@ -45,7 +45,7 @@ func NewConfigManager(dataDir string) *ConfigManager {
 		config: AppConfig{
 			SchemaVersion:   currentSchemaVersion,
 			DarkMode:        false,
-			AutoStartServer: false,
+			AutoStartServer: true,  // Auto-start server by default
 			AutoSync:        false,
 			AutoSyncMinutes: 30,
 			ServerPort:      8080,

@@ -10,6 +10,7 @@ import (
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
+	"github.com/mau-network/mau"
 )
 
 // HomeView handles the home view with composer and posts
@@ -313,28 +314,45 @@ func (hv *HomeView) publishPost() {
 	hv.Refresh()
 }
 
-// Refresh reloads the posts list
+// Refresh reloads the posts list showing posts from self and friends
 func (hv *HomeView) Refresh() {
 	hv.postsList.RemoveAll()
 
+	// Get own posts
 	fpr := hv.app.accountMgr.Account().Fingerprint()
-	files, err := hv.app.postMgr.List(fpr, 100)
-	if err != nil || len(files) == 0 {
+	ownFiles, _ := hv.app.postMgr.List(fpr, 100)
+
+	// Get friends' posts
+	keyring, err := hv.app.accountMgr.Account().ListFriends()
+	var friendFiles []*mau.File
+	if err == nil {
+		friends := keyring.FriendsSet()
+		for _, friend := range friends {
+			friendFpr := friend.Fingerprint()
+			files, _ := hv.app.postMgr.List(friendFpr, 100)
+			friendFiles = append(friendFiles, files...)
+		}
+	}
+
+	// Combine all files
+	allFiles := append(ownFiles, friendFiles...)
+
+	if len(allFiles) == 0 {
 		row := adw.NewActionRow()
 		row.SetTitle("No posts yet")
-		row.SetSubtitle("Create your first post above")
+		row.SetSubtitle("Create your first post above or add friends to see their posts")
 		hv.postsList.Append(row)
 		return
 	}
 
 	// Sort by newest first
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].Name() > files[j].Name()
+	sort.Slice(allFiles, func(i, j int) bool {
+		return allFiles[i].Name() > allFiles[j].Name()
 	})
 
 	searchTerm := strings.ToLower(hv.searchEntry.Text())
 
-	for _, file := range files {
+	for _, file := range allFiles {
 		post, err := hv.app.postMgr.Load(file)
 		if err != nil {
 			continue
@@ -347,7 +365,13 @@ func (hv *HomeView) Refresh() {
 		row := adw.NewActionRow()
 		row.SetTitle(Truncate(post.Body, 80))
 
-		subtitle := post.Published.Format("2006-01-02 15:04")
+		// Add author name to subtitle
+		authorInfo := post.Author.Name
+		if post.Author.Name == hv.app.accountMgr.Account().Name() {
+			authorInfo = "You"
+		}
+
+		subtitle := authorInfo + " • " + post.Published.Format("2006-01-02 15:04")
 		if len(post.Tags) > 0 {
 			subtitle += " • " + FormatTags(post.Tags)
 		}
