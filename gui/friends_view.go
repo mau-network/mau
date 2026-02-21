@@ -32,8 +32,7 @@ func (fv *FriendsView) Build() *gtk.Box {
 	friendsGroup.SetTitle("Friends")
 	friendsGroup.SetDescription("Manage your network")
 
-	fv.friendsList = gtk.NewListBox()
-	fv.friendsList.AddCSSClass("boxed-list")
+	fv.friendsList = NewBoxedListBox()
 
 	scrolled := gtk.NewScrolledWindow()
 	scrolled.SetVExpand(true)

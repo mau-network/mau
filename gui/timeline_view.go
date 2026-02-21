@@ -73,8 +73,7 @@ func (tv *TimelineView) Build() *gtk.Box {
 	timelineGroup := adw.NewPreferencesGroup()
 	timelineGroup.SetTitle("Posts from Friends")
 
-	tv.timelineList = gtk.NewListBox()
-	tv.timelineList.AddCSSClass("boxed-list")
+	tv.timelineList = NewBoxedListBox()
 
 	timelineScrolled := gtk.NewScrolledWindow()
 	timelineScrolled.SetVExpand(true)
