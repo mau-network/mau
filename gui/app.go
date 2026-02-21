@@ -1,3 +1,20 @@
+// Package main implements the Mau GUI - a GTK4/Adwaita-based client for the Mau P2P social network.
+//
+// Features:
+//   - Post creation with markdown support
+//   - Friend management with PGP key verification
+//   - P2P server with configurable port
+//   - Timeline with pagination and filtering
+//   - Automatic retry with exponential backoff
+//   - Graceful degradation and offline mode
+//
+// Architecture:
+//   - Modular design with separate view components
+//   - Interface-based dependency injection
+//   - In-memory LRU cache with TTL
+//   - Atomic file operations for data safety
+//
+// For more information, see README.md
 package main
 
 import (
