@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
@@ -156,7 +157,41 @@ func (fv *FriendsView) showAddFriendDialog() {
 }
 
 func (fv *FriendsView) addFriend(armoredKey string) error {
+	// Validate PGP key format
+	if err := validatePGPKey(armoredKey); err != nil {
+		return err
+	}
+
 	reader := strings.NewReader(armoredKey)
 	_, err := fv.app.accountMgr.Account().AddFriend(reader)
 	return err
+}
+
+// validatePGPKey validates PGP armored key format
+func validatePGPKey(armoredKey string) error {
+	key := strings.TrimSpace(armoredKey)
+	
+	if key == "" {
+		return fmt.Errorf("PGP key cannot be empty")
+	}
+
+	// Check for PGP armor headers
+	if !strings.Contains(key, "-----BEGIN PGP PUBLIC KEY BLOCK-----") {
+		return fmt.Errorf("invalid PGP key format: missing BEGIN header")
+	}
+
+	if !strings.Contains(key, "-----END PGP PUBLIC KEY BLOCK-----") {
+		return fmt.Errorf("invalid PGP key format: missing END header")
+	}
+
+	// Basic length check (typical PGP keys are 1-10KB)
+	if len(key) < 200 {
+		return fmt.Errorf("PGP key too short (possible truncation)")
+	}
+
+	if len(key) > 50000 {
+		return fmt.Errorf("PGP key too long (max 50KB)")
+	}
+
+	return nil
 }

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 )
@@ -43,15 +45,15 @@ func (nv *NetworkView) Build() *gtk.Box {
 	nv.serverToggle.SetActive(false)
 	nv.serverToggle.ConnectStateSet(func(state bool) bool {
 		if state {
-			if err := nv.app.startServer(); err != nil {
-				nv.app.showToast("Failed to start server: " + err.Error())
+			if err := nv.app.Start(); err != nil {
+				nv.app.ShowError("Server Error", err.Error())
 				nv.serverToggle.SetActive(false)
 				return false
 			}
 			nv.UpdateStatus(true)
 		} else {
-			if err := nv.app.stopServer(); err != nil {
-				nv.app.showToast("Failed to stop server: " + err.Error())
+			if err := nv.app.Stop(); err != nil {
+				nv.app.ShowError("Server Error", err.Error())
 				return false
 			}
 			nv.UpdateStatus(false)
@@ -72,18 +74,26 @@ func (nv *NetworkView) Build() *gtk.Box {
 	fprRow.SetSubtitle(nv.app.accountMgr.Account().Fingerprint().String())
 	infoGroup.Add(fprRow)
 
+	// Server port info
+	config := nv.app.configMgr.Get()
+	portRow := adw.NewActionRow()
+	portRow.SetTitle("Server Port")
+	portRow.SetSubtitle(fmt.Sprintf("%d (configurable in settings)", config.ServerPort))
+	infoGroup.Add(portRow)
+
 	nv.page.Append(infoGroup)
 
 	// Update initial status
-	nv.UpdateStatus(nv.app.serverRunning)
+	nv.UpdateStatus(nv.app.IsRunning())
 
 	return nv.page
 }
 
 // UpdateStatus updates the server status indicator
 func (nv *NetworkView) UpdateStatus(running bool) {
+	config := nv.app.configMgr.Get()
 	if running {
-		nv.serverStatus.SetText("Running on :8080")
+		nv.serverStatus.SetText(fmt.Sprintf("Running on :%d", config.ServerPort))
 		nv.serverStatus.RemoveCSSClass("status-stopped")
 		nv.serverStatus.AddCSSClass("status-running")
 	} else {

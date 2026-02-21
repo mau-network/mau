@@ -261,6 +261,13 @@ func (hv *HomeView) publishPost() {
 		return
 	}
 
+	// Validate and sanitize post body
+	if err := ValidatePostBody(text); err != nil {
+		hv.app.ShowError("Validation Error", err.Error())
+		return
+	}
+	text = SanitizePostBody(text)
+
 	tags := ParseTags(hv.tagEntry.Text())
 
 	author := Author{
@@ -273,7 +280,7 @@ func (hv *HomeView) publishPost() {
 	post := NewPost(text, author, tags)
 
 	if err := hv.app.postMgr.Save(post); err != nil {
-		hv.app.showToast("Failed to save post: " + err.Error())
+		hv.app.ShowError("Save Error", fmt.Sprintf("Failed to save post: %v", err))
 		return
 	}
 

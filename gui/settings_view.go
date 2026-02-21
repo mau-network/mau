@@ -111,6 +111,22 @@ func (sv *SettingsView) buildServerSection() {
 	autoStartRow.AddSuffix(sv.autoStartSwitch)
 	serverGroup.Add(autoStartRow)
 
+	// Server port configuration
+	portRow := adw.NewActionRow()
+	portRow.SetTitle("Server Port")
+	portRow.SetSubtitle("Port for P2P server (requires restart)")
+
+	portSpin := gtk.NewSpinButtonWithRange(1024, 65535, 1)
+	portSpin.SetValue(float64(config.ServerPort))
+	portSpin.ConnectValueChanged(func() {
+		sv.app.configMgr.Update(func(cfg *AppConfig) {
+			cfg.ServerPort = int(portSpin.Value())
+		})
+		sv.app.showToast("Server port updated (restart server to apply)")
+	})
+	portRow.AddSuffix(portSpin)
+	serverGroup.Add(portRow)
+
 	sv.page.Append(serverGroup)
 }
 

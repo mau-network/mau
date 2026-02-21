@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
+	"github.com/diamondburned/gotk4/pkg/gdk/v4"
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 	"github.com/mau-network/mau"
@@ -143,10 +144,10 @@ func (m *MauApp) buildUI() {
 
 	window.SetContent(m.toastOverlay)
 	
-	// Load custom CSS
-	m.loadCSS()
-	
 	window.Show()
+	
+	// Load CSS after window is shown
+	m.loadCSS()
 }
 
 func (m *MauApp) loadCSS() {
@@ -207,8 +208,15 @@ func (m *MauApp) loadCSS() {
 	provider := gtk.NewCSSProvider()
 	provider.LoadFromData(css)
 	
-	// CSS is loaded globally - will be applied when windows are created
-	// Note: Individual windows can add provider to their display context
+	// Apply CSS to the default display (works for all windows)
+	display := gdk.DisplayGetDefault()
+	if display != nil {
+		gtk.StyleContextAddProviderForDisplay(
+			display,
+			provider,
+			gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+		)
+	}
 }
 
 func (m *MauApp) showToast(message string) {
@@ -233,25 +241,32 @@ func (m *MauApp) startServer() error {
 
 	server, err := m.accountMgr.Account().Server(nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create server: %w", err)
 	}
 
 	m.server = server
 
+	// Get configured port
+	config := m.configMgr.Get()
+	serverAddr := fmt.Sprintf(":%d", config.ServerPort)
+	externalAddr := fmt.Sprintf("127.0.0.1:%d", config.ServerPort)
+
 	go func() {
-		listener, err := mau.ListenTCP(":8080")
+		listener, err := mau.ListenTCP(serverAddr)
 		if err != nil {
-			log.Printf("Failed to listen: %v", err)
+			log.Printf("Failed to listen on %s: %v", serverAddr, err)
+			m.serverRunning = false
+			m.server = nil
 			return
 		}
 
-		if err := m.server.Serve(listener, "127.0.0.1:8080"); err != nil {
-			log.Printf("Server error: %v", err)
+		if err := m.server.Serve(listener, externalAddr); err != nil {
+			log.Printf("Server error on %s: %v", serverAddr, err)
 		}
 	}()
 
 	m.serverRunning = true
-	m.showToast("Server started on :8080")
+	m.showToast(fmt.Sprintf("Server started on %s", serverAddr))
 	return nil
 }
 
@@ -261,13 +276,35 @@ func (m *MauApp) stopServer() error {
 	}
 
 	if err := m.server.Close(); err != nil {
-		return err
+		return fmt.Errorf("failed to stop server: %w", err)
 	}
 
 	m.serverRunning = false
 	m.server = nil
 	m.showToast("Server stopped")
 	return nil
+}
+
+// Interface implementations for ServerController
+func (m *MauApp) Start() error {
+	return m.startServer()
+}
+
+func (m *MauApp) Stop() error {
+	return m.stopServer()
+}
+
+func (m *MauApp) IsRunning() bool {
+	return m.serverRunning
+}
+
+// Interface implementations for ToastNotifier
+func (m *MauApp) ShowToast(message string) {
+	m.showToast(message)
+}
+
+func (m *MauApp) ShowError(title, message string) {
+	m.showErrorDialog(title, message)
 }
 
 func (m *MauApp) startAutoSync() {
@@ -307,7 +344,12 @@ func (m *MauApp) syncFriends() {
 }
 
 func main() {
-	dataDir := filepath.Join(os.Getenv("HOME"), ".mau-gui")
+	// Allow data dir to be overridden via environment variable for testing
+	dataDir := os.Getenv("MAU_GUI_DATA_DIR")
+	if dataDir == "" {
+		dataDir = filepath.Join(os.Getenv("HOME"), ".mau-gui")
+	}
+
 	app := NewMauApp(dataDir)
 	
 	if code := app.Run(os.Args); code > 0 {

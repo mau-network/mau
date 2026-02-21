@@ -171,14 +171,46 @@ func ParseTags(tagText string) []string {
 		return nil
 	}
 
+	// Validate input length
+	if len(tagText) > maxTagsInput {
+		tagText = tagText[:maxTagsInput]
+	}
+
 	var tags []string
 	for _, tag := range strings.Split(tagText, ",") {
 		tag = strings.TrimSpace(tag)
-		if tag != "" {
-			tags = append(tags, tag)
+		if tag == "" {
+			continue
+		}
+		// Validate individual tag length
+		if len(tag) > maxTagLength {
+			tag = tag[:maxTagLength]
+		}
+		tags = append(tags, tag)
+		// Limit number of tags
+		if len(tags) >= maxTags {
+			break
 		}
 	}
 	return tags
+}
+
+// ValidatePostBody validates post body content
+func ValidatePostBody(body string) error {
+	if body == "" {
+		return fmt.Errorf("post body cannot be empty")
+	}
+	if len(body) > maxPostBodyLength {
+		return fmt.Errorf("post body too long (max %d characters, got %d)", maxPostBodyLength, len(body))
+	}
+	return nil
+}
+
+// SanitizePostBody sanitizes post body (basic HTML escape for safety)
+func SanitizePostBody(body string) string {
+	// Basic sanitization - the markdown renderer handles the rest
+	body = strings.ReplaceAll(body, "\x00", "") // Remove null bytes
+	return strings.TrimSpace(body)
 }
 
 // FormatTags formats tags as comma-separated string
