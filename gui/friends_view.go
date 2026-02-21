@@ -138,15 +138,15 @@ func (fv *FriendsView) showAddFriendDialog() {
 			keyData := buffer.Text(start, end, false)
 
 			if keyData == "" {
-				fv.app.showToast("Please enter a public key")
+				fv.app.ShowError(dialogValidateError, "Please enter a PGP public key")
 				dialog.Destroy()
 				return
 			}
 
 			if err := fv.addFriend(keyData); err != nil {
-				fv.app.showToast("Failed to add friend: " + err.Error())
+				fv.app.ShowError("Failed to Add Friend", fmt.Sprintf("Could not add friend: %v", err))
 			} else {
-				fv.app.showToast("Friend added!")
+				fv.app.showToast(toastFriendAdded)
 				fv.Refresh()
 			}
 		}

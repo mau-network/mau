@@ -69,44 +69,67 @@ func PostFromJSON(data []byte) (Post, error) {
 // PostManager handles post operations
 type PostManager struct {
 	account *mau.Account
+	cache   *PostCache
 }
 
 // NewPostManager creates a post manager
 func NewPostManager(account *mau.Account) *PostManager {
-	return &PostManager{account: account}
+	return &PostManager{
+		account: account,
+		cache:   NewPostCache(500, 5*time.Minute), // Cache 500 posts for 5 minutes
+	}
 }
 
 // Save saves a post
 func (pm *PostManager) Save(post Post) error {
 	jsonData, err := post.ToJSON()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to serialize post: %w", err)
 	}
 
 	keyring, err := pm.account.ListFriends()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list friends: %w", err)
 	}
 
 	recipients := keyring.FriendsSet()
 	filename := fmt.Sprintf("posts/post-%d.json", time.Now().UnixNano())
 	reader := bytes.NewReader(jsonData)
 
-	_, err = pm.account.AddFile(reader, filename, recipients)
-	return err
+	file, err := pm.account.AddFile(reader, filename, recipients)
+	if err != nil {
+		return fmt.Errorf("failed to add file: %w", err)
+	}
+
+	// Cache the newly saved post
+	cacheKey := fmt.Sprintf("%s:%s", pm.account.Fingerprint().String(), filename)
+	pm.cache.Set(cacheKey, post)
+
+	_ = file // Use file if needed in future
+	return nil
 }
 
 // Load loads a post from a file
 func (pm *PostManager) Load(file *mau.File) (Post, error) {
+	// Try cache first - use file path as cache key
+	cacheKey := file.Name()
+	if cached, ok := pm.cache.Get(cacheKey); ok {
+		return cached, nil
+	}
+
+	// Cache miss - load from disk
 	reader, err := file.Reader(pm.account)
 	if err != nil {
-		return Post{}, err
+		return Post{}, fmt.Errorf("failed to read file: %w", err)
 	}
 
 	var post Post
 	if err := json.NewDecoder(reader).Decode(&post); err != nil {
-		return Post{}, err
+		return Post{}, fmt.Errorf("failed to decode post: %w", err)
 	}
+
+	// Store in cache
+	pm.cache.Set(cacheKey, post)
 
 	return post, nil
 }
@@ -123,6 +146,16 @@ func (pm *PostManager) List(fingerprint mau.Fingerprint, limit int) ([]*mau.File
 	}
 
 	return postFiles, nil
+}
+
+// ClearCache clears the post cache
+func (pm *PostManager) ClearCache() {
+	pm.cache.Clear()
+}
+
+// CacheStats returns cache statistics
+func (pm *PostManager) CacheStats() (size int, capacity int) {
+	return pm.cache.Stats()
 }
 
 // MarkdownRenderer handles markdown conversion
