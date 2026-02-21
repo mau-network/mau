@@ -13,6 +13,7 @@ type PostCache struct {
 	ttl     time.Duration
 }
 
+// cacheEntry represents a cached post with timestamp
 type cacheEntry struct {
 	post      Post
 	timestamp time.Time
