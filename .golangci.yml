@@ -8,12 +8,21 @@ linters-settings:
     max-complexity: 8
     # Should ignore tests
     skip-tests: true
+  
+  funlen:
+    # Maximum number of lines in a function
+    lines: 20
+    # Maximum number of statements in a function
+    statements: 15
+    # Ignore comments when counting lines
+    ignore-comments: false
 
 linters:
   enable:
     - gocyclo      # Checks function complexity
     - cyclop       # Alternative cyclomatic complexity checker
     - gocognit     # Checks cognitive complexity (similar to cyclomatic)
+    - funlen       # Checks function length (max 20 lines, 15 statements)
   
   disable:
     - errcheck
@@ -26,6 +35,14 @@ run:
   
   # Include test files
   tests: true
+
+# Code Quality Standards:
+# - Maximum function length: 20 lines (enforced by funlen linter)
+# - Maximum file length: 200 lines (enforced manually - no built-in linter)
+# - Maximum cyclomatic complexity: 8 (enforced by gocyclo/cyclop)
+# 
+# To check file lengths manually:
+#   wc -l **/*.go | awk '$1 > 200 {print $0}'
 
 issues:
   # Maximum count of issues with the same text

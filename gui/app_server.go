@@ -17,128 +17,155 @@ func (m *MauApp) startServer() error {
 		return nil
 	}
 
-	server, err := m.accountMgr.Account().Server(nil)
+	server, err := m.createServer()
 	if err != nil {
-		return fmt.Errorf("failed to create server: %w", err)
+		return err
 	}
 
 	m.server = server
-
-	// Get configured port
-	config := m.configMgr.Get()
-	serverAddr := fmt.Sprintf(":%d", config.ServerPort)
-	externalAddr := fmt.Sprintf("127.0.0.1:%d", config.ServerPort)
-
-	// Channel to capture startup errors
-	startupErr := make(chan error, 1)
-
-	go func() {
-		listener, err := mau.ListenTCP(serverAddr)
-		if err != nil {
-			log.Printf("Failed to listen on %s: %v", serverAddr, err)
-			m.serverRunning = false
-			m.server = nil
-			startupErr <- err
-
-			// Show error dialog with retry option (using glib.IdleAdd for GTK thread safety)
-			glib.IdleAdd(func() bool {
-				m.handleServerStartupFailure(err, serverAddr)
-				return false
-			})
-			return
-		}
-
-		// Signal successful startup
-		startupErr <- nil
-
-		if err := m.server.Serve(listener, externalAddr); err != nil {
-			log.Printf("Server error on %s: %v", serverAddr, err)
-
-			// Show error if server fails during operation
-			glib.IdleAdd(func() bool {
-				m.showToast(fmt.Sprintf("Server stopped unexpectedly: %v", err))
-				m.serverRunning = false
-				return false
-			})
-		}
-	}()
-
-	// Wait briefly for startup result
-	go func() {
-		select {
-		case err := <-startupErr:
-			if err == nil {
-				// Success
-				glib.IdleAdd(func() bool {
-					m.serverRunning = true
-					m.showToast(fmt.Sprintf("Server started on %s", serverAddr))
-					return false
-				})
-			}
-			// Error case handled in goroutine above
-		case <-time.After(serverStartupWait * time.Second):
-			// Assume success if no error within 2 seconds
-			glib.IdleAdd(func() bool {
-				m.serverRunning = true
-				m.showToast(fmt.Sprintf("Server started on %s", serverAddr))
-				return false
-			})
-		}
-	}()
-
+	m.launchServerAsync()
 	return nil
 }
 
-// handleServerStartupFailure handles server startup errors with user-friendly dialogs
-func (m *MauApp) handleServerStartupFailure(err error, addr string) {
-	// Determine user-friendly error message
-	errMsg := err.Error()
-	var friendlyMsg string
-	var suggestion string
+// createServer creates a new server instance
+func (m *MauApp) createServer() (*mau.Server, error) {
+	server, err := m.accountMgr.Account().Server(nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create server: %w", err)
+	}
+	return server, nil
+}
 
-	if strings.Contains(errMsg, "bind") || strings.Contains(errMsg, "address already in use") {
-		friendlyMsg = errPortInUse
-		suggestion = "Try changing the server port in Settings, or stop any other service using the port."
-	} else if strings.Contains(errMsg, "permission denied") {
-		friendlyMsg = errPermissionDenied
-		suggestion = "Try using a port number above 1024, or run with appropriate permissions."
-	} else {
-		friendlyMsg = fmt.Sprintf("Failed to start server on %s: %v", addr, err)
-		suggestion = "Check your network configuration and firewall settings."
+// launchServerAsync launches the server in background goroutines
+func (m *MauApp) launchServerAsync() {
+	config := m.configMgr.Get()
+	serverAddr := fmt.Sprintf(":%d", config.ServerPort)
+	externalAddr := fmt.Sprintf("127.0.0.1:%d", config.ServerPort)
+	startupErr := make(chan error, 1)
+
+	go m.runServerListener(serverAddr, externalAddr, startupErr)
+	go m.monitorServerStartup(serverAddr, startupErr)
+}
+
+// runServerListener runs the server listener loop
+func (m *MauApp) runServerListener(serverAddr, externalAddr string, startupErr chan error) {
+	listener, err := mau.ListenTCP(serverAddr)
+	if err != nil {
+		m.handleListenerError(err, serverAddr, startupErr)
+		return
 	}
 
-	// Show error dialog with details and retry option
+	startupErr <- nil
+
+	if err := m.server.Serve(listener, externalAddr); err != nil {
+		m.handleServerError(err)
+	}
+}
+
+// handleListenerError handles listener creation failures
+func (m *MauApp) handleListenerError(err error, serverAddr string, startupErr chan error) {
+	log.Printf("Failed to listen on %s: %v", serverAddr, err)
+	m.serverRunning = false
+	m.server = nil
+	startupErr <- err
+
+	glib.IdleAdd(func() bool {
+		m.handleServerStartupFailure(err, serverAddr)
+		return false
+	})
+}
+
+// handleServerError handles runtime server errors
+func (m *MauApp) handleServerError(err error) {
+	log.Printf("Server error: %v", err)
+	glib.IdleAdd(func() bool {
+		m.showToast(fmt.Sprintf("Server stopped unexpectedly: %v", err))
+		m.serverRunning = false
+		return false
+	})
+}
+
+// monitorServerStartup waits for startup completion or timeout
+func (m *MauApp) monitorServerStartup(serverAddr string, startupErr chan error) {
+	select {
+	case err := <-startupErr:
+		if err == nil {
+			m.notifyServerStarted(serverAddr)
+		}
+	case <-time.After(serverStartupWait * time.Second):
+		m.notifyServerStarted(serverAddr)
+	}
+}
+
+// notifyServerStarted updates UI after successful startup
+func (m *MauApp) notifyServerStarted(serverAddr string) {
+	glib.IdleAdd(func() bool {
+		m.serverRunning = true
+		m.showToast(fmt.Sprintf("Server started on %s", serverAddr))
+		return false
+	})
+}
+
+// handleServerStartupFailure shows error dialog with retry option
+func (m *MauApp) handleServerStartupFailure(err error, addr string) {
+	friendlyMsg, suggestion := m.parseServerError(err, addr)
+	dialog := m.createServerErrorDialog(friendlyMsg, suggestion)
+	m.connectServerErrorHandlers(dialog)
+	dialog.Show()
+}
+
+// parseServerError converts technical errors to user-friendly messages
+func (m *MauApp) parseServerError(err error, addr string) (string, string) {
+	errMsg := err.Error()
+
+	if strings.Contains(errMsg, "bind") || strings.Contains(errMsg, "address already in use") {
+		return errPortInUse, "Try changing the server port in Settings, or stop any other service using the port."
+	}
+	if strings.Contains(errMsg, "permission denied") {
+		return errPermissionDenied, "Try using a port number above 1024, or run with appropriate permissions."
+	}
+	return fmt.Sprintf("Failed to start server on %s: %v", addr, err), "Check your network configuration and firewall settings."
+}
+
+// createServerErrorDialog creates the error dialog UI
+func (m *MauApp) createServerErrorDialog(friendlyMsg, suggestion string) *adw.MessageDialog {
 	window := m.app.ActiveWindow()
-	dialog := adw.NewMessageDialog(
-		window,
-		dialogNetworkError,
-		friendlyMsg+"\n\n"+suggestion,
-	)
+	dialog := adw.NewMessageDialog(window, dialogNetworkError, friendlyMsg+"\n\n"+suggestion)
 	dialog.AddResponse("retry", "Retry")
 	dialog.AddResponse("offline", "Continue Offline")
 	dialog.SetDefaultResponse("retry")
 	dialog.SetCloseResponse("offline")
 	dialog.SetResponseAppearance("retry", adw.ResponseSuggested)
+	return dialog
+}
 
+// connectServerErrorHandlers connects dialog response handlers
+func (m *MauApp) connectServerErrorHandlers(dialog *adw.MessageDialog) {
 	dialog.ConnectResponse(func(responseId string) {
 		if responseId == "retry" {
-			// Retry starting the server
-			m.showToast("Retrying server startup...")
-			time.AfterFunc(retryDelay*time.Second, func() {
-				glib.IdleAdd(func() bool {
-					if err := m.startServer(); err != nil {
-						m.showToast("Retry failed: " + err.Error())
-					}
-					return false
-				})
-			})
+			m.retryServerStart()
 		} else {
-			// Continue in offline mode
-			m.showToast("Continuing in offline mode. You can start the server later from the Network tab.")
+			m.continueOffline()
 		}
 	})
+}
 
-	dialog.Show()
+// retryServerStart retries starting the server
+func (m *MauApp) retryServerStart() {
+	m.showToast("Retrying server startup...")
+	time.AfterFunc(retryDelay*time.Second, func() {
+		glib.IdleAdd(func() bool {
+			if err := m.startServer(); err != nil {
+				m.showToast("Retry failed: " + err.Error())
+			}
+			return false
+		})
+	})
+}
+
+// continueOffline notifies user about offline mode
+func (m *MauApp) continueOffline() {
+	m.showToast("Continuing in offline mode. You can start the server later from the Network tab.")
 }
 
 // stopServer stops the P2P server

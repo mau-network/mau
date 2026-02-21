@@ -14,7 +14,21 @@ func (hv *HomeView) buildComposer() {
 	postGroup.SetTitle("Create a Post")
 	postGroup.SetDescription("Share with your network (encrypted & signed)")
 
-	// Header with markdown toggle and character counter
+	composerBox := gtk.NewBox(gtk.OrientationVertical, 6)
+	composerBox.Append(hv.buildComposerHeader())
+	composerBox.Append(hv.buildComposerTextView())
+	composerBox.Append(hv.buildComposerPreview())
+	composerBox.Append(hv.buildComposerTags())
+	composerBox.Append(hv.buildComposerButtons())
+
+	postRow := adw.NewActionRow()
+	postRow.SetChild(composerBox)
+	postGroup.Add(postRow)
+	hv.page.Append(postGroup)
+}
+
+// buildComposerHeader creates the header with toggle and counter
+func (hv *HomeView) buildComposerHeader() *gtk.Box {
 	headerBox := gtk.NewBox(gtk.OrientationHorizontal, 6)
 
 	hv.markdownToggle = gtk.NewToggleButton()
@@ -31,7 +45,11 @@ func (hv *HomeView) buildComposer() {
 	hv.charCountLabel.SetHAlign(gtk.AlignEnd)
 	headerBox.Append(hv.charCountLabel)
 
-	// Text view
+	return headerBox
+}
+
+// buildComposerTextView creates the text entry area
+func (hv *HomeView) buildComposerTextView() *gtk.ScrolledWindow {
 	scrolled := gtk.NewScrolledWindow()
 	scrolled.SetVExpand(false)
 	scrolled.SetSizeRequest(-1, 150)
@@ -42,8 +60,6 @@ func (hv *HomeView) buildComposer() {
 	hv.postEntry.SetMarginBottom(6)
 	hv.postEntry.SetMarginStart(6)
 	hv.postEntry.SetMarginEnd(6)
-
-	// Enable undo/redo
 	hv.postEntry.Buffer().SetEnableUndo(true)
 
 	hv.postEntry.Buffer().ConnectChanged(func() {
@@ -53,8 +69,11 @@ func (hv *HomeView) buildComposer() {
 	})
 
 	scrolled.SetChild(hv.postEntry)
+	return scrolled
+}
 
-	// Markdown preview
+// buildComposerPreview creates the markdown preview area
+func (hv *HomeView) buildComposerPreview() *gtk.Label {
 	hv.markdownPreview = gtk.NewLabel("")
 	hv.markdownPreview.SetWrap(true)
 	hv.markdownPreview.SetMarginTop(6)
@@ -64,8 +83,11 @@ func (hv *HomeView) buildComposer() {
 	hv.markdownPreview.SetVisible(false)
 	hv.markdownPreview.SetUseMarkup(true)
 	hv.markdownPreview.AddCSSClass("preview-box")
+	return hv.markdownPreview
+}
 
-	// Tags entry
+// buildComposerTags creates the tags input area
+func (hv *HomeView) buildComposerTags() *gtk.Box {
 	tagsBox := gtk.NewBox(gtk.OrientationHorizontal, 6)
 	tagsLabel := gtk.NewLabel("Tags:")
 	hv.tagEntry = gtk.NewEntry()
@@ -73,8 +95,11 @@ func (hv *HomeView) buildComposer() {
 	hv.tagEntry.SetHExpand(true)
 	tagsBox.Append(tagsLabel)
 	tagsBox.Append(hv.tagEntry)
+	return tagsBox
+}
 
-	// Buttons
+// buildComposerButtons creates the action buttons
+func (hv *HomeView) buildComposerButtons() *gtk.Box {
 	btnBox := gtk.NewBox(gtk.OrientationHorizontal, 6)
 	btnBox.SetHAlign(gtk.AlignEnd)
 
@@ -85,20 +110,7 @@ func (hv *HomeView) buildComposer() {
 		hv.publishPost()
 	})
 	btnBox.Append(publishBtn)
-
-	// Compose everything
-	composerBox := gtk.NewBox(gtk.OrientationVertical, 6)
-	composerBox.Append(headerBox)
-	composerBox.Append(scrolled)
-	composerBox.Append(hv.markdownPreview)
-	composerBox.Append(tagsBox)
-	composerBox.Append(btnBox)
-
-	postRow := adw.NewActionRow()
-	postRow.SetChild(composerBox)
-	postGroup.Add(postRow)
-
-	hv.page.Append(postGroup)
+	return btnBox
 }
 
 // updateCharCount updates the character counter label
@@ -111,19 +123,16 @@ func (hv *HomeView) updateCharCount() {
 	hv.charCountLabel.SetText(fmt.Sprintf("%d characters", count))
 }
 
-// debouncedMarkdownPreview delays markdown rendering until typing stops
+// debouncedMarkdownPreview delays markdown rendering
 func (hv *HomeView) debouncedMarkdownPreview() {
-	// Cancel existing timer
 	if hv.markdownDebounceTimer != 0 {
 		glib.SourceRemove(hv.markdownDebounceTimer)
 	}
 
-	// Only render if preview is active
 	if !hv.markdownToggle.Active() {
 		return
 	}
 
-	// Debounce markdown rendering (wait for typing to stop)
 	hv.markdownDebounceTimer = glib.TimeoutAdd(markdownDebounce, func() bool {
 		hv.updateMarkdownPreview()
 		hv.markdownDebounceTimer = 0
@@ -139,36 +148,46 @@ func (hv *HomeView) updateMarkdownPreview() {
 		return
 	}
 
-	buffer := hv.postEntry.Buffer()
-	start := buffer.StartIter()
-	end := buffer.EndIter()
-	text := buffer.Text(start, end, false)
-
+	text := hv.getPostText()
 	pango := hv.app.mdRenderer.ToPango(text)
 	hv.markdownPreview.SetMarkup(pango)
 	hv.markdownPreview.SetVisible(true)
 	hv.postEntry.SetVisible(false)
 }
 
-// publishPost handles post publishing
-func (hv *HomeView) publishPost() {
+// getPostText retrieves the current post text from buffer
+func (hv *HomeView) getPostText() string {
 	buffer := hv.postEntry.Buffer()
 	start := buffer.StartIter()
 	end := buffer.EndIter()
-	text := buffer.Text(start, end, false)
+	return buffer.Text(start, end, false)
+}
+
+// publishPost handles post publishing
+func (hv *HomeView) publishPost() {
+	text := hv.getPostText()
 
 	if text == "" {
 		hv.app.showToast(toastNoContent)
 		return
 	}
 
-	// Validate and sanitize post body
-	if err := ValidatePostBody(text); err != nil {
+	if err := hv.validateAndPublish(text); err != nil {
 		hv.app.ShowError(dialogValidateError, err.Error())
 		return
 	}
-	text = SanitizePostBody(text)
 
+	hv.clearComposer()
+	hv.app.showToast(toastPostPublished)
+	hv.Refresh()
+}
+
+// validateAndPublish validates and publishes a post
+func (hv *HomeView) validateAndPublish(text string) error {
+	if err := ValidatePostBody(text); err != nil {
+		return err
+	}
+	text = SanitizePostBody(text)
 	tags := ParseTags(hv.tagEntry.Text())
 
 	author := Author{
@@ -179,15 +198,12 @@ func (hv *HomeView) publishPost() {
 	}
 
 	post := NewPost(text, author, tags)
+	return hv.app.postMgr.Save(post)
+}
 
-	if err := hv.app.postMgr.Save(post); err != nil {
-		hv.app.ShowError(dialogSaveError, fmt.Sprintf("Failed to save post: %v", err))
-		return
-	}
-
-	hv.app.showToast(toastPostPublished)
-	buffer.SetText("")
+// clearComposer clears the composer UI
+func (hv *HomeView) clearComposer() {
+	hv.postEntry.Buffer().SetText("")
 	hv.tagEntry.SetText("")
 	hv.clearDraft()
-	hv.Refresh()
 }
