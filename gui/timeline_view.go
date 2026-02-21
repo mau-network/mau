@@ -36,7 +36,7 @@ func NewTimelineView(app *MauApp) *TimelineView {
 	return &TimelineView{
 		app:         app,
 		currentPage: 0,
-		pageSize:    20, // Show 20 posts per page
+		pageSize:    timelinePageSize, // Configurable page size
 		allPosts:    []timelinePost{},
 		hasMore:     false,
 	}

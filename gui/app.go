@@ -254,11 +254,11 @@ func (m *MauApp) processToastQueue() {
 	
 	// Show toast
 	toast := adw.NewToast(message)
-	toast.SetTimeout(3)
+	toast.SetTimeout(toastTimeout)
 	m.toastOverlay.AddToast(toast)
 	
-	// Process next toast after delay (3.5s: 3s timeout + 0.5s buffer)
-	glib.TimeoutSecondsAdd(4, func() bool {
+	// Process next toast after delay
+	glib.TimeoutSecondsAdd(toastDisplayTime, func() bool {
 		m.processToastQueue()
 		return false
 	})
@@ -355,7 +355,7 @@ func (m *MauApp) startServer() error {
 				})
 			}
 			// Error case handled in goroutine above
-		case <-time.After(2 * time.Second):
+		case <-time.After(serverStartupWait * time.Second):
 			// Assume success if no error within 2 seconds
 			glib.IdleAdd(func() bool {
 				m.serverRunning = true
@@ -402,7 +402,7 @@ func (m *MauApp) handleServerStartupFailure(err error, addr string) {
 		if responseId == "retry" {
 			// Retry starting the server
 			m.showToast("Retrying server startup...")
-			time.AfterFunc(1*time.Second, func() {
+			time.AfterFunc(retryDelay*time.Second, func() {
 				glib.IdleAdd(func() bool {
 					if err := m.startServer(); err != nil {
 						m.showToast("Retry failed: " + err.Error())
@@ -480,8 +480,8 @@ func (m *MauApp) syncFriends() {
 	// Use retry logic for sync operation
 	cfg := RetryConfig{
 		MaxAttempts:  3,
-		InitialDelay: 2 * time.Second,
-		MaxDelay:     10 * time.Second,
+		InitialDelay: retryInitialDelay * time.Second,
+		MaxDelay:     retryMaxDelay * time.Second,
 		Multiplier:   2.0,
 	}
 

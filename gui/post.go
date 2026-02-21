@@ -76,7 +76,7 @@ type PostManager struct {
 func NewPostManager(account *mau.Account) *PostManager {
 	return &PostManager{
 		account: account,
-		cache:   NewPostCache(500, 5*time.Minute), // Cache 500 posts for 5 minutes
+		cache:   NewPostCache(cacheMaxSize, cacheEntryTTL*time.Minute), // Configurable cache settings
 	}
 }
 
