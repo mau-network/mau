@@ -14,16 +14,16 @@ import (
 
 // HomeView handles the home view with composer and posts
 type HomeView struct {
-	app                    *MauApp
-	page                   *gtk.Box
-	postEntry              *gtk.TextView
-	searchEntry            *gtk.SearchEntry
-	charCountLabel         *gtk.Label
-	markdownToggle         *gtk.ToggleButton
-	markdownPreview        *gtk.Label
-	tagEntry               *gtk.Entry
-	postsList              *gtk.ListBox
-	markdownDebounceTimer  glib.SourceHandle
+	app                   *MauApp
+	page                  *gtk.Box
+	postEntry             *gtk.TextView
+	searchEntry           *gtk.SearchEntry
+	charCountLabel        *gtk.Label
+	markdownToggle        *gtk.ToggleButton
+	markdownPreview       *gtk.Label
+	tagEntry              *gtk.Entry
+	postsList             *gtk.ListBox
+	markdownDebounceTimer glib.SourceHandle
 }
 
 // NewHomeView creates a new home view

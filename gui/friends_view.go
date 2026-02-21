@@ -169,7 +169,7 @@ func (fv *FriendsView) addFriend(armoredKey string) error {
 // validatePGPKey validates PGP armored key format
 func validatePGPKey(armoredKey string) error {
 	key := strings.TrimSpace(armoredKey)
-	
+
 	if key == "" {
 		return fmt.Errorf(errInvalidPGPKey)
 	}

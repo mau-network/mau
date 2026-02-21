@@ -39,7 +39,6 @@ issues:
     - vendor
     - .git
     - .github
-    - gui
     - gotk4-adwaita
   
   exclude-rules:

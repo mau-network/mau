@@ -18,17 +18,17 @@ type timelinePost struct {
 
 // TimelineView handles the timeline view
 type TimelineView struct {
-	app             *MauApp
-	page            *gtk.Box
-	timelineList    *gtk.ListBox
-	filterAuthor    *gtk.DropDown
-	filterStart     *gtk.Entry
-	filterEnd       *gtk.Entry
-	loadMoreBtn     *gtk.Button
-	currentPage     int
-	pageSize        int
-	allPosts        []timelinePost
-	hasMore         bool
+	app          *MauApp
+	page         *gtk.Box
+	timelineList *gtk.ListBox
+	filterAuthor *gtk.DropDown
+	filterStart  *gtk.Entry
+	filterEnd    *gtk.Entry
+	loadMoreBtn  *gtk.Button
+	currentPage  int
+	pageSize     int
+	allPosts     []timelinePost
+	hasMore      bool
 }
 
 // NewTimelineView creates a new timeline view
