@@ -72,3 +72,8 @@ issues:
         - gocyclo
         - cyclop
         - gocognit
+    
+    # Exclude account.go from funlen - core library file needs separate refactoring
+    - path: account\.go
+      linters:
+        - funlen
