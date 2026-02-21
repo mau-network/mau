@@ -172,8 +172,7 @@ func (hv *HomeView) buildPostsList() {
 	postsGroup := adw.NewPreferencesGroup()
 	postsGroup.SetTitle("Your Posts")
 
-	hv.postsList = gtk.NewListBox()
-	hv.postsList.AddCSSClass("boxed-list")
+	hv.postsList = NewBoxedListBox()
 
 	postsScrolled := gtk.NewScrolledWindow()
 	postsScrolled.SetVExpand(true)
