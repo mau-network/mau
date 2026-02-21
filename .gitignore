@@ -1,2 +1,8 @@
 gotk4-adwaita/
 e2e/bin/
+
+# Compiled binaries
+mau-gui
+mau
+gui/mau-gui
+gui/mau-gui-poc
