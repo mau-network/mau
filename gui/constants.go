@@ -11,4 +11,10 @@ const (
 	maxTagLength      = 50     // Max characters per tag
 	maxTags           = 20     // Max number of tags per post
 	maxTagsInput      = 200    // Max characters in tag input field
+
+	// Performance tuning
+	draftSaveDelay    = 10     // Seconds to wait before auto-saving draft
+	markdownDebounce  = 500    // Milliseconds to debounce markdown preview
+	postLoadLimit     = 100    // Max posts to load at once
+	friendPostLimit   = 50     // Max posts per friend in timeline
 )
