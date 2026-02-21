@@ -308,11 +308,12 @@ func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File
 	}
 
 	fpr := a.Fingerprint().String()
-	if err := os.MkdirAll(path.Join(a.path, fpr), DirPerm); err != nil {
+	p := path.Join(a.path, fpr, name)
+	
+	// Create all parent directories for the file path
+	if err := os.MkdirAll(path.Dir(p), DirPerm); err != nil {
 		return nil, err
 	}
-
-	p := path.Join(a.path, fpr, name)
 	if err := a.handleExistingFile(p); err != nil {
 		return nil, err
 	}

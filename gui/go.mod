@@ -11,6 +11,7 @@ require (
 require (
 	github.com/KarpelesLab/weak v0.1.1 // indirect
 	github.com/go-resty/resty/v2 v2.16.2 // indirect
+	github.com/gomarkdown/markdown v0.0.0-20260217112301-37c66b85d6ab // indirect
 	github.com/hashicorp/mdns v1.0.5 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/miekg/dns v1.1.57 // indirect
