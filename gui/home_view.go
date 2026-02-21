@@ -14,15 +14,16 @@ import (
 
 // HomeView handles the home view with composer and posts
 type HomeView struct {
-	app             *MauApp
-	page            *gtk.Box
-	postEntry       *gtk.TextView
-	searchEntry     *gtk.SearchEntry
-	charCountLabel  *gtk.Label
-	markdownToggle  *gtk.ToggleButton
-	markdownPreview *gtk.Label
-	tagEntry        *gtk.Entry
-	postsList       *gtk.ListBox
+	app                    *MauApp
+	page                   *gtk.Box
+	postEntry              *gtk.TextView
+	searchEntry            *gtk.SearchEntry
+	charCountLabel         *gtk.Label
+	markdownToggle         *gtk.ToggleButton
+	markdownPreview        *gtk.Label
+	tagEntry               *gtk.Entry
+	postsList              *gtk.ListBox
+	markdownDebounceTimer  glib.SourceHandle
 }
 
 // NewHomeView creates a new home view
@@ -93,9 +94,12 @@ func (hv *HomeView) buildComposer() {
 	hv.postEntry.SetMarginStart(6)
 	hv.postEntry.SetMarginEnd(6)
 
+	// Enable undo/redo
+	hv.postEntry.Buffer().SetEnableUndo(true)
+
 	hv.postEntry.Buffer().ConnectChanged(func() {
 		hv.updateCharCount()
-		hv.updateMarkdownPreview()
+		hv.debouncedMarkdownPreview()
 		hv.saveDraftDelayed()
 	})
 
@@ -188,6 +192,25 @@ func (hv *HomeView) updateCharCount() {
 	hv.charCountLabel.SetText(fmt.Sprintf("%d characters", count))
 }
 
+func (hv *HomeView) debouncedMarkdownPreview() {
+	// Cancel existing timer
+	if hv.markdownDebounceTimer != 0 {
+		glib.SourceRemove(hv.markdownDebounceTimer)
+	}
+
+	// Only render if preview is active
+	if !hv.markdownToggle.Active() {
+		return
+	}
+
+	// Debounce markdown rendering (wait for typing to stop)
+	hv.markdownDebounceTimer = glib.TimeoutAdd(markdownDebounce, func() bool {
+		hv.updateMarkdownPreview()
+		hv.markdownDebounceTimer = 0
+		return false
+	})
+}
+
 func (hv *HomeView) updateMarkdownPreview() {
 	if !hv.markdownToggle.Active() {
 		hv.markdownPreview.SetVisible(false)
@@ -211,7 +234,7 @@ func (hv *HomeView) saveDraftDelayed() {
 		glib.SourceRemove(hv.app.draftSaveTimer)
 	}
 
-	hv.app.draftSaveTimer = glib.TimeoutSecondsAdd(2, func() bool {
+	hv.app.draftSaveTimer = glib.TimeoutSecondsAdd(draftSaveDelay, func() bool {
 		hv.saveDraft()
 		hv.app.draftSaveTimer = 0
 		return false
