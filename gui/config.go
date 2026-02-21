@@ -14,7 +14,6 @@ import (
 type AppConfig struct {
 	SchemaVersion   int           `json:"schemaVersion"` // Config schema version for migrations
 	DarkMode        bool          `json:"darkMode"`
-	AutoStartServer bool          `json:"autoStartServer"`
 	AutoSync        bool          `json:"autoSync"`
 	AutoSyncMinutes int           `json:"autoSyncMinutes"`
 	ServerPort      int           `json:"serverPort"` // Configurable server port (default: 8080)
@@ -45,7 +44,6 @@ func NewConfigManager(dataDir string) *ConfigManager {
 		config: AppConfig{
 			SchemaVersion:   currentSchemaVersion,
 			DarkMode:        false,
-			AutoStartServer: true,  // Auto-start server by default
 			AutoSync:        false,
 			AutoSyncMinutes: 30,
 			ServerPort:      8080,

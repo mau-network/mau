@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 )
@@ -10,7 +12,6 @@ type SettingsView struct {
 	app              *MauApp
 	page             *gtk.Box
 	darkModeSwitch   *gtk.Switch
-	autoStartSwitch  *gtk.Switch
 	autoSyncSwitch   *gtk.Switch
 	autoSyncInterval *gtk.SpinButton
 }
@@ -181,27 +182,22 @@ func (sv *SettingsView) buildAppearanceSection() {
 
 func (sv *SettingsView) buildServerSection() {
 	serverGroup := adw.NewPreferencesGroup()
-	serverGroup.SetTitle("Server")
+	serverGroup.SetTitle("Network")
+	serverGroup.SetDescription("P2P server and network configuration")
 
-	autoStartRow := adw.NewActionRow()
-	autoStartRow.SetTitle("Auto-start Server")
-	autoStartRow.SetSubtitle("Start P2P server on launch")
-
-	config := sv.app.configMgr.Get()
-	sv.autoStartSwitch = gtk.NewSwitch()
-	sv.autoStartSwitch.SetActive(config.AutoStartServer)
-	sv.autoStartSwitch.SetVAlign(gtk.AlignCenter)
-	sv.autoStartSwitch.ConnectStateSet(func(state bool) bool {
-		sv.app.configMgr.Update(func(cfg *AppConfig) {
-			cfg.AutoStartServer = state
-		})
-		sv.app.showToast("Auto-start " + map[bool]string{true: "enabled", false: "disabled"}[state])
-		return false
-	})
-	autoStartRow.AddSuffix(sv.autoStartSwitch)
-	serverGroup.Add(autoStartRow)
+	// Server status (always running)
+	statusRow := adw.NewActionRow()
+	statusRow.SetTitle("Server Status")
+	if sv.app.IsRunning() {
+		config := sv.app.configMgr.Get()
+		statusRow.SetSubtitle("Running on port " + fmt.Sprintf("%d", config.ServerPort))
+	} else {
+		statusRow.SetSubtitle("Not running")
+	}
+	serverGroup.Add(statusRow)
 
 	// Server port configuration
+	config := sv.app.configMgr.Get()
 	portRow := adw.NewActionRow()
 	portRow.SetTitle("Server Port")
 	portRow.SetSubtitle("Port for P2P server (requires restart)")
@@ -213,10 +209,16 @@ func (sv *SettingsView) buildServerSection() {
 		sv.app.configMgr.Update(func(cfg *AppConfig) {
 			cfg.ServerPort = int(portSpin.Value())
 		})
-		sv.app.showToast("Server port updated (restart server to apply)")
+		sv.app.showToast("Server port updated (restart app to apply)")
 	})
 	portRow.AddSuffix(portSpin)
 	serverGroup.Add(portRow)
+
+	// Fingerprint
+	fpRow := adw.NewActionRow()
+	fpRow.SetTitle("Network Fingerprint")
+	fpRow.SetSubtitle(sv.app.accountMgr.Account().Fingerprint().String())
+	serverGroup.Add(fpRow)
 
 	sv.page.Append(serverGroup)
 }

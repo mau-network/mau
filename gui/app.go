@@ -47,7 +47,6 @@ type MauApp struct {
 	// Views
 	homeView     *HomeView
 	friendsView  *FriendsView
-	networkView  *NetworkView
 	settingsView *SettingsView
 }
 
@@ -109,9 +108,9 @@ func (m *MauApp) activate() error {
 	// Create UI
 	m.buildUI()
 
-	// Auto-start server if configured
-	if config.AutoStartServer {
-		m.startServer()
+	// Always start server (P2P network - should always be online)
+	if err := m.startServer(); err != nil {
+		m.showToast(fmt.Sprintf("Warning: Server failed to start: %v", err))
 	}
 
 	// Start auto-sync if configured
@@ -152,13 +151,11 @@ func (m *MauApp) buildUI() {
 	// Build views
 	m.homeView = NewHomeView(m)
 	m.friendsView = NewFriendsView(m)
-	m.networkView = NewNetworkView(m)
 	m.settingsView = NewSettingsView(m)
 
 	// Add to stack
 	m.mainStack.AddTitledWithIcon(m.homeView.Build(), "home", "Home", "user-home-symbolic")
 	m.mainStack.AddTitledWithIcon(m.friendsView.Build(), "friends", "Friends", "system-users-symbolic")
-	m.mainStack.AddTitledWithIcon(m.networkView.Build(), "network", "Network", "network-workgroup-symbolic")
 	m.mainStack.AddTitledWithIcon(m.settingsView.Build(), "settings", "Settings", "preferences-system-symbolic")
 
 	window.SetContent(m.toastOverlay)
