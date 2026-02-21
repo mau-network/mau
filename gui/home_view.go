@@ -120,7 +120,7 @@ func (hv *HomeView) buildComposer() {
 	tagsBox := gtk.NewBox(gtk.OrientationHorizontal, 6)
 	tagsLabel := gtk.NewLabel("Tags:")
 	hv.tagEntry = gtk.NewEntry()
-	hv.tagEntry.SetPlaceholderText("tag1, tag2, tag3")
+	hv.tagEntry.SetPlaceholderText(placeholderTags)
 	hv.tagEntry.SetHExpand(true)
 	tagsBox.Append(tagsLabel)
 	tagsBox.Append(hv.tagEntry)
@@ -280,13 +280,13 @@ func (hv *HomeView) publishPost() {
 	text := buffer.Text(start, end, false)
 
 	if text == "" {
-		hv.app.showToast("Please enter some content")
+		hv.app.showToast(toastNoContent)
 		return
 	}
 
 	// Validate and sanitize post body
 	if err := ValidatePostBody(text); err != nil {
-		hv.app.ShowError("Validation Error", err.Error())
+		hv.app.ShowError(dialogValidateError, err.Error())
 		return
 	}
 	text = SanitizePostBody(text)
@@ -303,11 +303,11 @@ func (hv *HomeView) publishPost() {
 	post := NewPost(text, author, tags)
 
 	if err := hv.app.postMgr.Save(post); err != nil {
-		hv.app.ShowError("Save Error", fmt.Sprintf("Failed to save post: %v", err))
+		hv.app.ShowError(dialogSaveError, fmt.Sprintf("Failed to save post: %v", err))
 		return
 	}
 
-	hv.app.showToast("Post published!")
+	hv.app.showToast(toastPostPublished)
 	buffer.SetText("")
 	hv.tagEntry.SetText("")
 	hv.clearDraft()

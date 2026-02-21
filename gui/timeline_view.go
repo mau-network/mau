@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"sort"
+	"strings"
+	"time"
 
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
@@ -104,7 +106,7 @@ func (tv *TimelineView) buildFilters() {
 	tv.page.Append(filterBox)
 }
 
-// Refresh reloads the timeline
+// Refresh reloads the timeline with filters applied
 func (tv *TimelineView) Refresh() {
 	tv.timelineList.RemoveAll()
 
@@ -112,6 +114,7 @@ func (tv *TimelineView) Refresh() {
 	if err != nil {
 		row := adw.NewActionRow()
 		row.SetTitle("Error loading friends")
+		row.SetSubtitle(err.Error())
 		tv.timelineList.Append(row)
 		return
 	}
@@ -125,6 +128,11 @@ func (tv *TimelineView) Refresh() {
 		return
 	}
 
+	// Get filter values
+	filterAuthorText := strings.TrimSpace(tv.filterStart.Text()) // Reusing start field for author
+	filterStartDate := tv.parseDate(tv.filterStart.Text())
+	filterEndDate := tv.parseDate(tv.filterEnd.Text())
+
 	type timelinePost struct {
 		post       Post
 		friendName string
@@ -133,11 +141,16 @@ func (tv *TimelineView) Refresh() {
 
 	for _, friend := range friends {
 		fpr := friend.Fingerprint()
-		files, _ := tv.app.postMgr.List(fpr, 50)
+		files, _ := tv.app.postMgr.List(fpr, friendPostLimit)
 
 		for _, file := range files {
 			post, err := tv.app.postMgr.Load(file)
 			if err != nil {
+				continue
+			}
+
+			// Apply filters
+			if !tv.matchesFilters(post, friend.Name(), filterAuthorText, filterStartDate, filterEndDate) {
 				continue
 			}
 
@@ -150,7 +163,12 @@ func (tv *TimelineView) Refresh() {
 
 	if len(allPosts) == 0 {
 		row := adw.NewActionRow()
-		row.SetTitle("No posts from friends yet")
+		if filterAuthorText != "" || !filterStartDate.IsZero() || !filterEndDate.IsZero() {
+			row.SetTitle("No posts match filters")
+			row.SetSubtitle("Try adjusting your filter criteria")
+		} else {
+			row.SetTitle("No posts from friends yet")
+		}
 		tv.timelineList.Append(row)
 		return
 	}
@@ -159,6 +177,11 @@ func (tv *TimelineView) Refresh() {
 	sort.Slice(allPosts, func(i, j int) bool {
 		return allPosts[i].post.Published.After(allPosts[j].post.Published)
 	})
+
+	// Limit results
+	if len(allPosts) > postLoadLimit {
+		allPosts = allPosts[:postLoadLimit]
+	}
 
 	for _, tp := range allPosts {
 		row := adw.NewActionRow()
@@ -178,4 +201,39 @@ func (tv *TimelineView) Refresh() {
 
 		tv.timelineList.Append(row)
 	}
+}
+
+func (tv *TimelineView) matchesFilters(post Post, authorName, filterAuthor string, startDate, endDate time.Time) bool {
+	// Author filter (case-insensitive substring match)
+	if filterAuthor != "" {
+		if !strings.Contains(strings.ToLower(authorName), strings.ToLower(filterAuthor)) {
+			return false
+		}
+	}
+
+	// Date range filters
+	if !startDate.IsZero() && post.Published.Before(startDate) {
+		return false
+	}
+
+	if !endDate.IsZero() && post.Published.After(endDate.Add(24*time.Hour-time.Second)) {
+		return false
+	}
+
+	return true
+}
+
+func (tv *TimelineView) parseDate(dateStr string) time.Time {
+	dateStr = strings.TrimSpace(dateStr)
+	if dateStr == "" {
+		return time.Time{}
+	}
+
+	// Try YYYY-MM-DD format
+	t, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return time.Time{}
+	}
+
+	return t
 }
