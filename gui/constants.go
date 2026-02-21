@@ -13,10 +13,19 @@ const (
 	maxTagsInput      = 200   // Max characters in tag input field
 
 	// Performance tuning
-	draftSaveDelay   = 10  // Seconds to wait before auto-saving draft
-	markdownDebounce = 500 // Milliseconds to debounce markdown preview
-	postLoadLimit    = 100 // Max posts to load at once
-	friendPostLimit  = 50  // Max posts per friend in timeline
+	draftSaveDelay      = 10   // Seconds to wait before auto-saving draft
+	markdownDebounce    = 500  // Milliseconds to debounce markdown preview
+	postLoadLimit       = 100  // Max posts to load at once
+	friendPostLimit     = 50   // Max posts per friend in timeline
+	serverStartupWait   = 2    // Seconds to wait for server startup
+	retryDelay          = 1    // Seconds to wait before retrying operations
+	retryInitialDelay   = 2    // Seconds for first retry attempt
+	retryMaxDelay       = 10   // Seconds maximum delay between retries
+	toastDisplayTime    = 4    // Seconds to display each toast (3s timeout + 1s buffer)
+	toastTimeout        = 3    // Seconds for toast auto-dismiss
+	cacheEntryTTL       = 5    // Minutes before cache entries expire
+	cacheMaxSize        = 500  // Maximum number of cached posts
+	timelinePageSize    = 20   // Posts per page in timeline
 )
 
 // UI Strings
