@@ -47,24 +47,51 @@ func (sv *SettingsView) Build() *gtk.Box {
 func (sv *SettingsView) buildAccountSection() {
 	accountGroup := adw.NewPreferencesGroup()
 	accountGroup.SetTitle("Account")
-	accountGroup.SetDescription("Your account identities (PGP supports multiple name/email pairs)")
-
-	// Current primary identity (read-only display)
-	nameRow := adw.NewActionRow()
-	nameRow.SetTitle("Primary Name")
-	nameRow.SetSubtitle(sv.app.accountMgr.Account().Name())
-	accountGroup.Add(nameRow)
-
-	emailRow := adw.NewActionRow()
-	emailRow.SetTitle("Primary Email")
-	emailRow.SetSubtitle(sv.app.accountMgr.Account().Email())
-	accountGroup.Add(emailRow)
+	accountGroup.SetDescription("Your PGP account and identities")
 
 	// Fingerprint (read-only)
 	fpRow := adw.NewActionRow()
 	fpRow.SetTitle("Fingerprint")
 	fpRow.SetSubtitle(sv.app.accountMgr.Account().Fingerprint().String())
 	accountGroup.Add(fpRow)
+
+	sv.page.Append(accountGroup)
+	
+	// Identities section
+	sv.buildIdentitiesSection()
+}
+
+func (sv *SettingsView) buildIdentitiesSection() {
+	identitiesGroup := adw.NewPreferencesGroup()
+	identitiesGroup.SetTitle("Identities")
+	identitiesGroup.SetDescription("PGP keys can have multiple name/email identities")
+
+	identities := sv.app.accountMgr.Account().ListIdentities()
+	
+	for _, identityStr := range identities {
+		row := adw.NewActionRow()
+		row.SetTitle(identityStr)
+		
+		isPrimary := sv.app.accountMgr.Account().IsPrimaryIdentity(identityStr)
+		
+		if isPrimary {
+			row.SetSubtitle("Primary identity")
+			icon := gtk.NewImageFromIconName("emblem-default-symbolic")
+			row.AddPrefix(icon)
+		} else {
+			// Add "Set Primary" button for non-primary identities
+			setPrimaryBtn := gtk.NewButton()
+			setPrimaryBtn.SetLabel("Set Primary")
+			setPrimaryBtn.SetVAlign(gtk.AlignCenter)
+			identStr := identityStr // Capture for closure
+			setPrimaryBtn.ConnectClicked(func() {
+				sv.setPrimaryIdentity(identStr)
+			})
+			row.AddSuffix(setPrimaryBtn)
+		}
+		
+		identitiesGroup.Add(row)
+	}
 
 	// Add new identity button
 	addIdentityRow := adw.NewActionRow()
@@ -78,9 +105,75 @@ func (sv *SettingsView) buildAccountSection() {
 		sv.showAddIdentityDialog()
 	})
 	addIdentityRow.AddSuffix(addBtn)
-	accountGroup.Add(addIdentityRow)
+	identitiesGroup.Add(addIdentityRow)
 
-	sv.page.Append(accountGroup)
+	sv.page.Append(identitiesGroup)
+}
+
+func (sv *SettingsView) setPrimaryIdentity(identityName string) {
+	// Prompt for passphrase
+	window := sv.app.app.ActiveWindow()
+	dialog := adw.NewMessageDialog(window, "Set Primary Identity", "")
+	dialog.SetBody("Enter your account passphrase to change primary identity")
+	
+	contentBox := gtk.NewBox(gtk.OrientationVertical, 12)
+	contentBox.SetMarginTop(12)
+	contentBox.SetMarginBottom(12)
+	contentBox.SetMarginStart(12)
+	contentBox.SetMarginEnd(12)
+
+	passphraseLabel := gtk.NewLabel("Account Passphrase:")
+	passphraseLabel.SetXAlign(0)
+	passphraseEntry := gtk.NewPasswordEntry()
+	passphraseEntry.SetShowPeekIcon(true)
+	contentBox.Append(passphraseLabel)
+	contentBox.Append(passphraseEntry)
+
+	dialog.SetExtraChild(contentBox)
+	dialog.AddResponse("cancel", "Cancel")
+	dialog.AddResponse("set", "Set Primary")
+	dialog.SetDefaultResponse("set")
+	dialog.SetCloseResponse("cancel")
+	dialog.SetResponseAppearance("set", adw.ResponseSuggested)
+
+	dialog.ConnectResponse(func(response string) {
+		if response == "set" {
+			passphrase := passphraseEntry.Text()
+			if passphrase == "" {
+				sv.app.ShowError("Passphrase Required", "You must enter your account passphrase")
+				return
+			}
+
+			err := sv.app.accountMgr.Account().SetPrimaryIdentity(identityName, passphrase)
+			if err != nil {
+				sv.app.ShowError("Failed to Set Primary", err.Error())
+				return
+			}
+
+			sv.app.showToast("Primary identity updated!")
+			sv.refreshAccountSection()
+		}
+	})
+
+	dialog.Show()
+}
+
+func (sv *SettingsView) refreshAccountSection() {
+	// Rebuild the entire page
+	// Remove all current content
+	for {
+		child := sv.page.FirstChild()
+		if child == nil {
+			break
+		}
+		sv.page.Remove(child)
+	}
+
+	// Rebuild all sections
+	sv.buildAccountSection()
+	sv.buildAppearanceSection()
+	sv.buildServerSection()
+	sv.buildSyncSection()
 }
 
 func (sv *SettingsView) showAddIdentityDialog() {
@@ -151,7 +244,8 @@ func (sv *SettingsView) addIdentity(name, email, passphrase string) {
 		return
 	}
 
-	sv.app.showToast("Identity added successfully! Restart to see changes.")
+	sv.app.showToast("Identity added successfully!")
+	sv.refreshAccountSection()
 }
 
 func (sv *SettingsView) buildAppearanceSection() {

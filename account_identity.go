@@ -111,6 +111,24 @@ func (a *Account) ListIdentities() []string {
 	return identities
 }
 
+// IsPrimaryIdentity checks if the given identity name is marked as primary
+func (a *Account) IsPrimaryIdentity(identityName string) bool {
+	if a == nil || a.entity == nil {
+		return false
+	}
+
+	identity, exists := a.entity.Identities[identityName]
+	if !exists {
+		return false
+	}
+
+	if identity.SelfSignature.IsPrimaryId != nil && *identity.SelfSignature.IsPrimaryId {
+		return true
+	}
+
+	return false
+}
+
 // saveEntity saves the updated entity back to the encrypted account file
 func (a *Account) saveEntity(passphrase string) error {
 	if len(passphrase) == 0 {
