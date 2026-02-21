@@ -95,7 +95,10 @@ func (hv *HomeView) Refresh() {
 
 	// Get own posts
 	fpr := hv.app.accountMgr.Account().Fingerprint()
-	ownFiles, _ := hv.app.postMgr.List(fpr, 100)
+	ownFiles, err := hv.app.postMgr.List(fpr, 100)
+	if err != nil {
+		hv.app.showToast(fmt.Sprintf("Error loading posts: %v", err))
+	}
 
 	// Get friends' posts
 	keyring, err := hv.app.accountMgr.Account().ListFriends()
@@ -120,7 +123,7 @@ func (hv *HomeView) Refresh() {
 		return
 	}
 
-	// Sort by newest first
+	// Sort by newest first (files are named with timestamp)
 	sort.Slice(allFiles, func(i, j int) bool {
 		return allFiles[i].Name() > allFiles[j].Name()
 	})

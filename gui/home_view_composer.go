@@ -179,7 +179,12 @@ func (hv *HomeView) publishPost() {
 
 	hv.clearComposer()
 	hv.app.showToast(toastPostPublished)
-	hv.Refresh()
+	
+	// Refresh after a brief delay to ensure file is on disk
+	glib.IdleAdd(func() bool {
+		hv.Refresh()
+		return false
+	})
 }
 
 // validateAndPublish validates and publishes a post

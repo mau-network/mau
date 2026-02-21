@@ -45,11 +45,10 @@ func (pm *PostManager) Save(post Post) error {
 		return fmt.Errorf("failed to add file: %w", err)
 	}
 
-	// Cache the newly saved post
-	cacheKey := fmt.Sprintf("%s:%s", pm.account.Fingerprint().String(), filename)
-	pm.cache.Set(cacheKey, post)
+	// Cache the newly saved post with consistent key (just filename)
+	pm.cache.Set(filename, post)
 
-	_ = file // Use file if needed in future
+	_ = file
 	return nil
 }
 
