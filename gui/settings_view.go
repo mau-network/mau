@@ -46,17 +46,16 @@ func (sv *SettingsView) Build() *gtk.Box {
 func (sv *SettingsView) buildAccountSection() {
 	accountGroup := adw.NewPreferencesGroup()
 	accountGroup.SetTitle("Account")
-	accountGroup.SetDescription("Your account information (read-only, set at account creation)")
+	accountGroup.SetDescription("Your account identities (PGP supports multiple name/email pairs)")
 
-	// Name (read-only display)
+	// Current primary identity (read-only display)
 	nameRow := adw.NewActionRow()
-	nameRow.SetTitle("Name")
+	nameRow.SetTitle("Primary Name")
 	nameRow.SetSubtitle(sv.app.accountMgr.Account().Name())
 	accountGroup.Add(nameRow)
 
-	// Email (read-only display)
 	emailRow := adw.NewActionRow()
-	emailRow.SetTitle("Email")
+	emailRow.SetTitle("Primary Email")
 	emailRow.SetSubtitle(sv.app.accountMgr.Account().Email())
 	accountGroup.Add(emailRow)
 
@@ -66,7 +65,93 @@ func (sv *SettingsView) buildAccountSection() {
 	fpRow.SetSubtitle(sv.app.accountMgr.Account().Fingerprint().String())
 	accountGroup.Add(fpRow)
 
+	// Add new identity button
+	addIdentityRow := adw.NewActionRow()
+	addIdentityRow.SetTitle("Add New Identity")
+	addIdentityRow.SetSubtitle("Add another name/email to this account")
+	
+	addBtn := gtk.NewButton()
+	addBtn.SetLabel("Add Identity")
+	addBtn.SetVAlign(gtk.AlignCenter)
+	addBtn.ConnectClicked(func() {
+		sv.showAddIdentityDialog()
+	})
+	addIdentityRow.AddSuffix(addBtn)
+	accountGroup.Add(addIdentityRow)
+
 	sv.page.Append(accountGroup)
+}
+
+func (sv *SettingsView) showAddIdentityDialog() {
+	window := sv.app.app.ActiveWindow()
+	dialog := adw.NewMessageDialog(window, "Add New Identity", "")
+	
+	// Content area with form
+	contentBox := gtk.NewBox(gtk.OrientationVertical, 12)
+	contentBox.SetMarginTop(12)
+	contentBox.SetMarginBottom(12)
+	contentBox.SetMarginStart(12)
+	contentBox.SetMarginEnd(12)
+
+	// Name entry
+	nameLabel := gtk.NewLabel("Name:")
+	nameLabel.SetXAlign(0)
+	nameEntry := gtk.NewEntry()
+	nameEntry.SetPlaceholderText("Your Name")
+	contentBox.Append(nameLabel)
+	contentBox.Append(nameEntry)
+
+	// Email entry
+	emailLabel := gtk.NewLabel("Email:")
+	emailLabel.SetXAlign(0)
+	emailEntry := gtk.NewEntry()
+	emailEntry.SetPlaceholderText("your@email.com")
+	contentBox.Append(emailLabel)
+	contentBox.Append(emailEntry)
+
+	// Passphrase entry
+	passphraseLabel := gtk.NewLabel("Account Passphrase:")
+	passphraseLabel.SetXAlign(0)
+	passphraseEntry := gtk.NewPasswordEntry()
+	passphraseEntry.SetPlaceholderText("Required to update account")
+	passphraseEntry.SetShowPeekIcon(true)
+	contentBox.Append(passphraseLabel)
+	contentBox.Append(passphraseEntry)
+
+	dialog.SetExtraChild(contentBox)
+	dialog.AddResponse("cancel", "Cancel")
+	dialog.AddResponse("add", "Add Identity")
+	dialog.SetDefaultResponse("add")
+	dialog.SetCloseResponse("cancel")
+	dialog.SetResponseAppearance("add", adw.ResponseSuggested)
+
+	dialog.ConnectResponse(func(response string) {
+		if response == "add" {
+			sv.addIdentity(nameEntry.Text(), emailEntry.Text(), passphraseEntry.Text())
+		}
+	})
+
+	dialog.Show()
+}
+
+func (sv *SettingsView) addIdentity(name, email, passphrase string) {
+	if name == "" || email == "" {
+		sv.app.ShowError("Invalid Input", "Name and email cannot be empty")
+		return
+	}
+
+	if passphrase == "" {
+		sv.app.ShowError("Passphrase Required", "You must enter your account passphrase to add a new identity")
+		return
+	}
+
+	err := sv.app.accountMgr.Account().AddIdentity(name, email, passphrase)
+	if err != nil {
+		sv.app.ShowError("Failed to Add Identity", err.Error())
+		return
+	}
+
+	sv.app.showToast("Identity added successfully! Restart to see changes.")
 }
 
 func (sv *SettingsView) buildAppearanceSection() {
