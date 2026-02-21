@@ -83,7 +83,8 @@ func (pm *PostManager) List(fingerprint mau.Fingerprint, limit int) ([]*mau.File
 
 	var postFiles []*mau.File
 	for _, f := range files {
-		if strings.HasPrefix(f.Name(), "posts/") && strings.HasSuffix(f.Name(), ".json") {
+		// Files are stored as posts/post-*.json.pgp (AddFile adds .pgp extension)
+		if strings.HasPrefix(f.Name(), "posts/") && strings.Contains(f.Name(), ".json") {
 			postFiles = append(postFiles, f)
 		}
 	}
