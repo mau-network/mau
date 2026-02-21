@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
@@ -16,7 +15,6 @@ type HomeView struct {
 	app                   *MauApp
 	page                  *gtk.Box
 	postEntry             *gtk.TextView
-	searchEntry           *gtk.SearchEntry
 	charCountLabel        *gtk.Label
 	markdownToggle        *gtk.ToggleButton
 	markdownPreview       *gtk.Label
@@ -46,9 +44,6 @@ func (hv *HomeView) Build() *gtk.Box {
 	// Composer section
 	hv.buildComposer()
 
-	// Search section
-	hv.buildSearch()
-
 	// Posts list
 	hv.buildPostsList()
 
@@ -57,22 +52,6 @@ func (hv *HomeView) Build() *gtk.Box {
 	hv.Refresh()
 
 	return hv.page
-}
-
-func (hv *HomeView) buildSearch() {
-	searchBox := gtk.NewBox(gtk.OrientationHorizontal, 6)
-	searchBox.SetMarginTop(12)
-
-	searchLabel := gtk.NewLabel("Search:")
-	hv.searchEntry = gtk.NewSearchEntry()
-	hv.searchEntry.SetHExpand(true)
-	hv.searchEntry.ConnectSearchChanged(func() {
-		hv.Refresh()
-	})
-
-	searchBox.Append(searchLabel)
-	searchBox.Append(hv.searchEntry)
-	hv.page.Append(searchBox)
 }
 
 func (hv *HomeView) buildPostsList() {
@@ -128,15 +107,9 @@ func (hv *HomeView) Refresh() {
 		return allFiles[i].Name() > allFiles[j].Name()
 	})
 
-	searchTerm := strings.ToLower(hv.searchEntry.Text())
-
 	for _, file := range allFiles {
 		post, err := hv.app.postMgr.Load(file)
 		if err != nil {
-			continue
-		}
-
-		if searchTerm != "" && !strings.Contains(strings.ToLower(post.Body), searchTerm) {
 			continue
 		}
 

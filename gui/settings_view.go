@@ -113,7 +113,6 @@ func (sv *SettingsView) showAddIdentityDialog() {
 	passphraseLabel := gtk.NewLabel("Account Passphrase:")
 	passphraseLabel.SetXAlign(0)
 	passphraseEntry := gtk.NewPasswordEntry()
-	passphraseEntry.SetPlaceholderText("Required to update account")
 	passphraseEntry.SetShowPeekIcon(true)
 	contentBox.Append(passphraseLabel)
 	contentBox.Append(passphraseEntry)
