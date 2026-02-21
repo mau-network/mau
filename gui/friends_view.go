@@ -172,25 +172,25 @@ func validatePGPKey(armoredKey string) error {
 	key := strings.TrimSpace(armoredKey)
 	
 	if key == "" {
-		return fmt.Errorf("PGP key cannot be empty")
+		return fmt.Errorf(errInvalidPGPKey)
 	}
 
 	// Check for PGP armor headers
 	if !strings.Contains(key, "-----BEGIN PGP PUBLIC KEY BLOCK-----") {
-		return fmt.Errorf("invalid PGP key format: missing BEGIN header")
+		return fmt.Errorf(errMissingPGPHeaders)
 	}
 
 	if !strings.Contains(key, "-----END PGP PUBLIC KEY BLOCK-----") {
-		return fmt.Errorf("invalid PGP key format: missing END header")
+		return fmt.Errorf(errMissingPGPHeaders)
 	}
 
 	// Basic length check (typical PGP keys are 1-10KB)
 	if len(key) < 200 {
-		return fmt.Errorf("PGP key too short (possible truncation)")
+		return fmt.Errorf(errPGPKeyTooShort)
 	}
 
 	if len(key) > 50000 {
-		return fmt.Errorf("PGP key too long (max 50KB)")
+		return fmt.Errorf(errPGPKeyTooLarge)
 	}
 
 	return nil

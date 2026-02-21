@@ -10,19 +10,36 @@ import (
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 )
 
+// timelinePost represents a post with its author info
+type timelinePost struct {
+	post       Post
+	friendName string
+}
+
 // TimelineView handles the timeline view
 type TimelineView struct {
-	app          *MauApp
-	page         *gtk.Box
-	timelineList *gtk.ListBox
-	filterAuthor *gtk.DropDown
-	filterStart  *gtk.Entry
-	filterEnd    *gtk.Entry
+	app             *MauApp
+	page            *gtk.Box
+	timelineList    *gtk.ListBox
+	filterAuthor    *gtk.DropDown
+	filterStart     *gtk.Entry
+	filterEnd       *gtk.Entry
+	loadMoreBtn     *gtk.Button
+	currentPage     int
+	pageSize        int
+	allPosts        []timelinePost
+	hasMore         bool
 }
 
 // NewTimelineView creates a new timeline view
 func NewTimelineView(app *MauApp) *TimelineView {
-	return &TimelineView{app: app}
+	return &TimelineView{
+		app:         app,
+		currentPage: 0,
+		pageSize:    20, // Show 20 posts per page
+		allPosts:    []timelinePost{},
+		hasMore:     false,
+	}
 }
 
 // Build creates and returns the view widget
@@ -66,6 +83,20 @@ func (tv *TimelineView) Build() *gtk.Box {
 	tv.page.Append(timelineGroup)
 	tv.page.Append(timelineScrolled)
 
+	// Load More button
+	tv.loadMoreBtn = gtk.NewButton()
+	tv.loadMoreBtn.SetLabel("Load More Posts")
+	tv.loadMoreBtn.AddCSSClass("suggested-action")
+	tv.loadMoreBtn.SetVisible(false)
+	tv.loadMoreBtn.ConnectClicked(func() {
+		tv.loadMore()
+	})
+
+	loadMoreBox := gtk.NewBox(gtk.OrientationHorizontal, 0)
+	loadMoreBox.SetHAlign(gtk.AlignCenter)
+	loadMoreBox.Append(tv.loadMoreBtn)
+	tv.page.Append(loadMoreBox)
+
 	tv.Refresh()
 
 	return tv.page
@@ -108,6 +139,8 @@ func (tv *TimelineView) buildFilters() {
 
 // Refresh reloads the timeline with filters applied
 func (tv *TimelineView) Refresh() {
+	// Reset pagination
+	tv.currentPage = 0
 	tv.timelineList.RemoveAll()
 
 	keyring, err := tv.app.accountMgr.Account().ListFriends()
@@ -116,6 +149,7 @@ func (tv *TimelineView) Refresh() {
 		row.SetTitle("Error loading friends")
 		row.SetSubtitle(err.Error())
 		tv.timelineList.Append(row)
+		tv.loadMoreBtn.SetVisible(false)
 		return
 	}
 
@@ -125,6 +159,7 @@ func (tv *TimelineView) Refresh() {
 		row.SetTitle("No friends yet")
 		row.SetSubtitle("Add friends to see their posts")
 		tv.timelineList.Append(row)
+		tv.loadMoreBtn.SetVisible(false)
 		return
 	}
 
@@ -133,11 +168,7 @@ func (tv *TimelineView) Refresh() {
 	filterStartDate := tv.parseDate(tv.filterStart.Text())
 	filterEndDate := tv.parseDate(tv.filterEnd.Text())
 
-	type timelinePost struct {
-		post       Post
-		friendName string
-	}
-	var allPosts []timelinePost
+	tv.allPosts = []timelinePost{}
 
 	for _, friend := range friends {
 		fpr := friend.Fingerprint()
@@ -154,14 +185,14 @@ func (tv *TimelineView) Refresh() {
 				continue
 			}
 
-			allPosts = append(allPosts, timelinePost{
+			tv.allPosts = append(tv.allPosts, timelinePost{
 				post:       post,
 				friendName: friend.Name(),
 			})
 		}
 	}
 
-	if len(allPosts) == 0 {
+	if len(tv.allPosts) == 0 {
 		row := adw.NewActionRow()
 		if filterAuthorText != "" || !filterStartDate.IsZero() || !filterEndDate.IsZero() {
 			row.SetTitle("No posts match filters")
@@ -170,20 +201,42 @@ func (tv *TimelineView) Refresh() {
 			row.SetTitle("No posts from friends yet")
 		}
 		tv.timelineList.Append(row)
+		tv.loadMoreBtn.SetVisible(false)
 		return
 	}
 
 	// Sort by newest first
-	sort.Slice(allPosts, func(i, j int) bool {
-		return allPosts[i].post.Published.After(allPosts[j].post.Published)
+	sort.Slice(tv.allPosts, func(i, j int) bool {
+		return tv.allPosts[i].post.Published.After(tv.allPosts[j].post.Published)
 	})
 
-	// Limit results
-	if len(allPosts) > postLoadLimit {
-		allPosts = allPosts[:postLoadLimit]
+	// Display first page
+	tv.displayPage()
+}
+
+func (tv *TimelineView) loadMore() {
+	tv.currentPage++
+	tv.displayPage()
+}
+
+func (tv *TimelineView) displayPage() {
+	start := tv.currentPage * tv.pageSize
+	end := start + tv.pageSize
+
+	if start >= len(tv.allPosts) {
+		// No more posts
+		tv.hasMore = false
+		tv.loadMoreBtn.SetVisible(false)
+		return
 	}
 
-	for _, tp := range allPosts {
+	if end > len(tv.allPosts) {
+		end = len(tv.allPosts)
+	}
+
+	// Display posts for this page
+	for i := start; i < end; i++ {
+		tp := tv.allPosts[i]
 		row := adw.NewActionRow()
 		row.SetTitle(Truncate(tp.post.Body, 80))
 
@@ -200,6 +253,15 @@ func (tv *TimelineView) Refresh() {
 		row.AddSuffix(verifiedIcon)
 
 		tv.timelineList.Append(row)
+	}
+
+	// Update Load More button visibility
+	tv.hasMore = end < len(tv.allPosts)
+	tv.loadMoreBtn.SetVisible(tv.hasMore)
+
+	if tv.hasMore {
+		remaining := len(tv.allPosts) - end
+		tv.loadMoreBtn.SetLabel(fmt.Sprintf("Load More (%d remaining)", remaining))
 	}
 }
 
