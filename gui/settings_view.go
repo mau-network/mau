@@ -46,32 +46,18 @@ func (sv *SettingsView) Build() *gtk.Box {
 func (sv *SettingsView) buildAccountSection() {
 	accountGroup := adw.NewPreferencesGroup()
 	accountGroup.SetTitle("Account")
-	accountGroup.SetDescription("Your account information (changes require app restart)")
+	accountGroup.SetDescription("Your account information (read-only, set at account creation)")
 
-	// Name entry
-	nameEntry := gtk.NewEntry()
-	nameEntry.SetText(sv.app.accountMgr.Account().Name())
-	nameEntry.SetPlaceholderText("Your name")
-	nameEntry.SetVAlign(gtk.AlignCenter)
-	nameEntry.ConnectChanged(func() {
-		sv.app.showToast("Name updated (restart required)")
-	})
+	// Name (read-only display)
 	nameRow := adw.NewActionRow()
 	nameRow.SetTitle("Name")
-	nameRow.AddSuffix(nameEntry)
+	nameRow.SetSubtitle(sv.app.accountMgr.Account().Name())
 	accountGroup.Add(nameRow)
 
-	// Email entry
-	emailEntry := gtk.NewEntry()
-	emailEntry.SetText(sv.app.accountMgr.Account().Email())
-	emailEntry.SetPlaceholderText("your@email.com")
-	emailEntry.SetVAlign(gtk.AlignCenter)
-	emailEntry.ConnectChanged(func() {
-		sv.app.showToast("Email updated (restart required)")
-	})
+	// Email (read-only display)
 	emailRow := adw.NewActionRow()
 	emailRow.SetTitle("Email")
-	emailRow.AddSuffix(emailEntry)
+	emailRow.SetSubtitle(sv.app.accountMgr.Account().Email())
 	accountGroup.Add(emailRow)
 
 	// Fingerprint (read-only)
