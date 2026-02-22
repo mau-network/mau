@@ -27,61 +27,49 @@ func DefaultRetryConfig() RetryConfig {
 func RetryOperation(cfg RetryConfig, operation func() error) error {
 	var lastErr error
 	delay := cfg.InitialDelay
-
 	for attempt := 1; attempt <= cfg.MaxAttempts; attempt++ {
-		err := operation()
-		if err == nil {
+		if err := operation(); err == nil {
 			return nil
+		} else {
+			lastErr = err
 		}
-
-		lastErr = err
-
-		// Don't wait after last attempt
-		if attempt == cfg.MaxAttempts {
-			break
-		}
-
-		// Wait before retry with exponential backoff
-		time.Sleep(delay)
-		delay = time.Duration(float64(delay) * cfg.Multiplier)
-		if delay > cfg.MaxDelay {
-			delay = cfg.MaxDelay
+		if attempt < cfg.MaxAttempts {
+			time.Sleep(delay)
+			delay = calculateNextDelay(delay, cfg)
 		}
 	}
-
 	return fmt.Errorf("operation failed after %d attempts: %w", cfg.MaxAttempts, lastErr)
+}
+
+func calculateNextDelay(current time.Duration, cfg RetryConfig) time.Duration {
+	next := time.Duration(float64(current) * cfg.Multiplier)
+	if next > cfg.MaxDelay {
+		return cfg.MaxDelay
+	}
+	return next
 }
 
 // RetryWithContext executes with retry and progress callback
 func RetryWithContext(cfg RetryConfig, onRetry func(attempt int, err error), operation func() error) error {
 	var lastErr error
 	delay := cfg.InitialDelay
-
 	for attempt := 1; attempt <= cfg.MaxAttempts; attempt++ {
-		err := operation()
-		if err == nil {
+		if err := operation(); err == nil {
 			return nil
+		} else {
+			lastErr = err
+			handleRetryError(attempt, err, cfg.MaxAttempts, onRetry)
 		}
-
-		lastErr = err
-
-		// Notify about retry
-		if onRetry != nil && attempt < cfg.MaxAttempts {
-			onRetry(attempt, err)
-		}
-
-		// Don't wait after last attempt
-		if attempt == cfg.MaxAttempts {
-			break
-		}
-
-		// Wait before retry with exponential backoff
-		time.Sleep(delay)
-		delay = time.Duration(float64(delay) * cfg.Multiplier)
-		if delay > cfg.MaxDelay {
-			delay = cfg.MaxDelay
+		if attempt < cfg.MaxAttempts {
+			time.Sleep(delay)
+			delay = calculateNextDelay(delay, cfg)
 		}
 	}
-
 	return fmt.Errorf("operation failed after %d attempts: %w", cfg.MaxAttempts, lastErr)
+}
+
+func handleRetryError(attempt int, err error, maxAttempts int, onRetry func(int, error)) {
+	if onRetry != nil && attempt < maxAttempts {
+		onRetry(attempt, err)
+	}
 }

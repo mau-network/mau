@@ -72,107 +72,140 @@ func (m *MauApp) Run(args []string) int {
 }
 
 func (m *MauApp) activate() error {
-	// Initialize managers
-	m.configMgr = NewConfigManager(m.dataDir)
-	m.accountMgr = NewAccountManager(m.dataDir)
-	m.mdRenderer = NewMarkdownRenderer()
-
-	// Apply theme
-	config := m.configMgr.Get()
-	ApplyTheme(m.app, config.DarkMode)
-
-	// Initialize account
-	if err := m.accountMgr.Init(); err != nil {
-		return fmt.Errorf("account initialization failed: %w", err)
+	m.initializeManagers()
+	m.applyThemeFromConfig()
+	if err := m.initializeAccount(); err != nil {
+		return err
 	}
-
-	// Create post manager
-	m.postMgr = NewPostManager(m.accountMgr.Account())
-
-	// Update config with account info
-	accInfo := m.accountMgr.Info()
-	m.configMgr.Update(func(cfg *AppConfig) {
-		// Add account if not exists
-		exists := false
-		for _, acc := range cfg.Accounts {
-			if acc.Fingerprint == accInfo.Fingerprint {
-				exists = true
-				break
-			}
-		}
-		if !exists {
-			cfg.Accounts = append(cfg.Accounts, accInfo)
-			cfg.LastAccount = accInfo.Fingerprint
-		}
-	})
-
-	// Create UI
+	m.createPostManager()
+	m.updateConfigWithAccount()
 	m.buildUI()
-
-	// Always start server (P2P network - should always be online)
-	if err := m.startServer(); err != nil {
-		m.showToast(fmt.Sprintf("Warning: Server failed to start: %v", err))
-	}
-
-	// Start auto-sync if configured
-	if config.AutoSync && config.AutoSyncMinutes > 0 {
-		m.startAutoSync()
-	}
-
+	m.startServerIfNeeded()
+	m.startAutoSyncIfConfigured()
 	return nil
 }
 
+func (m *MauApp) initializeManagers() {
+	m.configMgr = NewConfigManager(m.dataDir)
+	m.accountMgr = NewAccountManager(m.dataDir)
+	m.mdRenderer = NewMarkdownRenderer()
+}
+
+func (m *MauApp) applyThemeFromConfig() {
+	config := m.configMgr.Get()
+	ApplyTheme(m.app, config.DarkMode)
+}
+
+func (m *MauApp) initializeAccount() error {
+	if err := m.accountMgr.Init(); err != nil {
+		return fmt.Errorf("account initialization failed: %w", err)
+	}
+	return nil
+}
+
+func (m *MauApp) createPostManager() {
+	m.postMgr = NewPostManager(m.accountMgr.Account())
+}
+
+func (m *MauApp) updateConfigWithAccount() {
+	accInfo := m.accountMgr.Info()
+	m.configMgr.Update(func(cfg *AppConfig) {
+		m.addAccountIfNotExists(cfg, accInfo)
+	})
+}
+
+func (m *MauApp) addAccountIfNotExists(cfg *AppConfig, accInfo AccountInfo) {
+	for _, acc := range cfg.Accounts {
+		if acc.Fingerprint == accInfo.Fingerprint {
+			return
+		}
+	}
+	cfg.Accounts = append(cfg.Accounts, accInfo)
+	cfg.LastAccount = accInfo.Fingerprint
+}
+
+func (m *MauApp) startServerIfNeeded() {
+	if err := m.startServer(); err != nil {
+		m.showToast(fmt.Sprintf("Warning: Server failed to start: %v", err))
+	}
+}
+
+func (m *MauApp) startAutoSyncIfConfigured() {
+	config := m.configMgr.Get()
+	if config.AutoSync && config.AutoSyncMinutes > 0 {
+		m.startAutoSync()
+	}
+}
+
 func (m *MauApp) buildUI() {
+	window := m.createMainWindow()
+	m.setupToastOverlay()
+	headerBar := m.buildHeaderBar()
+	toolbarView := m.buildToolbarView(headerBar)
+	m.toastOverlay.SetChild(toolbarView)
+	m.buildAndAddViews()
+	window.SetContent(m.toastOverlay)
+	window.Show()
+	m.loadCSS()
+	m.updateNetworkStatus()
+}
+
+func (m *MauApp) createMainWindow() *adw.ApplicationWindow {
 	window := adw.NewApplicationWindow(&m.app.Application)
 	window.SetTitle(appTitle)
 	window.SetDefaultSize(1000, 800)
+	return window
+}
 
-	// Toast overlay
+func (m *MauApp) setupToastOverlay() {
 	m.toastOverlay = adw.NewToastOverlay()
+}
 
-	// Header bar
+func (m *MauApp) buildHeaderBar() *adw.HeaderBar {
 	headerBar := adw.NewHeaderBar()
 	viewSwitcher := adw.NewViewSwitcher()
 	m.mainStack = adw.NewViewStack()
 	viewSwitcher.SetStack(m.mainStack)
 	headerBar.SetTitleWidget(viewSwitcher)
+	m.addHeaderBarWidgets(headerBar)
+	return headerBar
+}
 
-	// Add loading spinner to header
+func (m *MauApp) addHeaderBarWidgets(headerBar *adw.HeaderBar) {
+	m.addSpinnerToHeader(headerBar)
+	m.addStatusIndicator(headerBar)
+}
+
+func (m *MauApp) addSpinnerToHeader(headerBar *adw.HeaderBar) {
 	m.spinner = gtk.NewSpinner()
 	m.spinner.SetVisible(false)
 	headerBar.PackEnd(m.spinner)
+}
 
-	// Add network status indicator
+func (m *MauApp) addStatusIndicator(headerBar *adw.HeaderBar) {
 	statusBox := gtk.NewBox(gtk.OrientationHorizontal, 4)
 	m.statusIndicator = gtk.NewLabel("🔴 Offline")
 	m.statusIndicator.AddCSSClass("status-label")
 	statusBox.Append(m.statusIndicator)
 	headerBar.PackEnd(statusBox)
+}
 
-	// Toolbar view
+func (m *MauApp) buildToolbarView(headerBar *adw.HeaderBar) *adw.ToolbarView {
 	toolbarView := adw.NewToolbarView()
 	toolbarView.AddTopBar(headerBar)
 	toolbarView.SetContent(m.mainStack)
+	return toolbarView
+}
 
-	m.toastOverlay.SetChild(toolbarView)
-
-	// Build views
+func (m *MauApp) buildAndAddViews() {
 	m.homeView = NewHomeView(m)
 	m.friendsView = NewFriendsView(m)
 	m.settingsView = NewSettingsView(m)
+	m.addViewsToStack()
+}
 
-	// Add to stack
+func (m *MauApp) addViewsToStack() {
 	m.mainStack.AddTitledWithIcon(m.homeView.Build(), "home", "Home", "user-home-symbolic")
 	m.mainStack.AddTitledWithIcon(m.friendsView.Build(), "friends", "Friends", "system-users-symbolic")
 	m.mainStack.AddTitledWithIcon(m.settingsView.Build(), "settings", "Settings", "preferences-system-symbolic")
-
-	window.SetContent(m.toastOverlay)
-
-	window.Show()
-
-	// Load CSS after window is shown
-	m.loadCSS()
-
-	// Initialize network status display
-	m.updateNetworkStatus()
 }

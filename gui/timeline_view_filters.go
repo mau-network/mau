@@ -10,37 +10,49 @@ import (
 // buildFilters creates the filter UI components
 func (tv *TimelineView) buildFilters() {
 	filterBox := gtk.NewBox(gtk.OrientationHorizontal, 6)
+	tv.addAuthorFilter(filterBox)
+	tv.addDateRangeFilters(filterBox)
+	tv.addApplyButton(filterBox)
+	tv.page.Append(filterBox)
+}
 
-	// Author filter
+func (tv *TimelineView) addAuthorFilter(box *gtk.Box) {
 	authorLabel := gtk.NewLabel("Author:")
 	tv.filterAuthor = gtk.NewDropDown(nil, nil)
-	filterBox.Append(authorLabel)
-	filterBox.Append(tv.filterAuthor)
+	box.Append(authorLabel)
+	box.Append(tv.filterAuthor)
+}
 
-	// Date range
+func (tv *TimelineView) addDateRangeFilters(box *gtk.Box) {
+	tv.addStartDateFilter(box)
+	tv.addEndDateFilter(box)
+}
+
+func (tv *TimelineView) addStartDateFilter(box *gtk.Box) {
 	dateLabel := gtk.NewLabel("From:")
 	tv.filterStart = gtk.NewEntry()
 	tv.filterStart.SetPlaceholderText("YYYY-MM-DD")
 	tv.filterStart.SetWidthChars(12)
-	filterBox.Append(dateLabel)
-	filterBox.Append(tv.filterStart)
+	box.Append(dateLabel)
+	box.Append(tv.filterStart)
+}
 
+func (tv *TimelineView) addEndDateFilter(box *gtk.Box) {
 	toLabel := gtk.NewLabel("To:")
 	tv.filterEnd = gtk.NewEntry()
 	tv.filterEnd.SetPlaceholderText("YYYY-MM-DD")
 	tv.filterEnd.SetWidthChars(12)
-	filterBox.Append(toLabel)
-	filterBox.Append(tv.filterEnd)
+	box.Append(toLabel)
+	box.Append(tv.filterEnd)
+}
 
-	// Apply button
+func (tv *TimelineView) addApplyButton(box *gtk.Box) {
 	applyBtn := gtk.NewButton()
 	applyBtn.SetLabel("Apply")
 	applyBtn.ConnectClicked(func() {
 		tv.Refresh()
 	})
-	filterBox.Append(applyBtn)
-
-	tv.page.Append(filterBox)
+	box.Append(applyBtn)
 }
 
 // matchesFilters checks if a post matches the current filter criteria
