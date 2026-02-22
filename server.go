@@ -49,32 +49,40 @@ func (a *Account) Server(knownNodes []*Peer) (*Server, error) {
 		router:         router,
 		resultsLimit:   serverResultLimit,
 		bootstrapNodes: knownNodes,
-		httpServer: http.Server{
-			Handler: router,
-			TLSConfig: &tls.Config{
-				Certificates:       []tls.Certificate{cert},
-				InsecureSkipVerify: true,
-				ClientAuth:         tls.RequestClientCert,
-				// Go 1.26: Use secure defaults, removed deprecated PreferServerCipherSuites
-				// and explicit CipherSuites (modern Go chooses optimal suites automatically)
-				MinVersion: tls.VersionTLS13, // TLS 1.3 for better security and performance
-				CurvePreferences: []tls.CurveID{
-					tls.X25519, // Modern, fast elliptic curve
-					tls.CurveP256,
-					tls.CurveP384,
-					tls.CurveP521,
-				},
-			},
-			ReadTimeout:       30 * time.Second,
-			WriteTimeout:      30 * time.Second,
-			IdleTimeout:       120 * time.Second,
-			ReadHeaderTimeout: 10 * time.Second,
-		},
+		httpServer:     createHTTPServer(router, cert),
 	}
 
 	router.Handle("/p2p/", &s)
 
 	return &s, nil
+}
+
+func createHTTPServer(router *http.ServeMux, cert tls.Certificate) http.Server {
+	return http.Server{
+		Handler:   router,
+		TLSConfig: createServerTLSConfig(cert),
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+}
+
+func createServerTLSConfig(cert tls.Certificate) *tls.Config {
+	return &tls.Config{
+		Certificates:       []tls.Certificate{cert},
+		InsecureSkipVerify: true,
+		ClientAuth:         tls.RequestClientCert,
+		// Go 1.26: Use secure defaults, removed deprecated PreferServerCipherSuites
+		// and explicit CipherSuites (modern Go chooses optimal suites automatically)
+		MinVersion: tls.VersionTLS13, // TLS 1.3 for better security and performance
+		CurvePreferences: []tls.CurveID{
+			tls.X25519, // Modern, fast elliptic curve
+			tls.CurveP256,
+			tls.CurveP384,
+			tls.CurveP521,
+		},
+	}
 }
 
 var (
@@ -207,19 +215,33 @@ func (s *Server) buildFileListItem(item *File, r *http.Request, fpr Fingerprint)
 }
 
 func (s *Server) list(w http.ResponseWriter, r *http.Request) {
-	lastModified, err := parseIfModifiedSince(r)
+	lastModified, fpr, err := s.parseListRequest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	list := s.buildFileList(r, fpr, lastModified)
+
+	s.writeJSONResponse(w, list)
+}
+
+func (s *Server) parseListRequest(r *http.Request) (time.Time, Fingerprint, error) {
+	lastModified, err := parseIfModifiedSince(r)
+	if err != nil {
+		return time.Time{}, Fingerprint{}, err
 	}
 
 	fprStr := strings.TrimPrefix(r.URL.Path, "/p2p/")
 	fpr, err := FingerprintFromString(fprStr)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return time.Time{}, Fingerprint{}, err
 	}
 
+	return lastModified, fpr, nil
+}
+
+func (s *Server) buildFileList(r *http.Request, fpr Fingerprint, lastModified time.Time) []FileListItem {
 	page := s.account.ListFiles(fpr, lastModified, s.resultsLimit)
 
 	list := make([]FileListItem, 0, len(page))
@@ -229,6 +251,10 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	return list
+}
+
+func (s *Server) writeJSONResponse(w http.ResponseWriter, list []FileListItem) {
 	marshaled, err := json.Marshal(list)
 	if err != nil {
 		http.Error(w, "Error while processing the list of files", http.StatusInternalServerError)
