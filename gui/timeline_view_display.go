@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
@@ -46,36 +47,44 @@ func (tv *TimelineView) showNoPosts() {
 
 // loadPostsFromFriends loads posts from all friends with filters applied
 func (tv *TimelineView) loadPostsFromFriends(friends []*mau.Friend) []timelinePost {
-	// Get filter values
 	filterAuthorText := strings.TrimSpace(tv.filterStart.Text())
 	filterStartDate := tv.parseDate(tv.filterStart.Text())
 	filterEndDate := tv.parseDate(tv.filterEnd.Text())
+	return tv.collectFilteredPosts(friends, filterAuthorText, filterStartDate, filterEndDate)
+}
 
+func (tv *TimelineView) collectFilteredPosts(friends []*mau.Friend, author string, start, end time.Time) []timelinePost {
 	var posts []timelinePost
-
 	for _, friend := range friends {
-		fpr := friend.Fingerprint()
-		files, _ := tv.app.postMgr.List(fpr, friendPostLimit)
+		posts = append(posts, tv.loadFriendPosts(friend, author, start, end)...)
+	}
+	return posts
+}
 
-		for _, file := range files {
-			post, err := tv.app.postMgr.Load(file)
-			if err != nil {
-				continue
-			}
-
-			// Apply filters
-			if !tv.matchesFilters(post, friend.Name(), filterAuthorText, filterStartDate, filterEndDate) {
-				continue
-			}
-
-			posts = append(posts, timelinePost{
-				post:       post,
-				friendName: friend.Name(),
-			})
+func (tv *TimelineView) loadFriendPosts(friend *mau.Friend, author string, start, end time.Time) []timelinePost {
+	fpr := friend.Fingerprint()
+	files, _ := tv.app.postMgr.List(fpr, friendPostLimit)
+	var posts []timelinePost
+	for _, file := range files {
+		if post := tv.loadAndFilterPost(file, friend, author, start, end); post != nil {
+			posts = append(posts, *post)
 		}
 	}
-
 	return posts
+}
+
+func (tv *TimelineView) loadAndFilterPost(file *mau.File, friend *mau.Friend, author string, start, end time.Time) *timelinePost {
+	post, err := tv.app.postMgr.Load(file)
+	if err != nil {
+		return nil
+	}
+	if !tv.matchesFilters(post, friend.Name(), author, start, end) {
+		return nil
+	}
+	return &timelinePost{
+		post:       post,
+		friendName: friend.Name(),
+	}
 }
 
 // loadMore increments the page and displays the next page
@@ -86,45 +95,61 @@ func (tv *TimelineView) loadMore() {
 
 // displayPage renders the current page of posts
 func (tv *TimelineView) displayPage() {
-	start := tv.currentPage * tv.pageSize
-	end := start + tv.pageSize
-
+	start, end := tv.calculatePageBounds()
 	if start >= len(tv.allPosts) {
-		// No more posts
-		tv.hasMore = false
-		tv.loadMoreBtn.SetVisible(false)
+		tv.hideLoadMore()
 		return
 	}
+	tv.renderPagePosts(start, end)
+	tv.updateLoadMoreButton(end)
+}
 
+func (tv *TimelineView) calculatePageBounds() (int, int) {
+	start := tv.currentPage * tv.pageSize
+	end := start + tv.pageSize
 	if end > len(tv.allPosts) {
 		end = len(tv.allPosts)
 	}
+	return start, end
+}
 
-	// Display posts for this page
+func (tv *TimelineView) hideLoadMore() {
+	tv.hasMore = false
+	tv.loadMoreBtn.SetVisible(false)
+}
+
+func (tv *TimelineView) renderPagePosts(start, end int) {
 	for i := start; i < end; i++ {
-		tp := tv.allPosts[i]
-		row := adw.NewActionRow()
-		row.SetTitle(Truncate(tp.post.Body, 80))
-
-		subtitle := fmt.Sprintf("%s • %s", tp.friendName, tp.post.Published.Format("2006-01-02 15:04"))
-		if len(tp.post.Tags) > 0 {
-			subtitle += " • " + FormatTags(tp.post.Tags)
-		}
-		row.SetSubtitle(subtitle)
-
-		icon := gtk.NewImageFromIconName("avatar-default-symbolic")
-		row.AddPrefix(icon)
-
-		verifiedIcon := gtk.NewImageFromIconName("emblem-ok-symbolic")
-		row.AddSuffix(verifiedIcon)
-
-		tv.timelineList.Append(row)
+		tv.timelineList.Append(tv.createPostRow(tv.allPosts[i]))
 	}
+}
 
-	// Update Load More button visibility
+func (tv *TimelineView) createPostRow(tp timelinePost) *adw.ActionRow {
+	row := adw.NewActionRow()
+	row.SetTitle(Truncate(tp.post.Body, 80))
+	row.SetSubtitle(tv.formatPostSubtitle(tp))
+	tv.addPostIcons(row)
+	return row
+}
+
+func (tv *TimelineView) formatPostSubtitle(tp timelinePost) string {
+	subtitle := fmt.Sprintf("%s • %s", tp.friendName, tp.post.Published.Format("2006-01-02 15:04"))
+	if len(tp.post.Tags) > 0 {
+		subtitle += " • " + FormatTags(tp.post.Tags)
+	}
+	return subtitle
+}
+
+func (tv *TimelineView) addPostIcons(row *adw.ActionRow) {
+	icon := gtk.NewImageFromIconName("avatar-default-symbolic")
+	row.AddPrefix(icon)
+	verifiedIcon := gtk.NewImageFromIconName("emblem-ok-symbolic")
+	row.AddSuffix(verifiedIcon)
+}
+
+func (tv *TimelineView) updateLoadMoreButton(end int) {
 	tv.hasMore = end < len(tv.allPosts)
 	tv.loadMoreBtn.SetVisible(tv.hasMore)
-
 	if tv.hasMore {
 		remaining := len(tv.allPosts) - end
 		tv.loadMoreBtn.SetLabel(fmt.Sprintf("Load More (%d remaining)", remaining))
