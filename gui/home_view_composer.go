@@ -12,7 +12,7 @@ import (
 func (hv *HomeView) buildComposer() {
 	postGroup := adw.NewPreferencesGroup()
 	postGroup.SetTitle("Create a Post")
-	postGroup.SetDescription("Share with your network (encrypted & signed)")
+	postGroup.SetDescription("Share with your network (encrypted &amp; signed)")
 
 	composerBox := gtk.NewBox(gtk.OrientationVertical, 6)
 	composerBox.Append(hv.buildComposerHeader())

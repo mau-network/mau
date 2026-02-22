@@ -1,11 +1,23 @@
 package main
 
 import (
+	"strings"
+	
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 )
 
 // UI Helper Functions
+
+// escapeMarkup escapes GTK markup characters (&, <, >, ", ')
+func escapeMarkup(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, "\"", "&quot;")
+	s = strings.ReplaceAll(s, "'", "&apos;")
+	return s
+}
 
 // NewBoxedListBox creates a styled ListBox with the "boxed-list" CSS class
 func NewBoxedListBox() *gtk.ListBox {

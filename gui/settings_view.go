@@ -70,7 +70,8 @@ func (sv *SettingsView) buildIdentitiesSection() {
 	
 	for _, identityStr := range identities {
 		row := adw.NewActionRow()
-		row.SetTitle(identityStr)
+		// Escape markup characters in identity string (contains <email>)
+		row.SetTitle(escapeMarkup(identityStr))
 		
 		isPrimary := sv.app.accountMgr.Account().IsPrimaryIdentity(identityStr)
 		
