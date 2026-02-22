@@ -118,6 +118,10 @@ func (a *Account) saveFriendEntity(fpr string, entity *openpgp.Entity) error {
 	}
 	defer file.Close()
 
+	return a.encryptAndSerializeEntity(file, entity)
+}
+
+func (a *Account) encryptAndSerializeEntity(file *os.File, entity *openpgp.Entity) error {
 	entities := []*openpgp.Entity{a.entity}
 	w, err := openpgp.Encrypt(file, entities, a.entity, nil, nil)
 	if err != nil {
@@ -136,27 +140,43 @@ func (a *Account) saveFriendEntity(fpr string, entity *openpgp.Entity) error {
 }
 
 func (a *Account) RemoveFriend(friend *Friend) error {
+	matches, err := a.findFriendFiles(friend)
+	if err != nil {
+		return err
+	}
+
+	if err := a.removeFriendFiles(matches); err != nil {
+		return err
+	}
+
+	return a.Unfollow(friend)
+}
+
+func (a *Account) findFriendFiles(friend *Friend) ([]string, error) {
 	file := fmt.Sprintf("%s.pgp", friend.Fingerprint())
 	uncategorized := path.Join(mauDir(a.path), file)
 	pattern := path.Join(mauDir(a.path), "**", file)
 
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if _, err := os.Stat(uncategorized); err == nil {
 		matches = append(matches, uncategorized)
 	}
 
+	return matches, nil
+}
+
+func (a *Account) removeFriendFiles(matches []string) error {
 	for _, match := range matches {
-		err = os.Remove(match)
-		if err != nil {
+		if err := os.Remove(match); err != nil {
 			return err
 		}
 	}
-
-	return a.Unfollow(friend)
+	return nil
+}
 }
 
 func (a *Account) ListFriends() (*Keyring, error) {

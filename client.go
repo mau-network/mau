@@ -41,26 +41,31 @@ func (a *Account) Client(peer Fingerprint, DNSNames []string) (*Client, error) {
 		peer:    peer,
 	}
 
-	c.client = resty.New().
+	c.client = c.createRestyClient(cert)
+	return c, nil
+}
+
+func (c *Client) createRestyClient(cert tls.Certificate) *resty.Client {
+	return resty.New().
 		SetRedirectPolicy(resty.NoRedirectPolicy()).
 		SetTimeout(httpClientTimeout).
-		SetTLSClientConfig(
-			&tls.Config{
-				Certificates:          []tls.Certificate{cert},
-				InsecureSkipVerify:    true,
-				VerifyPeerCertificate: c.verifyPeerCertificate,
-				// Go 1.26: Use secure defaults, removed explicit CipherSuites
-				// Modern Go automatically selects optimal cipher suites
-				MinVersion: tls.VersionTLS13, // TLS 1.3 for better security and performance
-				CurvePreferences: []tls.CurveID{
-					tls.X25519, // Modern, fast elliptic curve
-					tls.CurveP256,
-					tls.CurveP384,
-				},
-			},
-		)
+		SetTLSClientConfig(c.createTLSConfig(cert))
+}
 
-	return c, nil
+func (c *Client) createTLSConfig(cert tls.Certificate) *tls.Config {
+	return &tls.Config{
+		Certificates:          []tls.Certificate{cert},
+		InsecureSkipVerify:    true,
+		VerifyPeerCertificate: c.verifyPeerCertificate,
+		// Go 1.26: Use secure defaults, removed explicit CipherSuites
+		// Modern Go automatically selects optimal cipher suites
+		MinVersion: tls.VersionTLS13, // TLS 1.3 for better security and performance
+		CurvePreferences: []tls.CurveID{
+			tls.X25519, // Modern, fast elliptic curve
+			tls.CurveP256,
+			tls.CurveP384,
+		},
+	}
 }
 
 func (c *Client) resolveFingerprintAddress(ctx context.Context, fingerprint Fingerprint, resolvers []FingerprintResolver) (string, error) {
@@ -82,31 +87,41 @@ func (c *Client) resolveFingerprintAddress(ctx context.Context, fingerprint Fing
 }
 
 func (c *Client) fetchFileList(ctx context.Context, fingerprint Fingerprint, address string, after time.Time) ([]FileListItem, error) {
-	var list []FileListItem
-
-	resp, err := c.client.
-		R().
-		SetContext(ctx).
-		SetHeader("If-Modified-Since", after.UTC().Format(http.TimeFormat)).
-		SetResult(&list).
-		ForceContentType("application/json").
-		Get(
-			(&url.URL{
-				Scheme: uriProtocolName,
-				Host:   address,
-				Path:   fmt.Sprintf("/p2p/%s", fingerprint),
-			}).String(),
-		)
-
+	resp, err := c.fetchFileListRequest(ctx, fingerprint, address, after)
 	if err != nil {
-		return nil, fmt.Errorf("failed to request file list from peer %s: %w", fingerprint, err)
+		return nil, err
 	}
 
 	if resp.StatusCode() != http.StatusOK {
 		return nil, fmt.Errorf("peer %s responded with error status %s", fingerprint, resp.Status())
 	}
 
-	return list, nil
+	result, ok := resp.Result().(*[]FileListItem)
+	if !ok || result == nil {
+		return nil, fmt.Errorf("failed to parse response")
+	}
+
+	return *result, nil
+}
+
+func (c *Client) fetchFileListRequest(ctx context.Context, fingerprint Fingerprint, address string, after time.Time) (*resty.Response, error) {
+	var list []FileListItem
+	url := c.buildFileListURL(fingerprint, address)
+
+	return c.client.R().
+		SetContext(ctx).
+		SetHeader("If-Modified-Since", after.UTC().Format(http.TimeFormat)).
+		SetResult(&list).
+		ForceContentType("application/json").
+		Get(url)
+}
+
+func (c *Client) buildFileListURL(fingerprint Fingerprint, address string) string {
+	return (&url.URL{
+		Scheme: uriProtocolName,
+		Host:   address,
+		Path:   fmt.Sprintf("/p2p/%s", fingerprint),
+	}).String()
 }
 
 func (c *Client) downloadFiles(ctx context.Context, address string, fingerprint Fingerprint, list []FileListItem, resp *resty.Response) error {

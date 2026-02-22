@@ -17,22 +17,27 @@ func (a *Account) ListFollows() ([]*Friend, error) {
 		return nil, fmt.Errorf("failed to list friends while getting follows: %w", err)
 	}
 
+	return a.collectFollowedFriends(files, keyring), nil
+}
+
+func (a *Account) collectFollowedFriends(files []os.DirEntry, keyring *Keyring) []*Friend {
 	follows := []*Friend{}
 	for _, file := range files {
 		if file.IsDir() && file.Name()[0] != '.' {
-			fpr, err := FingerprintFromString(file.Name())
-			if err != nil {
-				continue // Ignore any directory that's not a fingerprint
-			}
-
-			friend := keyring.FindByFingerprint(fpr)
-			if friend != nil {
+			if friend := a.findFriendByDirName(file.Name(), keyring); friend != nil {
 				follows = append(follows, friend)
 			}
 		}
 	}
+	return follows
+}
 
-	return follows, nil
+func (a *Account) findFriendByDirName(name string, keyring *Keyring) *Friend {
+	fpr, err := FingerprintFromString(name)
+	if err != nil {
+		return nil // Ignore any directory that's not a fingerprint
+	}
+	return keyring.FindByFingerprint(fpr)
 }
 
 func (a *Account) Follow(friend *Friend) error {

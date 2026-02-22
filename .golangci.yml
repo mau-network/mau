@@ -74,8 +74,3 @@ issues:
         - cyclop
         - gocognit
         - funlen
-    
-    # Exclude core library files from funlen - they need separate refactoring
-    - path: '(account|client|file|follow|friend|kademlia|keyring|listen|server|sync_state)\.go'
-      linters:
-        - funlen
