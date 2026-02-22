@@ -235,23 +235,12 @@ func TestIdentityOperations(t *testing.T) {
 
 	acc := accMgr.Account()
 
-	// List identities
-	identities := acc.ListIdentities()
-	if len(identities) == 0 {
-		t.Fatal("Should have at least one identity")
-	}
-
 	// Get info
 	if acc.Name() == "" {
 		t.Error("Name should not be empty")
 	}
 	if acc.Email() == "" {
 		t.Error("Email should not be empty")
-	}
-
-	// Check primary
-	if !acc.IsPrimaryIdentity(identities[0]) {
-		t.Error("First identity should be primary")
 	}
 
 	// Fingerprint
