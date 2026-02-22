@@ -23,85 +23,116 @@ func NewSettingsView(app *MauApp) *SettingsView {
 
 // Build creates and returns the view widget
 func (sv *SettingsView) Build() *gtk.Box {
+	sv.initializePage()
+	sv.buildAccountSection()
+	sv.buildAppearanceSection()
+	sv.buildServerSection()
+	sv.buildSyncSection()
+	return sv.page
+}
+
+func (sv *SettingsView) initializePage() {
 	sv.page = gtk.NewBox(gtk.OrientationVertical, 12)
 	sv.page.SetMarginTop(12)
 	sv.page.SetMarginBottom(12)
 	sv.page.SetMarginStart(12)
 	sv.page.SetMarginEnd(12)
-
-	// Account info
-	sv.buildAccountSection()
-
-	// Appearance
-	sv.buildAppearanceSection()
-
-	// Server settings
-	sv.buildServerSection()
-
-	// Sync settings
-	sv.buildSyncSection()
-
-	return sv.page
 }
 
 func (sv *SettingsView) buildAccountSection() {
+	accountGroup := sv.createAccountGroup()
+	sv.addAccountRows(accountGroup)
+	sv.page.Append(accountGroup)
+}
+
+func (sv *SettingsView) createAccountGroup() *adw.PreferencesGroup {
 	accountGroup := adw.NewPreferencesGroup()
 	accountGroup.SetTitle("Account")
 	accountGroup.SetDescription("Your PGP account information")
+	return accountGroup
+}
 
-	// Name (read-only)
+func (sv *SettingsView) addAccountRows(group *adw.PreferencesGroup) {
+	group.Add(sv.createNameRow())
+	group.Add(sv.createEmailRow())
+	group.Add(sv.createFingerprintRow())
+}
+
+func (sv *SettingsView) createNameRow() *adw.ActionRow {
 	nameRow := adw.NewActionRow()
 	nameRow.SetTitle("Name")
 	nameRow.SetSubtitle(sv.app.accountMgr.Account().Name())
-	accountGroup.Add(nameRow)
+	return nameRow
+}
 
-	// Email (read-only)
+func (sv *SettingsView) createEmailRow() *adw.ActionRow {
 	emailRow := adw.NewActionRow()
 	emailRow.SetTitle("Email")
 	emailRow.SetSubtitle(sv.app.accountMgr.Account().Email())
-	accountGroup.Add(emailRow)
+	return emailRow
+}
 
-	// Fingerprint (read-only)
+func (sv *SettingsView) createFingerprintRow() *adw.ActionRow {
 	fpRow := adw.NewActionRow()
 	fpRow.SetTitle("Fingerprint")
 	fpRow.SetSubtitle(sv.app.accountMgr.Account().Fingerprint().String())
-	accountGroup.Add(fpRow)
-
-	sv.page.Append(accountGroup)
+	return fpRow
 }
 
 func (sv *SettingsView) buildAppearanceSection() {
 	appearanceGroup := adw.NewPreferencesGroup()
 	appearanceGroup.SetTitle("Appearance")
-
-	darkModeRow := adw.NewActionRow()
-	darkModeRow.SetTitle("Dark Mode")
-	darkModeRow.SetSubtitle("Use dark color scheme")
-
-	config := sv.app.configMgr.Get()
-	sv.darkModeSwitch = gtk.NewSwitch()
-	sv.darkModeSwitch.SetActive(config.DarkMode)
-	sv.darkModeSwitch.SetVAlign(gtk.AlignCenter)
-	sv.darkModeSwitch.ConnectStateSet(func(state bool) bool {
-		sv.app.configMgr.Update(func(cfg *AppConfig) {
-			cfg.DarkMode = state
-		})
-		ApplyTheme(sv.app.app, state)
-		sv.app.showToast("Dark mode " + map[bool]string{true: "enabled", false: "disabled"}[state])
-		return false
-	})
-	darkModeRow.AddSuffix(sv.darkModeSwitch)
-	appearanceGroup.Add(darkModeRow)
-
+	appearanceGroup.Add(sv.createDarkModeRow())
 	sv.page.Append(appearanceGroup)
 }
 
+func (sv *SettingsView) createDarkModeRow() *adw.ActionRow {
+	darkModeRow := adw.NewActionRow()
+	darkModeRow.SetTitle("Dark Mode")
+	darkModeRow.SetSubtitle("Use dark color scheme")
+	sv.darkModeSwitch = sv.createDarkModeSwitch()
+	darkModeRow.AddSuffix(sv.darkModeSwitch)
+	return darkModeRow
+}
+
+func (sv *SettingsView) createDarkModeSwitch() *gtk.Switch {
+	config := sv.app.configMgr.Get()
+	darkSwitch := gtk.NewSwitch()
+	darkSwitch.SetActive(config.DarkMode)
+	darkSwitch.SetVAlign(gtk.AlignCenter)
+	darkSwitch.ConnectStateSet(sv.onDarkModeToggle)
+	return darkSwitch
+}
+
+func (sv *SettingsView) onDarkModeToggle(state bool) bool {
+	sv.app.configMgr.Update(func(cfg *AppConfig) {
+		cfg.DarkMode = state
+	})
+	ApplyTheme(sv.app.app, state)
+	status := "enabled"
+	if !state {
+		status = "disabled"
+	}
+	sv.app.showToast("Dark mode " + status)
+	return false
+}
+
 func (sv *SettingsView) buildServerSection() {
+	serverGroup := sv.createServerGroup()
+	sv.addServerStatusRow(serverGroup)
+	sv.addServerPortRow(serverGroup)
+	sv.addServerFingerprintRow(serverGroup)
+	sv.page.Append(serverGroup)
+}
+
+func (sv *SettingsView) createServerGroup() *adw.PreferencesGroup {
 	serverGroup := adw.NewPreferencesGroup()
 	serverGroup.SetTitle("Network")
 	serverGroup.SetDescription("P2P server and network configuration")
+	return serverGroup
+}
 
-	// Server status (always running)
+func (sv *SettingsView) addServerStatusRow(group *adw.PreferencesGroup) {
 	statusRow := adw.NewActionRow()
 	statusRow.SetTitle("Server Status")
 	if sv.app.IsRunning() {
@@ -110,16 +141,22 @@ func (sv *SettingsView) buildServerSection() {
 	} else {
 		statusRow.SetSubtitle("Not running")
 	}
-	serverGroup.Add(statusRow)
+	group.Add(statusRow)
+}
 
-	// Server port configuration
+func (sv *SettingsView) addServerPortRow(group *adw.PreferencesGroup) {
 	config := sv.app.configMgr.Get()
 	portRow := adw.NewActionRow()
 	portRow.SetTitle("Server Port")
 	portRow.SetSubtitle("Port for P2P server (requires restart)")
+	portSpin := sv.createPortSpinButton(config.ServerPort)
+	portRow.AddSuffix(portSpin)
+	group.Add(portRow)
+}
 
+func (sv *SettingsView) createPortSpinButton(currentPort int) *gtk.SpinButton {
 	portSpin := gtk.NewSpinButtonWithRange(1024, 65535, 1)
-	portSpin.SetValue(float64(config.ServerPort))
+	portSpin.SetValue(float64(currentPort))
 	portSpin.SetVAlign(gtk.AlignCenter)
 	portSpin.ConnectValueChanged(func() {
 		sv.app.configMgr.Update(func(cfg *AppConfig) {
@@ -127,58 +164,74 @@ func (sv *SettingsView) buildServerSection() {
 		})
 		sv.app.showToast("Server port updated (restart app to apply)")
 	})
-	portRow.AddSuffix(portSpin)
-	serverGroup.Add(portRow)
+	return portSpin
+}
 
-	// Fingerprint
+func (sv *SettingsView) addServerFingerprintRow(group *adw.PreferencesGroup) {
 	fpRow := adw.NewActionRow()
 	fpRow.SetTitle("Network Fingerprint")
 	fpRow.SetSubtitle(sv.app.accountMgr.Account().Fingerprint().String())
-	serverGroup.Add(fpRow)
-
-	sv.page.Append(serverGroup)
+	group.Add(fpRow)
 }
 
 func (sv *SettingsView) buildSyncSection() {
 	syncGroup := adw.NewPreferencesGroup()
 	syncGroup.SetTitle("Synchronization")
-
 	config := sv.app.configMgr.Get()
+	syncGroup.Add(sv.createAutoSyncRow(config))
+	syncGroup.Add(sv.createIntervalRow(config))
+	sv.page.Append(syncGroup)
+}
 
+func (sv *SettingsView) createAutoSyncRow(config AppConfig) *adw.ActionRow {
 	autoSyncRow := adw.NewActionRow()
 	autoSyncRow.SetTitle("Auto-sync")
 	autoSyncRow.SetSubtitle("Automatically sync with friends")
-
-	sv.autoSyncSwitch = gtk.NewSwitch()
-	sv.autoSyncSwitch.SetActive(config.AutoSync)
-	sv.autoSyncSwitch.SetVAlign(gtk.AlignCenter)
-	sv.autoSyncSwitch.ConnectStateSet(func(state bool) bool {
-		sv.app.configMgr.Update(func(cfg *AppConfig) {
-			cfg.AutoSync = state
-		})
-		if state {
-			sv.app.startAutoSync()
-		}
-		sv.app.showToast("Auto-sync " + map[bool]string{true: "enabled", false: "disabled"}[state])
-		return false
-	})
+	sv.autoSyncSwitch = sv.createAutoSyncSwitch(config)
 	autoSyncRow.AddSuffix(sv.autoSyncSwitch)
-	syncGroup.Add(autoSyncRow)
+	return autoSyncRow
+}
 
+func (sv *SettingsView) createAutoSyncSwitch(config AppConfig) *gtk.Switch {
+	syncSwitch := gtk.NewSwitch()
+	syncSwitch.SetActive(config.AutoSync)
+	syncSwitch.SetVAlign(gtk.AlignCenter)
+	syncSwitch.ConnectStateSet(sv.onAutoSyncToggle)
+	return syncSwitch
+}
+
+func (sv *SettingsView) onAutoSyncToggle(state bool) bool {
+	sv.app.configMgr.Update(func(cfg *AppConfig) {
+		cfg.AutoSync = state
+	})
+	if state {
+		sv.app.startAutoSync()
+	}
+	status := "enabled"
+	if !state {
+		status = "disabled"
+	}
+	sv.app.showToast("Auto-sync " + status)
+	return false
+}
+
+func (sv *SettingsView) createIntervalRow(config AppConfig) *adw.ActionRow {
 	intervalRow := adw.NewActionRow()
 	intervalRow.SetTitle("Sync Interval")
 	intervalRow.SetSubtitle("Minutes between automatic syncs")
+	sv.autoSyncInterval = sv.createIntervalSpinButton(config)
+	intervalRow.AddSuffix(sv.autoSyncInterval)
+	return intervalRow
+}
 
-	sv.autoSyncInterval = gtk.NewSpinButtonWithRange(5, 1440, 5)
-	sv.autoSyncInterval.SetValue(float64(config.AutoSyncMinutes))
-	sv.autoSyncInterval.SetVAlign(gtk.AlignCenter)
-	sv.autoSyncInterval.ConnectValueChanged(func() {
+func (sv *SettingsView) createIntervalSpinButton(config AppConfig) *gtk.SpinButton {
+	intervalSpin := gtk.NewSpinButtonWithRange(5, 1440, 5)
+	intervalSpin.SetValue(float64(config.AutoSyncMinutes))
+	intervalSpin.SetVAlign(gtk.AlignCenter)
+	intervalSpin.ConnectValueChanged(func() {
 		sv.app.configMgr.Update(func(cfg *AppConfig) {
 			cfg.AutoSyncMinutes = int(sv.autoSyncInterval.Value())
 		})
 	})
-	intervalRow.AddSuffix(sv.autoSyncInterval)
-	syncGroup.Add(intervalRow)
-
-	sv.page.Append(syncGroup)
+	return intervalSpin
 }
