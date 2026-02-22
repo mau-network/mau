@@ -224,23 +224,37 @@ func (f *File) Recipients(account *Account) ([]*Friend, error) {
 		return nil, errors.New("account cannot be nil")
 	}
 
-	r, err := os.Open(f.Path)
+	r, keyring, err := f.openAndGetKeyring(account)
 	if err != nil {
 		return nil, err
 	}
 	defer r.Close()
-
-	k, err := account.ListFriends()
-	if err != nil {
-		return nil, err
-	}
 
 	keysIDs, err := extractEncryptedKeyIDs(r)
 	if err != nil {
 		return nil, err
 	}
 
-	return friendsByKeyIDs(k, keysIDs), nil
+	return matchKeyringToKeyIDs(keyring, keysIDs), nil
+}
+
+func (f *File) openAndGetKeyring(account *Account) (io.ReadCloser, *Keyring, error) {
+	r, err := os.Open(f.Path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	k, err := account.ListFriends()
+	if err != nil {
+		r.Close()
+		return nil, nil, err
+	}
+
+	return r, k, nil
+}
+
+func matchKeyringToKeyIDs(keyring *Keyring, keyIDs []uint64) []*Friend {
+	return friendsByKeyIDs(keyring, keyIDs)
 }
 
 func (f *File) Reader(account *Account) (io.Reader, error) {

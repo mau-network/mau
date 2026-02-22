@@ -58,10 +58,14 @@ func NewAccount(root, name, email, passphrase string) (*Account, error) {
 		return nil, err
 	}
 
+	return buildAccount(entity, root), nil
+}
+
+func buildAccount(entity *openpgp.Entity, path string) *Account {
 	return &Account{
 		entity: entity,
-		path:   root,
-	}, nil
+		path:   path,
+	}
 }
 
 func createAccountFile(root string) (string, error) {
@@ -511,13 +515,16 @@ func (a *Account) ListFiles(fingerprint Fingerprint, after time.Time, limit uint
 	sortByModificationTime(recent)
 	page := applyLimit(recent, limit)
 
-	list := make([]*File, 0, len(page))
-	for _, item := range page {
+	return buildFileList(dirpath, page)
+}
+
+func buildFileList(dirpath string, items []dirEntry) []*File {
+	list := make([]*File, 0, len(items))
+	for _, item := range items {
 		list = append(list, &File{
 			Path: path.Join(dirpath, item.entry.Name()),
 		})
 	}
-
 	return list
 }
 
