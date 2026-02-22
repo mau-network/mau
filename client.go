@@ -278,36 +278,43 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 		version: false,
 	}
 
-	// Check if file already exists with same content
 	if c.fileAlreadyExists(&f, file.Size, file.Sum) {
 		return nil
 	}
 
-	// Download file content
+	data, err := c.fetchAndValidateFile(ctx, address, fingerprint, filename, file)
+	if err != nil {
+		return err
+	}
+
+	return c.saveVerifiedFile(&f, data, fingerprint)
+}
+
+func (c *Client) fetchAndValidateFile(ctx context.Context, address string, fingerprint Fingerprint, filename string, file *FileListItem) ([]byte, error) {
 	data, _, err := c.downloadFileContent(ctx, address, fingerprint, filename)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// Validate downloaded content
 	if err := validateDownloadedContent(data, file); err != nil {
-		return err
+		return nil, err
 	}
 
-	// Write to temporary file and verify signature
-	tmpPath, err := c.writeAndVerifyTemp(&f, data, fingerprint)
+	return data, nil
+}
+
+func (c *Client) saveVerifiedFile(f *File, data []byte, fingerprint Fingerprint) error {
+	tmpPath, err := c.writeAndVerifyTemp(f, data, fingerprint)
 	if err != nil {
 		return err
 	}
 
-	// Create version backup if file exists
 	if _, err := os.Stat(f.Path); err == nil {
-		if err := createVersionBackup(&f, tmpPath); err != nil {
+		if err := createVersionBackup(f, tmpPath); err != nil {
 			return err
 		}
 	}
 
-	// Move verified temp file to final location
 	if err := os.Rename(tmpPath, f.Path); err != nil {
 		os.Remove(tmpPath)
 		return fmt.Errorf("failed to save verified file: %w", err)
