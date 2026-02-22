@@ -103,7 +103,7 @@ func (fv *FriendsView) showAddFriendDialog() {
 	dialog.SetTitle("Add Friend")
 	dialog.SetModal(true)
 	dialog.SetTransientFor(window)
-	dialog.SetDefaultSize(500, -1)
+	dialog.SetDefaultSize(dialogDefaultWidth, dialogDefaultHeight)
 
 	box := gtk.NewBox(gtk.OrientationVertical, 12)
 	box.SetMarginTop(12)
@@ -117,7 +117,7 @@ func (fv *FriendsView) showAddFriendDialog() {
 
 	scrolled := gtk.NewScrolledWindow()
 	scrolled.SetVExpand(true)
-	scrolled.SetSizeRequest(-1, 200)
+	scrolled.SetSizeRequest(-1, textViewMinHeight)
 
 	textView := gtk.NewTextView()
 	textView.SetWrapMode(gtk.WrapWord)
@@ -188,7 +188,7 @@ func validatePGPKey(armoredKey string) error {
 		return fmt.Errorf(errPGPKeyTooShort)
 	}
 
-	if len(key) > 50000 {
+	if len(key) > maxPGPKeySize {
 		return fmt.Errorf(errPGPKeyTooLarge)
 	}
 

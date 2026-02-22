@@ -11,6 +11,12 @@ const (
 	maxTagLength      = 50    // Max characters per tag
 	maxTags           = 20    // Max number of tags per post
 	maxTagsInput      = 200   // Max characters in tag input field
+	maxPGPKeySize     = 50000 // 50KB max PGP key (friends_view.go:191)
+
+	// UI sizing
+	dialogDefaultWidth  = 500 // Default width for dialogs
+	dialogDefaultHeight = -1  // Auto-height for dialogs
+	textViewMinHeight   = 200 // Minimum height for text views
 
 	// Performance tuning
 	draftSaveDelay    = 10  // Seconds to wait before auto-saving draft
