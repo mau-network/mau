@@ -44,40 +44,17 @@ func NewAccount(root, name, email, passphrase string) (*Account, error) {
 		return nil, ErrPassphraseRequired
 	}
 
-	dir := mauDir(root)
-
-	err := os.MkdirAll(dir, DirPerm)
+	acc, err := createAccountFile(root)
 	if err != nil {
 		return nil, err
 	}
 
-	acc := accountFile(root)
-	if _, err := os.Stat(acc); err == nil {
-		return nil, ErrAccountAlreadyExists
-	}
-
-	entity, err := openpgp.NewEntity(name, "", email, &packet.Config{
-		DefaultHash:            crypto.SHA256,
-		DefaultCompressionAlgo: packet.CompressionZIP,
-		RSABits:                rsaKeyLength,
-	})
+	entity, err := createAccountEntity(name, email)
 	if err != nil {
 		return nil, err
 	}
 
-	plainFile, err := os.Create(acc)
-	if err != nil {
-		return nil, err
-	}
-
-	encryptedFile, err := openpgp.SymmetricallyEncrypt(plainFile, []byte(passphrase), nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer encryptedFile.Close()
-
-	err = entity.SerializePrivate(encryptedFile, nil)
-	if err != nil {
+	if err := saveEncryptedEntity(acc, entity, passphrase); err != nil {
 		return nil, err
 	}
 
@@ -87,26 +64,80 @@ func NewAccount(root, name, email, passphrase string) (*Account, error) {
 	}, nil
 }
 
-func OpenAccount(rootPath, passphrase string) (*Account, error) {
-	dir := mauDir(rootPath)
-	err := os.MkdirAll(dir, DirPerm)
+func createAccountFile(root string) (string, error) {
+	dir := mauDir(root)
+	if err := os.MkdirAll(dir, DirPerm); err != nil {
+		return "", err
+	}
+
+	acc := accountFile(root)
+	if _, err := os.Stat(acc); err == nil {
+		return "", ErrAccountAlreadyExists
+	}
+	return acc, nil
+}
+
+func createAccountEntity(name, email string) (*openpgp.Entity, error) {
+	return openpgp.NewEntity(name, "", email, &packet.Config{
+		DefaultHash:            crypto.SHA256,
+		DefaultCompressionAlgo: packet.CompressionZIP,
+		RSABits:                rsaKeyLength,
+	})
+}
+
+func saveEncryptedEntity(acc string, entity *openpgp.Entity, passphrase string) error {
+	plainFile, err := os.Create(acc)
 	if err != nil {
+		return err
+	}
+
+	encryptedFile, err := openpgp.SymmetricallyEncrypt(plainFile, []byte(passphrase), nil, nil)
+	if err != nil {
+		return err
+	}
+	defer encryptedFile.Close()
+
+	return entity.SerializePrivate(encryptedFile, nil)
+}
+
+func OpenAccount(rootPath, passphrase string) (*Account, error) {
+	if err := ensureAccountDir(rootPath); err != nil {
 		return nil, err
 	}
 
-	acc := accountFile(rootPath)
-	encryptedFile, err := os.Open(acc)
+	encryptedFile, err := openAccountFile(rootPath)
 	if err != nil {
 		return nil, err
 	}
 	defer encryptedFile.Close()
 
+	entity, err := decryptAndReadEntity(encryptedFile, passphrase)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Account{
+		entity: entity,
+		path:   rootPath,
+	}, nil
+}
+
+func ensureAccountDir(rootPath string) error {
+	dir := mauDir(rootPath)
+	return os.MkdirAll(dir, DirPerm)
+}
+
+func openAccountFile(rootPath string) (*os.File, error) {
+	acc := accountFile(rootPath)
+	return os.Open(acc)
+}
+
+func decryptAndReadEntity(encryptedFile *os.File, passphrase string) (*openpgp.Entity, error) {
 	prompted := false
 	prompt := func(keys []openpgp.Key, symmetric bool) ([]byte, error) {
 		if prompted {
 			return nil, ErrIncorrectPassphrase
 		}
-
 		prompted = true
 		return []byte(passphrase), nil
 	}
@@ -119,15 +150,7 @@ func OpenAccount(rootPath, passphrase string) (*Account, error) {
 		return nil, errors.New("openpgp.ReadMessage returned nil")
 	}
 
-	entity, err := openpgp.ReadEntity(packet.NewReader(decryptedFile.UnverifiedBody))
-	if err != nil {
-		return nil, err
-	}
-
-	return &Account{
-		entity: entity,
-		path:   rootPath,
-	}, nil
+	return openpgp.ReadEntity(packet.NewReader(decryptedFile.UnverifiedBody))
 }
 
 type Account struct {
