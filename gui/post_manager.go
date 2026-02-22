@@ -30,50 +30,58 @@ func (pm *PostManager) Save(post Post) error {
 	if err != nil {
 		return fmt.Errorf("failed to serialize post: %w", err)
 	}
+	recipients, err := pm.getRecipients()
+	if err != nil {
+		return err
+	}
+	filename := pm.generateFilename()
+	if err := pm.saveFile(jsonData, filename, recipients); err != nil {
+		return err
+	}
+	pm.cache.Set(filename, post)
+	return nil
+}
 
+func (pm *PostManager) getRecipients() ([]*mau.Friend, error) {
 	keyring, err := pm.account.ListFriends()
 	if err != nil {
-		return fmt.Errorf("failed to list friends: %w", err)
+		return nil, fmt.Errorf("failed to list friends: %w", err)
 	}
+	return keyring.FriendsSet(), nil
+}
 
-	recipients := keyring.FriendsSet()
-	filename := fmt.Sprintf("posts/post-%d.json", time.Now().UnixNano())
-	reader := bytes.NewReader(jsonData)
+func (pm *PostManager) generateFilename() string {
+	return fmt.Sprintf("posts/post-%d.json", time.Now().UnixNano())
+}
 
-	file, err := pm.account.AddFile(reader, filename, recipients)
+func (pm *PostManager) saveFile(data []byte, filename string, recipients []*mau.Friend) error {
+	reader := bytes.NewReader(data)
+	_, err := pm.account.AddFile(reader, filename, recipients)
 	if err != nil {
 		return fmt.Errorf("failed to add file: %w", err)
 	}
-
-	// Cache the newly saved post with consistent key (just filename)
-	pm.cache.Set(filename, post)
-
-	_ = file
 	return nil
 }
 
 // Load loads a post from a file
 func (pm *PostManager) Load(file *mau.File) (Post, error) {
-	// Try cache first - use file path as cache key
 	cacheKey := file.Name()
 	if cached, ok := pm.cache.Get(cacheKey); ok {
 		return cached, nil
 	}
+	return pm.loadFromDisk(file, cacheKey)
+}
 
-	// Cache miss - load from disk
+func (pm *PostManager) loadFromDisk(file *mau.File, cacheKey string) (Post, error) {
 	reader, err := file.Reader(pm.account)
 	if err != nil {
 		return Post{}, fmt.Errorf("failed to read file: %w", err)
 	}
-
 	var post Post
 	if err := json.NewDecoder(reader).Decode(&post); err != nil {
 		return Post{}, fmt.Errorf("failed to decode post: %w", err)
 	}
-
-	// Store in cache
 	pm.cache.Set(cacheKey, post)
-
 	return post, nil
 }
 

@@ -58,26 +58,27 @@ func NewConfigManager(dataDir string) *ConfigManager {
 func (cm *ConfigManager) Load() error {
 	data, err := os.ReadFile(cm.configPath)
 	if err != nil {
-		// File doesn't exist - use defaults
-		return nil
+		return nil // File doesn't exist - use defaults
 	}
-
 	if err := json.Unmarshal(data, &cm.config); err != nil {
 		return err
 	}
-
-	// Migrate old configs
-	if cm.config.SchemaVersion == 0 {
-		// Migrate from v0 to v1
-		cm.config.SchemaVersion = 1
-		if cm.config.ServerPort == 0 {
-			cm.config.ServerPort = 8080
-		}
-		// Save migrated config
-		cm.Save()
-	}
-
+	cm.migrateIfNeeded()
 	return nil
+}
+
+func (cm *ConfigManager) migrateIfNeeded() {
+	if cm.config.SchemaVersion == 0 {
+		cm.migrateV0ToV1()
+	}
+}
+
+func (cm *ConfigManager) migrateV0ToV1() {
+	cm.config.SchemaVersion = 1
+	if cm.config.ServerPort == 0 {
+		cm.config.ServerPort = 8080
+	}
+	cm.Save()
 }
 
 // Save writes config to disk atomically

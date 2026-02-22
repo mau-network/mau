@@ -54,29 +54,39 @@ func ParseTags(tagText string) []string {
 	if tagText == "" {
 		return nil
 	}
+	tagText = truncateInput(tagText)
+	return extractTags(tagText)
+}
 
-	// Validate input length
-	if len(tagText) > maxTagsInput {
-		tagText = tagText[:maxTagsInput]
+func truncateInput(input string) string {
+	if len(input) > maxTagsInput {
+		return input[:maxTagsInput]
 	}
+	return input
+}
 
+func extractTags(tagText string) []string {
 	var tags []string
 	for _, tag := range strings.Split(tagText, ",") {
-		tag = strings.TrimSpace(tag)
-		if tag == "" {
-			continue
-		}
-		// Validate individual tag length
-		if len(tag) > maxTagLength {
-			tag = tag[:maxTagLength]
-		}
-		tags = append(tags, tag)
-		// Limit number of tags
-		if len(tags) >= maxTags {
-			break
+		if processedTag := processTag(tag); processedTag != "" {
+			tags = append(tags, processedTag)
+			if len(tags) >= maxTags {
+				break
+			}
 		}
 	}
 	return tags
+}
+
+func processTag(tag string) string {
+	tag = strings.TrimSpace(tag)
+	if tag == "" {
+		return ""
+	}
+	if len(tag) > maxTagLength {
+		return tag[:maxTagLength]
+	}
+	return tag
 }
 
 // ValidatePostBody validates post body content
