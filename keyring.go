@@ -93,33 +93,46 @@ func (k *Keyring) read(account *Account) error {
 			continue
 		}
 
-		filePath := path.Join(k.Path, file.Name())
-
-		if file.IsDir() {
-			keyring := Keyring{Path: filePath}
-
-			err := keyring.read(account)
-			if err != nil {
-				return err
-			}
-
-			k.SubKeyrings = append(k.SubKeyrings, &keyring)
-			continue
-		}
-
-		reader, err := os.Open(filePath)
-		if err != nil {
+		if err := k.processKeyringEntry(account, file); err != nil {
 			return err
 		}
-
-		friend, err := readFriend(account, reader)
-		reader.Close()
-		if err != nil {
-			return fmt.Errorf("failed to read friend key from %s: %w", filePath, err)
-		}
-
-		k.Friends = append(k.Friends, friend)
 	}
 
+	return nil
+}
+
+func (k *Keyring) processKeyringEntry(account *Account, file os.DirEntry) error {
+	filePath := path.Join(k.Path, file.Name())
+
+	if file.IsDir() {
+		return k.readSubKeyring(account, filePath)
+	}
+
+	return k.readFriendKey(account, filePath)
+}
+
+func (k *Keyring) readSubKeyring(account *Account, filePath string) error {
+	keyring := Keyring{Path: filePath}
+	if err := keyring.read(account); err != nil {
+		return err
+	}
+
+	k.SubKeyrings = append(k.SubKeyrings, &keyring)
+	return nil
+}
+
+func (k *Keyring) readFriendKey(account *Account, filePath string) error {
+	reader, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+
+	friend, err := readFriend(account, reader)
+	if err != nil {
+		return fmt.Errorf("failed to read friend key from %s: %w", filePath, err)
+	}
+
+	k.Friends = append(k.Friends, friend)
 	return nil
 }

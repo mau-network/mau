@@ -71,7 +71,6 @@ func (f *File) Versions() []*File {
 	}
 
 	vPath := f.Path + ".versions"
-
 	if _, err := os.Stat(vPath); err != nil {
 		return []*File{}
 	}
@@ -81,18 +80,19 @@ func (f *File) Versions() []*File {
 		return []*File{}
 	}
 
+	return f.collectVersionFiles(vPath, entries)
+}
+
+func (f *File) collectVersionFiles(vPath string, entries []os.DirEntry) []*File {
 	versions := []*File{}
 	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
+		if !entry.IsDir() {
+			versions = append(versions, &File{
+				Path:    path.Join(vPath, entry.Name()),
+				version: true,
+			})
 		}
-
-		versions = append(versions, &File{
-			Path:    path.Join(vPath, entry.Name()),
-			version: true,
-		})
 	}
-
 	return versions
 }
 
@@ -125,17 +125,24 @@ func readAndVerifyMessage(data []byte, keyring openpgp.EntityList) (*openpgp.Mes
 		return nil, errors.New("file is not signed")
 	}
 
-	// Read the entire message to trigger signature verification
-	_, err = io.ReadAll(md.UnverifiedBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read message body: %w", err)
-	}
-
-	if md.SignatureError != nil {
-		return nil, fmt.Errorf("invalid signature: %w", md.SignatureError)
+	if err := verifyMessageSignature(md); err != nil {
+		return nil, err
 	}
 
 	return md, nil
+}
+
+func verifyMessageSignature(md *openpgp.MessageDetails) error {
+	_, err := io.ReadAll(md.UnverifiedBody)
+	if err != nil {
+		return fmt.Errorf("failed to read message body: %w", err)
+	}
+
+	if md.SignatureError != nil {
+		return fmt.Errorf("invalid signature: %w", md.SignatureError)
+	}
+
+	return nil
 }
 
 func checkSignerIdentity(md *openpgp.MessageDetails, expectedSigner Fingerprint) error {
@@ -159,7 +166,6 @@ func (f *File) VerifySignature(account *Account, expectedSigner Fingerprint) err
 		return fmt.Errorf("failed to read file for verification: %w", err)
 	}
 
-	// Get all friends to build complete keyring for signature verification
 	friends, err := account.ListFriends()
 	if err != nil {
 		return fmt.Errorf("failed to list friends for signature verification: %w", err)
@@ -169,6 +175,10 @@ func (f *File) VerifySignature(account *Account, expectedSigner Fingerprint) err
 		return err
 	}
 
+	return f.verifyMessageSignatureAndSigner(account, friends, data, expectedSigner)
+}
+
+func (f *File) verifyMessageSignatureAndSigner(account *Account, friends *Keyring, data []byte, expectedSigner Fingerprint) error {
 	keyring := buildVerificationKeyring(account, friends)
 	md, err := readAndVerifyMessage(data, keyring)
 	if err != nil {
@@ -246,8 +256,12 @@ func (f *File) Reader(account *Account) (io.Reader, error) {
 		return nil, err
 	}
 
+	return f.decryptFileContent(r, account)
+}
+
+func (f *File) decryptFileContent(data []byte, account *Account) (io.Reader, error) {
 	keyring := openpgp.EntityList{account.entity}
-	decryptedFile, err := openpgp.ReadMessage(bytes.NewReader(r), keyring, nil, nil)
+	decryptedFile, err := openpgp.ReadMessage(bytes.NewReader(data), keyring, nil, nil)
 	if err != nil {
 		return nil, err
 	}

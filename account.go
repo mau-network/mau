@@ -44,40 +44,17 @@ func NewAccount(root, name, email, passphrase string) (*Account, error) {
 		return nil, ErrPassphraseRequired
 	}
 
-	dir := mauDir(root)
-
-	err := os.MkdirAll(dir, DirPerm)
+	acc, err := createAccountFile(root)
 	if err != nil {
 		return nil, err
 	}
 
-	acc := accountFile(root)
-	if _, err := os.Stat(acc); err == nil {
-		return nil, ErrAccountAlreadyExists
-	}
-
-	entity, err := openpgp.NewEntity(name, "", email, &packet.Config{
-		DefaultHash:            crypto.SHA256,
-		DefaultCompressionAlgo: packet.CompressionZIP,
-		RSABits:                rsaKeyLength,
-	})
+	entity, err := createAccountEntity(name, email)
 	if err != nil {
 		return nil, err
 	}
 
-	plainFile, err := os.Create(acc)
-	if err != nil {
-		return nil, err
-	}
-
-	encryptedFile, err := openpgp.SymmetricallyEncrypt(plainFile, []byte(passphrase), nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer encryptedFile.Close()
-
-	err = entity.SerializePrivate(encryptedFile, nil)
-	if err != nil {
+	if err := saveEncryptedEntity(acc, entity, passphrase); err != nil {
 		return nil, err
 	}
 
@@ -87,26 +64,80 @@ func NewAccount(root, name, email, passphrase string) (*Account, error) {
 	}, nil
 }
 
-func OpenAccount(rootPath, passphrase string) (*Account, error) {
-	dir := mauDir(rootPath)
-	err := os.MkdirAll(dir, DirPerm)
+func createAccountFile(root string) (string, error) {
+	dir := mauDir(root)
+	if err := os.MkdirAll(dir, DirPerm); err != nil {
+		return "", err
+	}
+
+	acc := accountFile(root)
+	if _, err := os.Stat(acc); err == nil {
+		return "", ErrAccountAlreadyExists
+	}
+	return acc, nil
+}
+
+func createAccountEntity(name, email string) (*openpgp.Entity, error) {
+	return openpgp.NewEntity(name, "", email, &packet.Config{
+		DefaultHash:            crypto.SHA256,
+		DefaultCompressionAlgo: packet.CompressionZIP,
+		RSABits:                rsaKeyLength,
+	})
+}
+
+func saveEncryptedEntity(acc string, entity *openpgp.Entity, passphrase string) error {
+	plainFile, err := os.Create(acc)
 	if err != nil {
+		return err
+	}
+
+	encryptedFile, err := openpgp.SymmetricallyEncrypt(plainFile, []byte(passphrase), nil, nil)
+	if err != nil {
+		return err
+	}
+	defer encryptedFile.Close()
+
+	return entity.SerializePrivate(encryptedFile, nil)
+}
+
+func OpenAccount(rootPath, passphrase string) (*Account, error) {
+	if err := ensureAccountDir(rootPath); err != nil {
 		return nil, err
 	}
 
-	acc := accountFile(rootPath)
-	encryptedFile, err := os.Open(acc)
+	encryptedFile, err := openAccountFile(rootPath)
 	if err != nil {
 		return nil, err
 	}
 	defer encryptedFile.Close()
 
+	entity, err := decryptAndReadEntity(encryptedFile, passphrase)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Account{
+		entity: entity,
+		path:   rootPath,
+	}, nil
+}
+
+func ensureAccountDir(rootPath string) error {
+	dir := mauDir(rootPath)
+	return os.MkdirAll(dir, DirPerm)
+}
+
+func openAccountFile(rootPath string) (*os.File, error) {
+	acc := accountFile(rootPath)
+	return os.Open(acc)
+}
+
+func decryptAndReadEntity(encryptedFile *os.File, passphrase string) (*openpgp.Entity, error) {
 	prompted := false
 	prompt := func(keys []openpgp.Key, symmetric bool) ([]byte, error) {
 		if prompted {
 			return nil, ErrIncorrectPassphrase
 		}
-
 		prompted = true
 		return []byte(passphrase), nil
 	}
@@ -119,15 +150,7 @@ func OpenAccount(rootPath, passphrase string) (*Account, error) {
 		return nil, errors.New("openpgp.ReadMessage returned nil")
 	}
 
-	entity, err := openpgp.ReadEntity(packet.NewReader(decryptedFile.UnverifiedBody))
-	if err != nil {
-		return nil, err
-	}
-
-	return &Account{
-		entity: entity,
-		path:   rootPath,
-	}, nil
+	return openpgp.ReadEntity(packet.NewReader(decryptedFile.UnverifiedBody))
 }
 
 type Account struct {
@@ -150,6 +173,15 @@ func (a *Account) Name() string {
 	if a == nil || a.entity == nil {
 		return ""
 	}
+	
+	// First, look for primary identity
+	for _, i := range a.entity.Identities {
+		if i.SelfSignature.IsPrimaryId != nil && *i.SelfSignature.IsPrimaryId {
+			return i.UserId.Name
+		}
+	}
+	
+	// Fallback to first identity
 	for _, i := range a.entity.Identities {
 		return i.UserId.Name
 	}
@@ -161,6 +193,15 @@ func (a *Account) Email() string {
 	if a == nil || a.entity == nil {
 		return ""
 	}
+	
+	// First, look for primary identity
+	for _, i := range a.entity.Identities {
+		if i.SelfSignature.IsPrimaryId != nil && *i.SelfSignature.IsPrimaryId {
+			return i.UserId.Email
+		}
+	}
+	
+	// Fallback to first identity
 	for _, i := range a.entity.Identities {
 		return i.UserId.Email
 	}
@@ -240,6 +281,10 @@ func extractRSAKeyFromEntity(entity *openpgp.Entity) (*rsa.PrivateKey, error) {
 		return nil, ErrCannotConvertPublicKey
 	}
 
+	return buildRSAKeyFromParts(privkey, pubkey), nil
+}
+
+func buildRSAKeyFromParts(privkey *rsa.PrivateKey, pubkey *rsa.PublicKey) *rsa.PrivateKey {
 	crtvalues := []rsa.CRTValue{}
 	//nolint:staticcheck // SA1019: CRTValues deprecated but needed for backward compatibility
 	for _, i := range privkey.Precomputed.CRTValues {
@@ -259,7 +304,7 @@ func extractRSAKeyFromEntity(entity *openpgp.Entity) (*rsa.PrivateKey, error) {
 			Qinv:      privkey.Precomputed.Qinv,
 			CRTValues: crtvalues,
 		},
-	}, nil
+	}
 }
 
 func encodeCertificateAndKey(rsakey *rsa.PrivateKey, derBytes []byte) (tls.Certificate, error) {
@@ -308,11 +353,12 @@ func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File
 	}
 
 	fpr := a.Fingerprint().String()
-	if err := os.MkdirAll(path.Join(a.path, fpr), DirPerm); err != nil {
+	p := path.Join(a.path, fpr, name)
+	
+	// Create all parent directories for the file path
+	if err := os.MkdirAll(path.Dir(p), DirPerm); err != nil {
 		return nil, err
 	}
-
-	p := path.Join(a.path, fpr, name)
 	if err := a.handleExistingFile(p); err != nil {
 		return nil, err
 	}
@@ -359,8 +405,7 @@ func (a *Account) RemoveFile(file *File) error {
 		return nil
 	}
 	
-	err := os.Remove(file.Path)
-	if err != nil {
+	if err := os.Remove(file.Path); err != nil {
 		return err
 	}
 
@@ -368,13 +413,15 @@ func (a *Account) RemoveFile(file *File) error {
 		return nil
 	}
 
+	return a.removeFileVersions(file)
+}
+
+func (a *Account) removeFileVersions(file *File) error {
 	for _, version := range file.Versions() {
-		err := a.RemoveFile(version)
-		if err != nil {
+		if err := a.RemoveFile(version); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -402,26 +449,32 @@ type dirEntry struct {
 func filterRecentFiles(files []fs.DirEntry, after time.Time) []dirEntry {
 	recent := []dirEntry{}
 	for _, f := range files {
-		if !f.Type().IsRegular() {
-			continue
+		if entry := createRecentEntry(f, after); entry != nil {
+			recent = append(recent, *entry)
 		}
-
-		info, err := f.Info()
-		if err != nil {
-			continue
-		}
-
-		mod := info.ModTime()
-		if mod.Before(after) {
-			continue
-		}
-
-		recent = append(recent, dirEntry{
-			entry:        f,
-			modification: mod,
-		})
 	}
 	return recent
+}
+
+func createRecentEntry(f fs.DirEntry, after time.Time) *dirEntry {
+	if !f.Type().IsRegular() {
+		return nil
+	}
+
+	info, err := f.Info()
+	if err != nil {
+		return nil
+	}
+
+	mod := info.ModTime()
+	if mod.Before(after) {
+		return nil
+	}
+
+	return &dirEntry{
+		entry:        f,
+		modification: mod,
+	}
 }
 
 func sortByModificationTime(entries []dirEntry) {

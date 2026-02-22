@@ -112,6 +112,34 @@ func TestGetFile(t *testing.T) {
 	assert.Equal(t, string(file_content), string(opened_content))
 }
 
+func TestAddFileWithSubdirectories(t *testing.T) {
+	account_dir := t.TempDir()
+	account, err := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "password value")
+	assert.NoError(t, err)
+	assert.NotNil(t, account)
+
+	// Test adding a file with a subdirectory in the name
+	file, err := account.AddFile(strings.NewReader("test content"), "posts/post-123.json", []*Friend{})
+	assert.NoError(t, err, "AddFile should succeed with subdirectories in filename")
+	assert.NotNil(t, file)
+
+	// Verify file was created - use the actual file path returned
+	assert.FileExists(t, file.Path, "File should exist at the path returned by AddFile")
+
+	// Verify we can read the file content back
+	reader, err := file.Reader(account)
+	assert.NoError(t, err)
+	content, err := io.ReadAll(reader)
+	assert.NoError(t, err)
+	assert.Equal(t, "test content", string(content))
+
+	// Test with deeper nesting
+	file2, err := account.AddFile(strings.NewReader("nested content"), "a/b/c/deep.txt", []*Friend{})
+	assert.NoError(t, err, "AddFile should succeed with deeply nested directories")
+	assert.NotNil(t, file2)
+	assert.FileExists(t, file2.Path, "File should exist at deeply nested path")
+}
+
 func TestRemoveFile(t *testing.T) {
 	account_dir := t.TempDir()
 	account, err := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "password value")
