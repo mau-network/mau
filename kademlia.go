@@ -62,13 +62,7 @@ func (d *dhtServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // sendPing sends a ping to a peer and returns true if the peer response status isn't 2xx
 func (d *dhtServer) sendPing(ctx context.Context, peer *Peer) error {
-	// Rate limit pings to avoid excessive network traffic
-	d.lastPingMutex.RLock()
-	lastPingTime, exists := d.lastPing[peer.Fingerprint]
-	d.lastPingMutex.RUnlock()
-
-	if exists && time.Since(lastPingTime) < dht_PING_MIN_BACKOFF {
-		// Too soon since last ping, return nil (success) to avoid removing peer
+	if d.shouldSkipPing(peer.Fingerprint) {
 		return nil
 	}
 
@@ -77,22 +71,38 @@ func (d *dhtServer) sendPing(ctx context.Context, peer *Peer) error {
 		return err
 	}
 
-	u := url.URL{
-		Scheme: uriProtocolName,
-		Host:   peer.Address,
-		Path:   "/kad/ping",
-	}
-
-	_, err = client.client.R().SetContext(ctx).Get(u.String())
-
+	err = d.executePing(ctx, client, peer.Address)
+	
 	if err == nil {
-		// Update last ping time on success
-		d.lastPingMutex.Lock()
-		d.lastPing[peer.Fingerprint] = time.Now()
-		d.lastPingMutex.Unlock()
+		d.updateLastPingTime(peer.Fingerprint)
 	}
 
 	return err
+}
+
+func (d *dhtServer) shouldSkipPing(fingerprint Fingerprint) bool {
+	d.lastPingMutex.RLock()
+	lastPingTime, exists := d.lastPing[fingerprint]
+	d.lastPingMutex.RUnlock()
+
+	return exists && time.Since(lastPingTime) < dht_PING_MIN_BACKOFF
+}
+
+func (d *dhtServer) executePing(ctx context.Context, client *Client, address string) error {
+	u := url.URL{
+		Scheme: uriProtocolName,
+		Host:   address,
+		Path:   "/kad/ping",
+	}
+
+	_, err := client.client.R().SetContext(ctx).Get(u.String())
+	return err
+}
+
+func (d *dhtServer) updateLastPingTime(fingerprint Fingerprint) {
+	d.lastPingMutex.Lock()
+	d.lastPing[fingerprint] = time.Now()
+	d.lastPingMutex.Unlock()
 }
 
 // receivePing responds with http.StatusOK
@@ -132,32 +142,32 @@ func (d *dhtServer) runFindPeerWorker(ctx context.Context, fingerprint Fingerpri
 
 func (d *dhtServer) sendFindPeer(ctx context.Context, fingerprint Fingerprint) (found *Peer) {
 	nearest := d.nearest(fingerprint, dht_ALPHA)
-	nearest_count := len(nearest)
-
-	if nearest_count == 0 {
+	if len(nearest) == 0 {
 		return nil
 	}
 
-	// if we already have it return it
 	if existing := d.findPeerInNearest(nearest, fingerprint); existing != nil {
 		return existing
 	}
 
+	return d.parallelFindPeer(ctx, fingerprint, nearest)
+}
+
+func (d *dhtServer) parallelFindPeer(ctx context.Context, fingerprint Fingerprint, nearest []*Peer) (found *Peer) {
 	peers := newPeerRequestSet(fingerprint, nearest)
 	workersCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	var wg sync.WaitGroup
-	wg.Add(nearest_count)
+	wg.Add(len(nearest))
 
-	for i := 0; i < nearest_count; i++ {
+	for i := 0; i < len(nearest); i++ {
 		go func() {
 			d.runFindPeerWorker(workersCtx, fingerprint, peers, &found, cancel)
 			wg.Done()
 		}()
 	}
 
-	// if the passed context is canceled we cancel our workers
 	go func() {
 		<-ctx.Done()
 		cancel()
@@ -173,12 +183,30 @@ func (d *dhtServer) sendFindPeerWorker(ctx context.Context, fingerprint Fingerpr
 		return nil, nil
 	}
 
-	client, err := d.account.Client(peer.Fingerprint, []string{d.address})
+	foundPeers, err := d.queryPeerForFingerprint(ctx, peer, fingerprint)
 	if err != nil {
 		return nil, err
 	}
 
-	var foundPeers []*Peer
+	d.addPeer(peer)
+
+	if len(foundPeers) > dht_K {
+		foundPeers = foundPeers[:dht_K]
+	}
+
+	if target := d.findTargetInPeers(foundPeers, fingerprint); target != nil {
+		return target, nil
+	}
+
+	peers.add(foundPeers...)
+	return nil, nil
+}
+
+func (d *dhtServer) queryPeerForFingerprint(ctx context.Context, peer *Peer, fingerprint Fingerprint) ([]*Peer, error) {
+	client, err := d.account.Client(peer.Fingerprint, []string{d.address})
+	if err != nil {
+		return nil, err
+	}
 
 	u := url.URL{
 		Scheme: uriProtocolName,
@@ -186,6 +214,7 @@ func (d *dhtServer) sendFindPeerWorker(ctx context.Context, fingerprint Fingerpr
 		Path:   "/kad/find_peer/" + fingerprint.String(),
 	}
 
+	var foundPeers []*Peer
 	_, err = client.client.
 		R().
 		SetContext(ctx).
@@ -198,39 +227,39 @@ func (d *dhtServer) sendFindPeerWorker(ctx context.Context, fingerprint Fingerpr
 		return nil, err
 	}
 
-	// Add it to the known peers
-	d.addPeer(peer)
+	return foundPeers, nil
+}
 
-	// peer should return max K peers, if it's more limit it to K
-	if len(foundPeers) > dht_K {
-		foundPeers = foundPeers[:dht_K]
-	}
-
-	for i := range foundPeers {
-		if foundPeers[i].Fingerprint == fingerprint {
-			return foundPeers[i], nil
+func (d *dhtServer) findTargetInPeers(peers []*Peer, fingerprint Fingerprint) *Peer {
+	for i := range peers {
+		if peers[i].Fingerprint == fingerprint {
+			return peers[i]
 		}
 	}
-
-	peers.add(foundPeers...)
-
-	return nil, nil
+	return nil
 }
 
 func (d *dhtServer) receiveFindPeer(w http.ResponseWriter, r *http.Request) {
-	err := d.addPeerFromRequest(r)
+	if err := d.addPeerFromRequest(r); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fingerprint, err := d.extractFingerprintFromPath(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	d.writeNearestPeers(w, fingerprint)
+}
+
+func (d *dhtServer) extractFingerprintFromPath(r *http.Request) (Fingerprint, error) {
 	fpr := r.PathValue("fpr")
-	fingerprint, err := FingerprintFromString(fpr)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	return FingerprintFromString(fpr)
+}
 
+func (d *dhtServer) writeNearestPeers(w http.ResponseWriter, fingerprint Fingerprint) {
 	peers := d.nearest(fingerprint, dht_K)
 	output, err := json.Marshal(peers)
 	if err != nil {
@@ -344,34 +373,43 @@ func (d *dhtServer) shouldRefreshBucket(bucketIdx int) bool {
 }
 
 func (d *dhtServer) refreshStallBuckets(ctx context.Context) {
-	nextClick := time.Duration(0)
-
-	// refresh the buckets indefinitely
 	for {
-		nextClick = dht_STALL_PERIOD
+		nextClick := d.calculateRefreshInterval(ctx)
+		if nextClick < 0 {
+			return
+		}
 
-		// either the context is done and we exit of the next click trigger refreshing buckets
 		select {
 		case <-ctx.Done():
 			return
 		case <-time.After(nextClick):
-
-			// we'll go over all buckets and refresh the bucket or exit
-			for i := range d.buckets {
-				// if it's refreshable we'll refresh it
-				if d.shouldRefreshBucket(i) {
-					select {
-					case <-ctx.Done():
-						return
-					default:
-						d.refreshBucket(ctx, i)
-					}
-				} else {
-					nextClick = d.calculateNextRefreshTime(i, nextClick)
-				}
+			if !d.refreshAllStallBuckets(ctx) {
+				return
 			}
 		}
 	}
+}
+
+func (d *dhtServer) calculateRefreshInterval(ctx context.Context) time.Duration {
+	nextClick := dht_STALL_PERIOD
+	for i := range d.buckets {
+		nextClick = d.calculateNextRefreshTime(i, nextClick)
+	}
+	return nextClick
+}
+
+func (d *dhtServer) refreshAllStallBuckets(ctx context.Context) bool {
+	for i := range d.buckets {
+		if d.shouldRefreshBucket(i) {
+			select {
+			case <-ctx.Done():
+				return false
+			default:
+				d.refreshBucket(ctx, i)
+			}
+		}
+	}
+	return true
 }
 
 func (d *dhtServer) refreshBucket(ctx context.Context, i int) {
