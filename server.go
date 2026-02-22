@@ -274,8 +274,8 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, allowed, err := s.authorizeFileAccess(w, r, fpr, filename)
-	if err != nil || !allowed {
+	file, err := s.authorizeFileAccess(w, r, fpr, filename)
+	if err != nil {
 		return
 	}
 
@@ -298,26 +298,26 @@ func (s *Server) parseGetRequest(w http.ResponseWriter, r *http.Request) (Finger
 	return fpr, segments[1], nil
 }
 
-func (s *Server) authorizeFileAccess(w http.ResponseWriter, r *http.Request, fpr Fingerprint, filename string) (*File, bool, error) {
+func (s *Server) authorizeFileAccess(w http.ResponseWriter, r *http.Request, fpr Fingerprint, filename string) (*File, error) {
 	file, err := s.account.GetFile(fpr, filename)
 	if err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)
-		return nil, false, err
+		return nil, err
 	}
 
 	recipients, err := file.Recipients(s.account)
 	if err != nil {
 		http.Error(w, "Error reading file recipients", http.StatusInternalServerError)
-		return nil, false, err
+		return nil, err
 	}
 
 	allowed := isPermitted(r.TLS.PeerCertificates, recipients)
 	if !allowed {
 		http.Error(w, "Error file is not allowed for user", http.StatusUnauthorized)
-		return nil, false, nil
+		return nil, errors.New("unauthorized")
 	}
 
-	return file, true, nil
+	return file, nil
 }
 
 func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, file *File) {
@@ -339,8 +339,8 @@ func (s *Server) version(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, allowed, err := s.authorizeVersionAccess(w, r, fpr, filename, hash)
-	if err != nil || !allowed {
+	file, err := s.authorizeVersionAccess(w, r, fpr, filename, hash)
+	if err != nil {
 		return
 	}
 
@@ -365,26 +365,26 @@ func (s *Server) parseVersionRequest(w http.ResponseWriter, r *http.Request) (Fi
 	return fpr, filename, segments[2], nil
 }
 
-func (s *Server) authorizeVersionAccess(w http.ResponseWriter, r *http.Request, fpr Fingerprint, filename, hash string) (*File, bool, error) {
+func (s *Server) authorizeVersionAccess(w http.ResponseWriter, r *http.Request, fpr Fingerprint, filename, hash string) (*File, error) {
 	file, err := s.account.GetFileVersion(fpr, filename, hash)
 	if err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)
-		return nil, false, err
+		return nil, err
 	}
 
 	recipients, err := file.Recipients(s.account)
 	if err != nil {
 		http.Error(w, "Error reading file recipients", http.StatusInternalServerError)
-		return nil, false, err
+		return nil, err
 	}
 
 	allowed := isPermitted(r.TLS.PeerCertificates, recipients)
 	if !allowed {
 		http.Error(w, "Error file is not allowed for user", http.StatusUnauthorized)
-		return nil, false, nil
+		return nil, errors.New("unauthorized")
 	}
 
-	return file, true, nil
+	return file, nil
 }
 
 func isPermitted(certs []*x509.Certificate, recipients []*Friend) bool {
