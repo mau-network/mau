@@ -12,16 +12,16 @@ import (
 // Note: Skipped because serverRunning flag is set via glib.IdleAdd which requires GTK main loop
 func TestServerStartupLogic(t *testing.T) {
 	t.Skip("Requires GTK main loop for glib.IdleAdd - server creation tested elsewhere")
-	
+
 	tmpDir := t.TempDir()
-	
+
 	app := &MauApp{
 		dataDir: tmpDir,
 	}
-	
+
 	app.configMgr = NewConfigManager(tmpDir)
 	app.accountMgr = NewAccountManager(tmpDir)
-	
+
 	if err := app.accountMgr.Init(); err != nil {
 		t.Fatalf("Failed to init account: %v", err)
 	}

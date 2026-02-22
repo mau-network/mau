@@ -112,7 +112,7 @@ func (m *MauApp) updateNetworkStatus() {
 	if m.statusIndicator == nil {
 		return
 	}
-	
+
 	if m.serverRunning {
 		config := m.configMgr.Get()
 		m.statusIndicator.SetText(fmt.Sprintf("🟢 Online:%d", config.ServerPort))

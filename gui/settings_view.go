@@ -56,7 +56,7 @@ func (sv *SettingsView) buildAccountSection() {
 	accountGroup.Add(fpRow)
 
 	sv.page.Append(accountGroup)
-	
+
 	// Identities section
 	sv.buildIdentitiesSection()
 }
@@ -67,14 +67,14 @@ func (sv *SettingsView) buildIdentitiesSection() {
 	identitiesGroup.SetDescription("PGP keys can have multiple name/email identities")
 
 	identities := sv.app.accountMgr.Account().ListIdentities()
-	
+
 	for _, identityStr := range identities {
 		row := adw.NewActionRow()
 		// Escape markup characters in identity string (contains <email>)
 		row.SetTitle(escapeMarkup(identityStr))
-		
+
 		isPrimary := sv.app.accountMgr.Account().IsPrimaryIdentity(identityStr)
-		
+
 		if isPrimary {
 			row.SetSubtitle("Primary identity")
 			icon := gtk.NewImageFromIconName("emblem-default-symbolic")
@@ -90,7 +90,7 @@ func (sv *SettingsView) buildIdentitiesSection() {
 			})
 			row.AddSuffix(setPrimaryBtn)
 		}
-		
+
 		identitiesGroup.Add(row)
 	}
 
@@ -98,7 +98,7 @@ func (sv *SettingsView) buildIdentitiesSection() {
 	addIdentityRow := adw.NewActionRow()
 	addIdentityRow.SetTitle("Add New Identity")
 	addIdentityRow.SetSubtitle("Add another name/email to this account")
-	
+
 	addBtn := gtk.NewButton()
 	addBtn.SetLabel("Add Identity")
 	addBtn.SetVAlign(gtk.AlignCenter)
@@ -114,7 +114,7 @@ func (sv *SettingsView) buildIdentitiesSection() {
 func (sv *SettingsView) setPrimaryIdentity(identityName string) {
 	// Check for cached passphrase first
 	cachedPass, hasCached := sv.app.accountMgr.GetCachedPassphrase()
-	
+
 	if hasCached {
 		// Try with cached passphrase
 		err := sv.app.accountMgr.Account().SetPrimaryIdentity(identityName, cachedPass)
@@ -130,7 +130,7 @@ func (sv *SettingsView) setPrimaryIdentity(identityName string) {
 	window := sv.app.app.ActiveWindow()
 	dialog := adw.NewMessageDialog(window, "Set Primary Identity", "")
 	dialog.SetBody("Enter your account passphrase to change primary identity")
-	
+
 	contentBox := gtk.NewBox(gtk.OrientationVertical, 12)
 	contentBox.SetMarginTop(12)
 	contentBox.SetMarginBottom(12)
@@ -197,7 +197,7 @@ func (sv *SettingsView) refreshAccountSection() {
 func (sv *SettingsView) showAddIdentityDialog() {
 	window := sv.app.app.ActiveWindow()
 	dialog := adw.NewMessageDialog(window, "Add New Identity", "")
-	
+
 	// Content area with form
 	contentBox := gtk.NewBox(gtk.OrientationVertical, 12)
 	contentBox.SetMarginTop(12)

@@ -28,21 +28,21 @@ import (
 
 // MauApp is the main application
 type MauApp struct {
-	app            *adw.Application
-	dataDir        string
-	configMgr      *ConfigManager
-	accountMgr     *AccountManager
-	postMgr        *PostManager
-	mdRenderer     *MarkdownRenderer
-	server         *mau.Server
-	serverRunning  bool
-	toastOverlay   *adw.ToastOverlay
-	mainStack      *adw.ViewStack
-	draftSaveTimer glib.SourceHandle
-	syncTimer      glib.SourceHandle
-	toastQueue     []string
-	toastActive    bool
-	spinner        *gtk.Spinner
+	app             *adw.Application
+	dataDir         string
+	configMgr       *ConfigManager
+	accountMgr      *AccountManager
+	postMgr         *PostManager
+	mdRenderer      *MarkdownRenderer
+	server          *mau.Server
+	serverRunning   bool
+	toastOverlay    *adw.ToastOverlay
+	mainStack       *adw.ViewStack
+	draftSaveTimer  glib.SourceHandle
+	syncTimer       glib.SourceHandle
+	toastQueue      []string
+	toastActive     bool
+	spinner         *gtk.Spinner
 	statusIndicator *gtk.Label
 
 	// Views
@@ -172,7 +172,7 @@ func (m *MauApp) buildUI() {
 
 	// Load CSS after window is shown
 	m.loadCSS()
-	
+
 	// Initialize network status display
 	m.updateNetworkStatus()
 }
