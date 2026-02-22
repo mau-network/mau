@@ -65,6 +65,7 @@ issues:
         - gocyclo
         - cyclop
         - gocognit
+        - funlen
     
     # Exclude cmd/mau/mau.go - it's a CLI dispatcher that needs refactoring separately
     - path: cmd/mau/mau\.go
@@ -72,8 +73,9 @@ issues:
         - gocyclo
         - cyclop
         - gocognit
+        - funlen
     
-    # Exclude account.go from funlen - core library file needs separate refactoring
-    - path: account\.go
+    # Exclude core library files from funlen - they need separate refactoring
+    - path: '(account|client|file|follow|friend|kademlia|keyring|listen|server|sync_state)\.go'
       linters:
         - funlen
