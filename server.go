@@ -269,39 +269,58 @@ func (s *Server) writeJSONResponse(w http.ResponseWriter, list []FileListItem) {
 }
 
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {
+	fpr, filename, err := s.parseGetRequest(w, r)
+	if err != nil {
+		return
+	}
+
+	file, err := s.authorizeFileAccess(w, r, fpr, filename)
+	if err != nil {
+		return
+	}
+
+	s.serveFile(w, r, file)
+}
+
+func (s *Server) parseGetRequest(w http.ResponseWriter, r *http.Request) (Fingerprint, string, error) {
 	segments := strings.Split(strings.TrimPrefix(r.URL.Path, "/p2p/"), "/")
 	if len(segments) != 2 {
 		http.Error(w, "", http.StatusBadRequest)
-		return
+		return Fingerprint{}, "", errors.New("invalid segments")
 	}
 
-	fprStr := segments[0]
-	var fpr Fingerprint
-	var err error
-	fpr, err = FingerprintFromString(fprStr)
+	fpr, err := FingerprintFromString(segments[0])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return Fingerprint{}, "", err
 	}
 
-	file, err := s.account.GetFile(fpr, segments[1])
+	return fpr, segments[1], nil
+}
+
+func (s *Server) authorizeFileAccess(w http.ResponseWriter, r *http.Request, fpr Fingerprint, filename string) (*File, error) {
+	file, err := s.account.GetFile(fpr, filename)
 	if err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)
-		return
+		return nil, err
 	}
 
 	recipients, err := file.Recipients(s.account)
 	if err != nil {
 		http.Error(w, "Error reading file recipients", http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 
 	allowed := isPermitted(r.TLS.PeerCertificates, recipients)
 	if !allowed {
 		http.Error(w, "Error file is not allowed for user", http.StatusUnauthorized)
-		return
+		return nil, errors.New("unauthorized")
 	}
 
+	return file, nil
+}
+
+func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, file *File) {
 	reader, err := os.Open(file.Path)
 	if err != nil {
 		http.Error(w, "Error reading file", http.StatusInternalServerError)
@@ -315,51 +334,57 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) version(w http.ResponseWriter, r *http.Request) {
+	fpr, filename, hash, err := s.parseVersionRequest(w, r)
+	if err != nil {
+		return
+	}
+
+	file, err := s.authorizeVersionAccess(w, r, fpr, filename, hash)
+	if err != nil {
+		return
+	}
+
+	s.serveFile(w, r, file)
+}
+
+func (s *Server) parseVersionRequest(w http.ResponseWriter, r *http.Request) (Fingerprint, string, string, error) {
 	segments := strings.Split(strings.TrimPrefix(r.URL.Path, "/p2p/"), "/")
 	if len(segments) != 3 {
 		http.Error(w, "", http.StatusBadRequest)
-		return
+		return Fingerprint{}, "", "", errors.New("invalid segments")
 	}
 
 	fpr, err := FingerprintFromString(segments[0])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return Fingerprint{}, "", "", err
 	}
 
 	// Strip .version suffix from filename
-	// URL format: /p2p/{fpr}/{filename}.version/{hash}
-	// But GetFileVersion expects just {filename}
 	filename := strings.TrimSuffix(segments[1], ".version")
+	return fpr, filename, segments[2], nil
+}
 
-	file, err := s.account.GetFileVersion(fpr, filename, segments[2])
+func (s *Server) authorizeVersionAccess(w http.ResponseWriter, r *http.Request, fpr Fingerprint, filename, hash string) (*File, error) {
+	file, err := s.account.GetFileVersion(fpr, filename, hash)
 	if err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)
-		return
+		return nil, err
 	}
 
 	recipients, err := file.Recipients(s.account)
 	if err != nil {
 		http.Error(w, "Error reading file recipients", http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 
 	allowed := isPermitted(r.TLS.PeerCertificates, recipients)
 	if !allowed {
 		http.Error(w, "Error file is not allowed for user", http.StatusUnauthorized)
-		return
+		return nil, errors.New("unauthorized")
 	}
 
-	reader, err := os.Open(file.Path)
-	if err != nil {
-		http.Error(w, "Error reading file", http.StatusInternalServerError)
-		return
-	}
-	defer reader.Close()
-
-	w.Header().Add("Content-Type", "application/octet-stream")
-	w.Header().Add("Accept-Ranges", "bytes")
-	http.ServeContent(w, r, file.Name(), time.Time{}, reader)
+	return file, nil
 }
 
 func isPermitted(certs []*x509.Certificate, recipients []*Friend) bool {

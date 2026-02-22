@@ -161,20 +161,27 @@ func (d *dhtServer) parallelFindPeer(ctx context.Context, fingerprint Fingerprin
 	var wg sync.WaitGroup
 	wg.Add(len(nearest))
 
-	for i := 0; i < len(nearest); i++ {
+	d.spawnFindPeerWorkers(workersCtx, fingerprint, peers, &found, cancel, &wg, len(nearest))
+	d.watchContextCancellation(ctx, cancel)
+
+	wg.Wait()
+	return found
+}
+
+func (d *dhtServer) spawnFindPeerWorkers(ctx context.Context, fingerprint Fingerprint, peers *peerRequestSet, found **Peer, cancel context.CancelFunc, wg *sync.WaitGroup, count int) {
+	for i := 0; i < count; i++ {
 		go func() {
-			d.runFindPeerWorker(workersCtx, fingerprint, peers, &found, cancel)
+			d.runFindPeerWorker(ctx, fingerprint, peers, found, cancel)
 			wg.Done()
 		}()
 	}
+}
 
+func (d *dhtServer) watchContextCancellation(ctx context.Context, cancel context.CancelFunc) {
 	go func() {
 		<-ctx.Done()
 		cancel()
 	}()
-
-	wg.Wait()
-	return found
 }
 
 func (d *dhtServer) sendFindPeerWorker(ctx context.Context, fingerprint Fingerprint, peers *peerRequestSet) (*Peer, error) {
@@ -190,16 +197,21 @@ func (d *dhtServer) sendFindPeerWorker(ctx context.Context, fingerprint Fingerpr
 
 	d.addPeer(peer)
 
-	if len(foundPeers) > dht_K {
-		foundPeers = foundPeers[:dht_K]
-	}
-
-	if target := d.findTargetInPeers(foundPeers, fingerprint); target != nil {
+	limited := limitPeers(foundPeers, dht_K)
+	target := d.findTargetInPeers(limited, fingerprint)
+	if target != nil {
 		return target, nil
 	}
 
-	peers.add(foundPeers...)
+	peers.add(limited...)
 	return nil, nil
+}
+
+func limitPeers(peers []*Peer, max int) []*Peer {
+	if len(peers) > max {
+		return peers[:max]
+	}
+	return peers
 }
 
 func (d *dhtServer) queryPeerForFingerprint(ctx context.Context, peer *Peer, fingerprint Fingerprint) ([]*Peer, error) {
@@ -208,26 +220,35 @@ func (d *dhtServer) queryPeerForFingerprint(ctx context.Context, peer *Peer, fin
 		return nil, err
 	}
 
-	u := url.URL{
-		Scheme: uriProtocolName,
-		Host:   peer.Address,
-		Path:   "/kad/find_peer/" + fingerprint.String(),
-	}
-
-	var foundPeers []*Peer
-	_, err = client.client.
-		R().
-		SetContext(ctx).
-		ForceContentType("application/json").
-		SetResult(&foundPeers).
-		Get(u.String())
-
+	u := buildFindPeerURL(peer.Address, fingerprint)
+	foundPeers, err := d.executeFindPeerRequest(ctx, client, u)
 	if err != nil {
 		d.removePeer(peer)
 		return nil, err
 	}
 
 	return foundPeers, nil
+}
+
+func buildFindPeerURL(address string, fingerprint Fingerprint) string {
+	u := url.URL{
+		Scheme: uriProtocolName,
+		Host:   address,
+		Path:   "/kad/find_peer/" + fingerprint.String(),
+	}
+	return u.String()
+}
+
+func (d *dhtServer) executeFindPeerRequest(ctx context.Context, client *Client, url string) ([]*Peer, error) {
+	var foundPeers []*Peer
+	_, err := client.client.
+		R().
+		SetContext(ctx).
+		ForceContentType("application/json").
+		SetResult(&foundPeers).
+		Get(url)
+
+	return foundPeers, err
 }
 
 func (d *dhtServer) findTargetInPeers(peers []*Peer, fingerprint Fingerprint) *Peer {
