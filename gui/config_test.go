@@ -31,7 +31,6 @@ func TestConfigManager_SaveLoad(t *testing.T) {
 	// Update config
 	err := cm.Update(func(cfg *AppConfig) {
 		cfg.DarkMode = true
-		cfg.AutoStartServer = true
 		cfg.AutoSyncMinutes = 60
 	})
 	if err != nil {
@@ -50,9 +49,6 @@ func TestConfigManager_SaveLoad(t *testing.T) {
 
 	if !cfg.DarkMode {
 		t.Error("DarkMode not persisted")
-	}
-	if !cfg.AutoStartServer {
-		t.Error("AutoStartServer not persisted")
 	}
 	if cfg.AutoSyncMinutes != 60 {
 		t.Errorf("Expected AutoSyncMinutes=60, got %d", cfg.AutoSyncMinutes)
@@ -216,7 +212,6 @@ func TestAppConfig_Defaults(t *testing.T) {
 		expected interface{}
 	}{
 		{"DarkMode", cfg.DarkMode, false},
-		{"AutoStartServer", cfg.AutoStartServer, true},
 		{"AutoSync", cfg.AutoSync, false},
 		{"AutoSyncMinutes", cfg.AutoSyncMinutes, 30},
 		{"LastAccount", cfg.LastAccount, ""},
