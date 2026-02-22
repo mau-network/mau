@@ -165,22 +165,7 @@ func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, af
 }
 
 func (c *Client) fetchFileListWithResp(ctx context.Context, fingerprint Fingerprint, address string, after time.Time) ([]FileListItem, *resty.Response, error) {
-	var list []FileListItem
-
-	resp, err := c.client.
-		R().
-		SetContext(ctx).
-		SetHeader("If-Modified-Since", after.UTC().Format(http.TimeFormat)).
-		SetResult(&list).
-		ForceContentType("application/json").
-		Get(
-			(&url.URL{
-				Scheme: uriProtocolName,
-				Host:   address,
-				Path:   fmt.Sprintf("/p2p/%s", fingerprint),
-			}).String(),
-		)
-
+	resp, err := c.fetchFileListRequest(ctx, fingerprint, address, after)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to request file list from peer %s: %w", fingerprint, err)
 	}
@@ -189,7 +174,12 @@ func (c *Client) fetchFileListWithResp(ctx context.Context, fingerprint Fingerpr
 		return nil, nil, fmt.Errorf("peer %s responded with error status %s", fingerprint, resp.Status())
 	}
 
-	return list, resp, nil
+	result, ok := resp.Result().(*[]FileListItem)
+	if !ok || result == nil {
+		return nil, nil, fmt.Errorf("failed to parse response")
+	}
+
+	return *result, resp, nil
 }
 
 func (c *Client) fileAlreadyExists(f *File, expectedSize int64, expectedHash string) bool {
