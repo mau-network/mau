@@ -281,6 +281,10 @@ func extractRSAKeyFromEntity(entity *openpgp.Entity) (*rsa.PrivateKey, error) {
 		return nil, ErrCannotConvertPublicKey
 	}
 
+	return buildRSAKeyFromParts(privkey, pubkey), nil
+}
+
+func buildRSAKeyFromParts(privkey *rsa.PrivateKey, pubkey *rsa.PublicKey) *rsa.PrivateKey {
 	crtvalues := []rsa.CRTValue{}
 	//nolint:staticcheck // SA1019: CRTValues deprecated but needed for backward compatibility
 	for _, i := range privkey.Precomputed.CRTValues {
@@ -300,7 +304,7 @@ func extractRSAKeyFromEntity(entity *openpgp.Entity) (*rsa.PrivateKey, error) {
 			Qinv:      privkey.Precomputed.Qinv,
 			CRTValues: crtvalues,
 		},
-	}, nil
+	}
 }
 
 func encodeCertificateAndKey(rsakey *rsa.PrivateKey, derBytes []byte) (tls.Certificate, error) {
@@ -401,8 +405,7 @@ func (a *Account) RemoveFile(file *File) error {
 		return nil
 	}
 	
-	err := os.Remove(file.Path)
-	if err != nil {
+	if err := os.Remove(file.Path); err != nil {
 		return err
 	}
 
@@ -410,13 +413,15 @@ func (a *Account) RemoveFile(file *File) error {
 		return nil
 	}
 
+	return a.removeFileVersions(file)
+}
+
+func (a *Account) removeFileVersions(file *File) error {
 	for _, version := range file.Versions() {
-		err := a.RemoveFile(version)
-		if err != nil {
+		if err := a.RemoveFile(version); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -444,26 +449,32 @@ type dirEntry struct {
 func filterRecentFiles(files []fs.DirEntry, after time.Time) []dirEntry {
 	recent := []dirEntry{}
 	for _, f := range files {
-		if !f.Type().IsRegular() {
-			continue
+		if entry := createRecentEntry(f, after); entry != nil {
+			recent = append(recent, *entry)
 		}
-
-		info, err := f.Info()
-		if err != nil {
-			continue
-		}
-
-		mod := info.ModTime()
-		if mod.Before(after) {
-			continue
-		}
-
-		recent = append(recent, dirEntry{
-			entry:        f,
-			modification: mod,
-		})
 	}
 	return recent
+}
+
+func createRecentEntry(f fs.DirEntry, after time.Time) *dirEntry {
+	if !f.Type().IsRegular() {
+		return nil
+	}
+
+	info, err := f.Info()
+	if err != nil {
+		return nil
+	}
+
+	mod := info.ModTime()
+	if mod.Before(after) {
+		return nil
+	}
+
+	return &dirEntry{
+		entry:        f,
+		modification: mod,
+	}
 }
 
 func sortByModificationTime(entries []dirEntry) {
