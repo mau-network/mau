@@ -53,23 +53,27 @@ func (hv *HomeView) buildComposerTextView() *gtk.ScrolledWindow {
 	scrolled := gtk.NewScrolledWindow()
 	scrolled.SetVExpand(false)
 	scrolled.SetSizeRequest(-1, 150)
-
-	hv.postEntry = gtk.NewTextView()
-	hv.postEntry.SetWrapMode(gtk.WrapWord)
-	hv.postEntry.SetMarginTop(6)
-	hv.postEntry.SetMarginBottom(6)
-	hv.postEntry.SetMarginStart(6)
-	hv.postEntry.SetMarginEnd(6)
-	hv.postEntry.Buffer().SetEnableUndo(true)
-
-	hv.postEntry.Buffer().ConnectChanged(func() {
-		hv.updateCharCount()
-		hv.debouncedMarkdownPreview()
-		hv.saveDraftDelayed()
-	})
-
+	hv.postEntry = hv.createTextView()
 	scrolled.SetChild(hv.postEntry)
 	return scrolled
+}
+
+func (hv *HomeView) createTextView() *gtk.TextView {
+	textView := gtk.NewTextView()
+	textView.SetWrapMode(gtk.WrapWord)
+	textView.SetMarginTop(6)
+	textView.SetMarginBottom(6)
+	textView.SetMarginStart(6)
+	textView.SetMarginEnd(6)
+	textView.Buffer().SetEnableUndo(true)
+	textView.Buffer().ConnectChanged(hv.onTextChanged)
+	return textView
+}
+
+func (hv *HomeView) onTextChanged() {
+	hv.updateCharCount()
+	hv.debouncedMarkdownPreview()
+	hv.saveDraftDelayed()
 }
 
 // buildComposerPreview creates the markdown preview area
@@ -166,21 +170,20 @@ func (hv *HomeView) getPostText() string {
 // publishPost handles post publishing
 func (hv *HomeView) publishPost() {
 	text := hv.getPostText()
-
 	if text == "" {
 		hv.app.showToast(toastNoContent)
 		return
 	}
-
 	if err := hv.validateAndPublish(text); err != nil {
 		hv.app.ShowError(dialogValidateError, err.Error())
 		return
 	}
+	hv.handleSuccessfulPublish()
+}
 
+func (hv *HomeView) handleSuccessfulPublish() {
 	hv.clearComposer()
 	hv.app.showToast(toastPostPublished)
-
-	// Refresh after a brief delay to ensure file is on disk
 	glib.IdleAdd(func() bool {
 		hv.Refresh()
 		return false
