@@ -177,7 +177,6 @@ func (a *Account) removeFriendFiles(matches []string) error {
 	}
 	return nil
 }
-}
 
 func (a *Account) ListFriends() (*Keyring, error) {
 	friends := Keyring{Path: mauDir(a.path)}
