@@ -61,88 +61,6 @@ func TestUPNPClient(t *testing.T) {
 	assert.NotEqual(t, "", address)
 }
 
-func TestMockUPNPClient(t *testing.T) {
-	t.Run("GetExternalIPAddress returns configured IP", func(t *testing.T) {
-		expectedIP := "192.0.2.1"
-		mock := &mockUPNPClient{
-			getExternalIPAddressFunc: func() (string, error) {
-				return expectedIP, nil
-			},
-		}
-
-		ip, err := mock.GetExternalIPAddress()
-		assert.NoError(t, err)
-		assert.Equal(t, expectedIP, ip)
-	})
-
-	t.Run("GetExternalIPAddress returns error", func(t *testing.T) {
-		expectedErr := errors.New("network timeout")
-		mock := &mockUPNPClient{
-			getExternalIPAddressFunc: func() (string, error) {
-				return "", expectedErr
-			},
-		}
-
-		ip, err := mock.GetExternalIPAddress()
-		assert.Error(t, err)
-		assert.Equal(t, expectedErr, err)
-		assert.Equal(t, "", ip)
-	})
-
-	t.Run("AddPortMapping succeeds", func(t *testing.T) {
-		var capturedPort uint16
-		var capturedProtocol string
-
-		mock := &mockUPNPClient{
-			addPortMappingFunc: func(
-				remoteHost string,
-				externalPort uint16,
-				protocol string,
-				internalPort uint16,
-				internalClient string,
-				enabled bool,
-				description string,
-				leaseDuration uint32,
-			) error {
-				capturedPort = externalPort
-				capturedProtocol = protocol
-				return nil
-			},
-		}
-
-		err := mock.AddPortMapping("", 8080, "TCP", 8080, "192.168.1.100", true, "Test mapping", 3600)
-		assert.NoError(t, err)
-		assert.Equal(t, uint16(8080), capturedPort)
-		assert.Equal(t, "TCP", capturedProtocol)
-	})
-
-	t.Run("AddPortMapping returns error", func(t *testing.T) {
-		expectedErr := errors.New("port already in use")
-		mock := &mockUPNPClient{
-			addPortMappingFunc: func(string, uint16, string, uint16, string, bool, string, uint32) error {
-				return expectedErr
-			},
-		}
-
-		err := mock.AddPortMapping("", 8080, "TCP", 8080, "192.168.1.100", true, "Test", 3600)
-		assert.Error(t, err)
-		assert.Equal(t, expectedErr, err)
-	})
-
-	t.Run("Default implementation returns no error", func(t *testing.T) {
-		mock := &mockUPNPClient{}
-
-		// AddPortMapping with nil function should return nil
-		err := mock.AddPortMapping("", 8080, "TCP", 8080, "192.168.1.100", true, "Test", 3600)
-		assert.NoError(t, err)
-
-		// GetExternalIPAddress with nil function should return default IP
-		ip, err := mock.GetExternalIPAddress()
-		assert.NoError(t, err)
-		assert.Equal(t, "203.0.113.1", ip)
-	})
-}
-
 func TestUPNPFactory(t *testing.T) {
 	t.Run("Factory converts typed clients to interface slice", func(t *testing.T) {
 		mock1 := &mockUPNPClient{
@@ -237,8 +155,5 @@ func TestNewUPNPClient(t *testing.T) {
 	})
 }
 
-func TestUPNPClientInterface(t *testing.T) {
-	t.Run("Interface compliance", func(t *testing.T) {
-		var _ upnpClient = (*mockUPNPClient)(nil)
-	})
-}
+// Verify mock implements interface at compile time
+var _ upnpClient = (*mockUPNPClient)(nil)
