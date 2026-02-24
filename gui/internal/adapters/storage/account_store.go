@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/mau-network/mau"
-	"github.com/mau-network/mau/gui/internal/domain/account"
 )
 
 // AccountStore implements account.Store using Mau's PGP-based account system

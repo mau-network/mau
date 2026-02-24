@@ -2,12 +2,6 @@
 // This package is GTK-agnostic and contains pure server control logic.
 package server
 
-import (
-	"fmt"
-
-	"github.com/mau-network/mau"
-)
-
 // Controller defines the interface for server lifecycle control
 type Controller interface {
 	// Start starts the P2P server

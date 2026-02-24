@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/mau-network/mau"
-	"github.com/mau-network/mau/gui/internal/domain/post"
+	"github.com/mau-network/mau-gui-poc/internal/domain/post"
 )
 
 // PostStore implements post.Store using Mau's encrypted file storage

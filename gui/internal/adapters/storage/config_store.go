@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mau-network/mau/gui/internal/domain/config"
+	"github.com/mau-network/mau-gui-poc/internal/domain/config"
 )
 
 const configFileName = "config.json"
