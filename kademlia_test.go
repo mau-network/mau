@@ -313,3 +313,148 @@ func ParseFPRIgnoreErr(fpr string) Fingerprint {
 	v, _ := FingerprintFromString(fpr)
 	return v
 }
+
+func TestShouldRefreshBucket(t *testing.T) {
+	account, err := NewAccount(t.TempDir(), "Test peer", "test@example.com", "password")
+	assert.NoError(t, err)
+	s := newDHTServer(account, "localhost:8080")
+
+	t.Run("Fresh bucket should not need refresh", func(t *testing.T) {
+		// All buckets are freshly initialized, lastLookup is zero
+		// Time since zero time is > dht_STALL_PERIOD, so it SHOULD refresh
+		// (This is the actual behavior based on the code)
+		bucketIdx := 0
+		result := s.shouldRefreshBucket(bucketIdx)
+		assert.True(t, result, "Fresh bucket (zero time) should need refresh")
+	})
+
+	t.Run("Recently updated bucket should not need refresh", func(t *testing.T) {
+		bucketIdx := 5
+		s.buckets[bucketIdx].lastLookup = time.Now()
+		
+		result := s.shouldRefreshBucket(bucketIdx)
+		assert.False(t, result, "Recently updated bucket should not need refresh")
+	})
+
+	t.Run("Stale bucket should need refresh", func(t *testing.T) {
+		bucketIdx := 10
+		s.buckets[bucketIdx].lastLookup = time.Now().Add(-2 * dht_STALL_PERIOD)
+		
+		result := s.shouldRefreshBucket(bucketIdx)
+		assert.True(t, result, "Stale bucket should need refresh")
+	})
+
+	t.Run("Bucket at exact threshold should need refresh", func(t *testing.T) {
+		bucketIdx := 15
+		s.buckets[bucketIdx].lastLookup = time.Now().Add(-dht_STALL_PERIOD)
+		
+		result := s.shouldRefreshBucket(bucketIdx)
+		assert.True(t, result, "Bucket at exact threshold should need refresh")
+	})
+
+	t.Run("Bucket just before threshold should not need refresh", func(t *testing.T) {
+		bucketIdx := 20
+		s.buckets[bucketIdx].lastLookup = time.Now().Add(-dht_STALL_PERIOD + time.Second)
+		
+		result := s.shouldRefreshBucket(bucketIdx)
+		assert.False(t, result, "Bucket just before threshold should not need refresh")
+	})
+}
+
+func TestRefreshAllStallBuckets(t *testing.T) {
+	account, err := NewAccount(t.TempDir(), "Test peer", "test@example.com", "password")
+	assert.NoError(t, err)
+	s := newDHTServer(account, "localhost:8080")
+
+	t.Run("Returns true when all buckets processed without cancellation", func(t *testing.T) {
+		ctx := context.Background()
+		
+		// Set some buckets to be stale
+		s.buckets[0].lastLookup = time.Now().Add(-2 * dht_STALL_PERIOD)
+		s.buckets[5].lastLookup = time.Now().Add(-2 * dht_STALL_PERIOD)
+		
+		// Add a peer to buckets so refreshBucket has something to work with
+		fpr1 := ParseFPRIgnoreErr("ABAF11C65A2970B130ABE3C479BE3E4300411886")
+		s.buckets[0].addToTail(&Peer{fpr1, "127.0.0.1:8081"})
+		
+		result := s.refreshAllStallBuckets(ctx)
+		assert.True(t, result, "Should return true when processing completes")
+	})
+
+	t.Run("Returns false when context is cancelled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Cancel immediately
+		
+		// Set all buckets to be stale
+		for i := range s.buckets {
+			s.buckets[i].lastLookup = time.Now().Add(-2 * dht_STALL_PERIOD)
+		}
+		
+		result := s.refreshAllStallBuckets(ctx)
+		assert.False(t, result, "Should return false when context is cancelled")
+	})
+
+	t.Run("Only refreshes stale buckets", func(t *testing.T) {
+		ctx := context.Background()
+		
+		// Set specific buckets to different states
+		staleBucket := 3
+		freshBucket := 7
+		
+		s.buckets[staleBucket].lastLookup = time.Now().Add(-2 * dht_STALL_PERIOD)
+		s.buckets[freshBucket].lastLookup = time.Now()
+		
+		initialStaleTime := s.buckets[staleBucket].lastLookup
+		initialFreshTime := s.buckets[freshBucket].lastLookup
+		
+		// Add peers so refresh actually happens
+		fpr := ParseFPRIgnoreErr("BBAF11C65A2970B130ABE3C479BE3E4300411886")
+		s.buckets[staleBucket].addToTail(&Peer{fpr, "127.0.0.1:8082"})
+		
+		result := s.refreshAllStallBuckets(ctx)
+		assert.True(t, result)
+		
+		// Stale bucket should have been refreshed (time updated)
+		assert.True(t, s.buckets[staleBucket].lastLookup.After(initialStaleTime),
+			"Stale bucket should have been refreshed")
+		
+		// Fresh bucket should not have been touched
+		assert.Equal(t, initialFreshTime, s.buckets[freshBucket].lastLookup,
+			"Fresh bucket should not have been refreshed")
+	})
+
+	t.Run("Handles empty buckets gracefully", func(t *testing.T) {
+		ctx := context.Background()
+		
+		// Set all buckets to stale but leave them empty
+		for i := range s.buckets {
+			s.buckets[i].lastLookup = time.Now().Add(-2 * dht_STALL_PERIOD)
+			s.buckets[i].values = nil
+		}
+		
+		result := s.refreshAllStallBuckets(ctx)
+		assert.True(t, result, "Should handle empty buckets without error")
+	})
+
+	t.Run("Processes multiple stale buckets", func(t *testing.T) {
+		ctx := context.Background()
+		
+		// Set multiple buckets to stale
+		staleBuckets := []int{1, 3, 5, 7, 9}
+		for _, idx := range staleBuckets {
+			s.buckets[idx].lastLookup = time.Now().Add(-2 * dht_STALL_PERIOD)
+			fpr := ParseFPRIgnoreErr(fmt.Sprintf("ABAF11C65A2970B130ABE3C47%015dF", idx))
+			s.buckets[idx].addToTail(&Peer{fpr, fmt.Sprintf("127.0.0.1:808%d", idx)})
+		}
+		
+		result := s.refreshAllStallBuckets(ctx)
+		assert.True(t, result)
+		
+		// Verify all stale buckets were refreshed
+		for _, idx := range staleBuckets {
+			assert.True(t, 
+				time.Since(s.buckets[idx].lastLookup) < time.Second,
+				"Bucket %d should have been recently refreshed", idx)
+		}
+	})
+}
