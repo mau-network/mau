@@ -6,3 +6,8 @@ mau-gui
 mau
 gui/mau-gui
 gui/mau-gui-poc
+
+# Test coverage files
+*.out
+coverage*.out
+*.prof
