@@ -22,4 +22,7 @@ type Store interface {
 
 	// Open opens an existing account
 	Open(password string) (*mau.Account, error)
+
+	// DataDir returns the data directory for the account
+	DataDir() string
 }

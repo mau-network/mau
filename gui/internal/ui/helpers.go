@@ -1,4 +1,5 @@
-package main
+// Package ui provides UI helper functions.
+package ui
 
 import (
 	"strings"
@@ -7,10 +8,8 @@ import (
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 )
 
-// UI Helper Functions
-
-// escapeMarkup escapes GTK markup characters (&, <, >, ", ')
-func escapeMarkup(s string) string {
+// EscapeMarkup escapes GTK markup characters (&, <, >, ", ')
+func EscapeMarkup(s string) string {
 	s = strings.ReplaceAll(s, "&", "&amp;")
 	s = strings.ReplaceAll(s, "<", "&lt;")
 	s = strings.ReplaceAll(s, ">", "&gt;")

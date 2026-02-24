@@ -62,3 +62,8 @@ func (m *Manager) GetCachedPassphrase() (string, bool) {
 func (m *Manager) ClearPassphraseCache() {
 	m.passphraseCache = ""
 }
+
+// DataDir returns the account's data directory
+func (m *Manager) DataDir() string {
+	return m.store.DataDir()
+}

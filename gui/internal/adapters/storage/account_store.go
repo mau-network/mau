@@ -56,3 +56,8 @@ func (s *AccountStore) Open(password string) (*mau.Account, error) {
 
 	return acc, nil
 }
+
+// DataDir returns the data directory
+func (s *AccountStore) DataDir() string {
+	return s.dataDir
+}
