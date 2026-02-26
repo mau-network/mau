@@ -247,28 +247,24 @@ func (c *Client) writeAndVerifyTemp(f *File, data []byte, fingerprint Fingerprin
 	return tmpPath, nil
 }
 
-func createVersionBackup(f *File, tmpPath string) error {
-	// Get hash of existing file
+func createVersionBackup(f *File, tmpPath string) (err error) {
+	defer func() {
+		if err != nil {
+			os.Remove(tmpPath)
+		}
+	}()
 	existingHash, err := f.Hash()
 	if err != nil {
-		os.Remove(tmpPath)
 		return fmt.Errorf("failed to hash existing file for versioning: %w", err)
 	}
-
-	// Create version directory (e.g., /path/to/file.txt.pgp.versions/)
 	versionsDir := f.Path + ".versions"
 	if err := os.MkdirAll(versionsDir, DirPerm); err != nil {
-		os.Remove(tmpPath)
 		return fmt.Errorf("failed to create versions directory: %w", err)
 	}
-
-	// Move existing file to version directory with hash as filename
 	versionPath := path.Join(versionsDir, existingHash)
 	if err := os.Rename(f.Path, versionPath); err != nil {
-		os.Remove(tmpPath)
 		return fmt.Errorf("failed to save file version: %w", err)
 	}
-
 	return nil
 }
 

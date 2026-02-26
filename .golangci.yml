@@ -1,76 +1,63 @@
-linters-settings:
-  gocyclo:
-    # Minimal cyclomatic complexity to report
-    min-complexity: 8
-  
-  cyclop:
-    # Maximum cyclomatic complexity of a function
-    max-complexity: 8
-    # Should ignore tests
-    skip-tests: true
-  
-  funlen:
-    # Maximum number of lines in a function
-    lines: 20
-    # Maximum number of statements in a function
-    statements: 15
-    # Ignore comments when counting lines
-    ignore-comments: false
-
+version: "2"
+run:
+  tests: true
 linters:
   enable:
-    - gocyclo      # Checks function complexity
-    - cyclop       # Alternative cyclomatic complexity checker
-    - gocognit     # Checks cognitive complexity (similar to cyclomatic)
-    - funlen       # Checks function length (max 20 lines, 15 statements)
-  
+    - cyclop
+    - funlen
+    - gocognit
+    - gocyclo
   disable:
     - errcheck
     - staticcheck
     - unused
-
-run:
-  # Timeout for analysis
-  timeout: 5m
-  
-  # Include test files
-  tests: true
-
-# Code Quality Standards:
-# - Maximum function length: 20 lines (enforced by funlen linter)
-# - Maximum file length: 200 lines (enforced manually - no built-in linter)
-# - Maximum cyclomatic complexity: 8 (enforced by gocyclo/cyclop)
-# 
-# To check file lengths manually:
-#   wc -l **/*.go | awk '$1 > 200 {print $0}'
-
+  settings:
+    cyclop:
+      max-complexity: 8
+    funlen:
+      lines: 20
+      statements: 15
+      ignore-comments: false
+    gocyclo:
+      min-complexity: 8
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - cyclop
+          - funlen
+          - gocognit
+          - gocyclo
+        path: _test\.go
+      - linters:
+          - cyclop
+          - funlen
+          - gocognit
+          - gocyclo
+        path: cmd/mau/mau\.go
+      - linters:
+          - cyclop
+        path: (.+)_test\.go
+    paths:
+      - vendor
+      - .git
+      - .github
+      - gotk4-adwaita
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  # Maximum count of issues with the same text
-  max-same-issues: 0
-  
-  # Maximum issues count per one linter
   max-issues-per-linter: 0
-  
-  # Which dirs to exclude
-  exclude-dirs:
-    - vendor
-    - .git
-    - .github
-    - gotk4-adwaita
-  
-  exclude-rules:
-    # Exclude some linters from running on tests files
-    - path: _test\.go
-      linters:
-        - gocyclo
-        - cyclop
-        - gocognit
-        - funlen
-    
-    # Exclude cmd/mau/mau.go - it's a CLI dispatcher that needs refactoring separately
-    - path: cmd/mau/mau\.go
-      linters:
-        - gocyclo
-        - cyclop
-        - gocognit
-        - funlen
+  max-same-issues: 0
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
