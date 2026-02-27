@@ -33,7 +33,7 @@ type Client struct {
 func (a *Account) Client(peer Fingerprint, DNSNames []string) (*Client, error) {
 	cert, err := a.certificate(DNSNames)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create certificate for peer %s: %w", peer, err)
 	}
 
 	c := &Client{
@@ -89,7 +89,7 @@ func (c *Client) resolveFingerprintAddress(ctx context.Context, fingerprint Fing
 func (c *Client) fetchFileList(ctx context.Context, fingerprint Fingerprint, address string, after time.Time) ([]FileListItem, error) {
 	resp, err := c.fetchFileListRequest(ctx, fingerprint, address, after)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch file list from %s: %w", fingerprint, err)
 	}
 
 	if resp.StatusCode() != http.StatusOK {
@@ -98,7 +98,7 @@ func (c *Client) fetchFileList(ctx context.Context, fingerprint Fingerprint, add
 
 	result, ok := resp.Result().(*[]FileListItem)
 	if !ok || result == nil {
-		return nil, fmt.Errorf("failed to parse response")
+		return nil, fmt.Errorf("failed to parse response from peer %s", fingerprint)
 	}
 
 	return *result, nil
@@ -153,12 +153,12 @@ func (c *Client) DownloadFriend(ctx context.Context, fingerprint Fingerprint, af
 
 	address, err := c.resolveFingerprintAddress(ctx, fingerprint, fingerprintResolvers)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to resolve address for %s: %w", fingerprint, err)
 	}
 
 	list, resp, err := c.fetchFileListWithResp(ctx, fingerprint, address, after)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to fetch file list for %s: %w", fingerprint, err)
 	}
 
 	return c.downloadFiles(ctx, address, fingerprint, list, resp)
@@ -284,7 +284,7 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 
 	data, err := c.fetchAndValidateFile(ctx, address, fingerprint, filename, file)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to fetch and validate file %s: %w", filename, err)
 	}
 
 	return c.saveVerifiedFile(&f, data, fingerprint)
@@ -293,11 +293,11 @@ func (c *Client) DownloadFile(ctx context.Context, address string, fingerprint F
 func (c *Client) fetchAndValidateFile(ctx context.Context, address string, fingerprint Fingerprint, filename string, file *FileListItem) ([]byte, error) {
 	data, _, err := c.downloadFileContent(ctx, address, fingerprint, filename)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to download file content: %w", err)
 	}
 
 	if err := validateDownloadedContent(data, file); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("file validation failed: %w", err)
 	}
 
 	return data, nil
@@ -306,12 +306,12 @@ func (c *Client) fetchAndValidateFile(ctx context.Context, address string, finge
 func (c *Client) saveVerifiedFile(f *File, data []byte, fingerprint Fingerprint) error {
 	tmpPath, err := c.writeAndVerifyTemp(f, data, fingerprint)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write and verify temporary file: %w", err)
 	}
 
 	if _, err := os.Stat(f.Path); err == nil {
 		if err := createVersionBackup(f, tmpPath); err != nil {
-			return err
+			return fmt.Errorf("failed to create version backup: %w", err)
 		}
 	}
 
@@ -327,12 +327,12 @@ func (c *Client) verifyPeerCertificate(rawCerts [][]byte, _ [][]*x509.Certificat
 	for _, rawcert := range rawCerts {
 		certs, err := x509.ParseCertificates(rawcert)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to parse certificate: %w", err)
 		}
 
 		id, err := FingerprintFromCert(certs)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to extract fingerprint from certificate: %w", err)
 		}
 
 		if id == c.peer {
