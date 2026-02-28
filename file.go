@@ -228,7 +228,7 @@ func (f *File) Recipients(account *Account) ([]*Friend, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	keysIDs, err := extractEncryptedKeyIDs(r)
 	if err != nil {

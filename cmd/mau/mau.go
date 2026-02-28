@@ -74,7 +74,11 @@ func main() {
 
 		out, err := os.OpenFile(*output, os.O_CREATE|os.O_RDWR|os.O_TRUNC, FilePerm)
 		raise(err)
-		defer out.Close()
+		defer func() {
+			if err := out.Close(); err != nil {
+				raise(err)
+			}
+		}()
 
 		err = account.Export(out)
 		raise(err)
@@ -90,7 +94,7 @@ func main() {
 
 		keyFile, err := os.OpenFile(*key, os.O_RDONLY, 0600)
 		raise(err)
-		defer keyFile.Close()
+		defer func() { _ = keyFile.Close() }()
 
 		friend, err := account.AddFriend(keyFile)
 		raise(err)
@@ -306,7 +310,11 @@ func main() {
 
 		out, err := os.OpenFile(*output, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, FilePerm)
 		raise(err)
-		defer out.Close()
+		defer func() {
+			if err := out.Close(); err != nil {
+				raise(err)
+			}
+		}()
 
 		_, err = io.Copy(out, r)
 		raise(err)
@@ -391,7 +399,7 @@ func main() {
 		}
 		err = client.DownloadFriend(ctx, fpr, t, resolvers)
 		raise(err)
-		
+
 		// Update last sync time on successful sync
 		err = account.UpdateLastSyncTime(fpr, syncStartTime)
 		raise(err)
@@ -425,7 +433,7 @@ func printKeyring(p string, r *Keyring) {
 	if r == nil {
 		return
 	}
-	
+
 	fmt.Println(r.Name(), ":")
 	for _, f := range r.Friends {
 		fmt.Println(p+" ", f.Name(), f.Email(), f.Fingerprint())
