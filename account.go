@@ -386,18 +386,27 @@ func (a *Account) handleExistingFile(p string) error {
 	return nil
 }
 
+func (a *Account) createFileWithCloseCheck(p string) (file *os.File, cleanup func(error) error, err error) {
+	file, err = os.Create(p)
+	if err != nil {
+		return nil, nil, err
+	}
+	cleanup = func(origErr error) error {
+		if cerr := file.Close(); cerr != nil && origErr == nil {
+			return cerr
+		}
+		return origErr
+	}
+	return file, cleanup, nil
+}
+
 func (a *Account) writeEncryptedFile(p string, r io.Reader, recipients []*Friend) (err error) {
 	entities := a.prepareEncryptionEntities(recipients)
-
-	file, err := os.Create(p)
+	file, cleanup, err := a.createFileWithCloseCheck(p)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if cerr := file.Close(); cerr != nil && err == nil {
-			err = cerr
-		}
-	}()
+	defer func() { err = cleanup(err) }()
 
 	w, err := openpgp.Encrypt(file, entities, a.entity, nil, nil)
 	if err != nil {
@@ -406,8 +415,7 @@ func (a *Account) writeEncryptedFile(p string, r io.Reader, recipients []*Friend
 	if w == nil {
 		return errors.New("openpgp.Encrypt returned nil writer")
 	}
-
-	if _, err := io.Copy(w, r); err != nil {
+	if _, err = io.Copy(w, r); err != nil {
 		return err
 	}
 	return w.Close()
