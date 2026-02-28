@@ -126,7 +126,7 @@ func (k *Keyring) readFriendKey(account *Account, filePath string) error {
 	if err != nil {
 		return err
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	friend, err := readFriend(account, reader)
 	if err != nil {

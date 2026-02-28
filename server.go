@@ -326,7 +326,7 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, file *File) {
 		http.Error(w, "Error reading file", http.StatusInternalServerError)
 		return
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	w.Header().Add("Content-Type", "application/octet-stream")
 	w.Header().Add("Accept-Ranges", "bytes")

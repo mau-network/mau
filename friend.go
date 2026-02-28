@@ -110,13 +110,17 @@ func readAndValidateEntity(reader io.Reader) (*openpgp.Entity, error) {
 	return entity, nil
 }
 
-func (a *Account) saveFriendEntity(fpr string, entity *openpgp.Entity) error {
+func (a *Account) saveFriendEntity(fpr string, entity *openpgp.Entity) (err error) {
 	filePath := path.Join(mauDir(a.path), fpr+".pgp")
 	file, err := os.Create(filePath)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if cerr := file.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	return a.encryptAndSerializeEntity(file, entity)
 }

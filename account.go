@@ -89,7 +89,7 @@ func createAccountEntity(name, email string) (*openpgp.Entity, error) {
 	})
 }
 
-func saveEncryptedEntity(acc string, entity *openpgp.Entity, passphrase string) error {
+func saveEncryptedEntity(acc string, entity *openpgp.Entity, passphrase string) (err error) {
 	plainFile, err := os.Create(acc)
 	if err != nil {
 		return err
@@ -99,9 +99,14 @@ func saveEncryptedEntity(acc string, entity *openpgp.Entity, passphrase string) 
 	if err != nil {
 		return err
 	}
-	defer encryptedFile.Close()
+	defer func() {
+		if cerr := encryptedFile.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
-	return entity.SerializePrivate(encryptedFile, nil)
+	err = entity.SerializePrivate(encryptedFile, nil)
+	return err
 }
 
 func OpenAccount(rootPath, passphrase string) (*Account, error) {
@@ -113,7 +118,7 @@ func OpenAccount(rootPath, passphrase string) (*Account, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer encryptedFile.Close()
+	defer func() { _ = encryptedFile.Close() }()
 
 	entity, err := decryptAndReadEntity(encryptedFile, passphrase)
 	if err != nil {
@@ -177,14 +182,14 @@ func (a *Account) Name() string {
 	if a == nil || a.entity == nil {
 		return ""
 	}
-	
+
 	// First, look for primary identity
 	for _, i := range a.entity.Identities {
 		if i.SelfSignature.IsPrimaryId != nil && *i.SelfSignature.IsPrimaryId {
 			return i.UserId.Name
 		}
 	}
-	
+
 	// Fallback to first identity
 	for _, i := range a.entity.Identities {
 		return i.UserId.Name
@@ -197,14 +202,14 @@ func (a *Account) Email() string {
 	if a == nil || a.entity == nil {
 		return ""
 	}
-	
+
 	// First, look for primary identity
 	for _, i := range a.entity.Identities {
 		if i.SelfSignature.IsPrimaryId != nil && *i.SelfSignature.IsPrimaryId {
 			return i.UserId.Email
 		}
 	}
-	
+
 	// Fallback to first identity
 	for _, i := range a.entity.Identities {
 		return i.UserId.Email
@@ -358,7 +363,7 @@ func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File
 
 	fpr := a.Fingerprint().String()
 	p := path.Join(a.path, fpr, name)
-	
+
 	// Create all parent directories for the file path
 	if err := os.MkdirAll(path.Dir(p), DirPerm); err != nil {
 		return nil, err
@@ -381,14 +386,18 @@ func (a *Account) handleExistingFile(p string) error {
 	return nil
 }
 
-func (a *Account) writeEncryptedFile(p string, r io.Reader, recipients []*Friend) error {
+func (a *Account) writeEncryptedFile(p string, r io.Reader, recipients []*Friend) (err error) {
 	entities := a.prepareEncryptionEntities(recipients)
 
 	file, err := os.Create(p)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if cerr := file.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	w, err := openpgp.Encrypt(file, entities, a.entity, nil, nil)
 	if err != nil {
@@ -408,7 +417,7 @@ func (a *Account) RemoveFile(file *File) error {
 	if file == nil {
 		return nil
 	}
-	
+
 	if err := os.Remove(file.Path); err != nil {
 		return err
 	}
@@ -542,11 +551,11 @@ func (a *Account) GetLastSyncTime(fpr Fingerprint) time.Time {
 	if err != nil {
 		return time.Time{}
 	}
-	
+
 	if lastSync, exists := state.LastSync[fpr.String()]; exists {
 		return lastSync
 	}
-	
+
 	return time.Time{}
 }
 
@@ -559,35 +568,35 @@ func (a *Account) UpdateLastSyncTime(fpr Fingerprint, syncTime time.Time) error 
 			LastSync: make(map[string]time.Time),
 		}
 	}
-	
+
 	state.LastSync[fpr.String()] = syncTime
-	
+
 	return a.saveSyncState(state)
 }
 
 func (a *Account) loadSyncState() (*syncState, error) {
 	filePath := syncStateFile(a.path)
-	
+
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var state syncState
 	if err := json.Unmarshal(data, &state); err != nil {
 		return nil, err
 	}
-	
+
 	return &state, nil
 }
 
 func (a *Account) saveSyncState(state *syncState) error {
 	filePath := syncStateFile(a.path)
-	
+
 	data, err := json.Marshal(state)
 	if err != nil {
 		return err
 	}
-	
+
 	return os.WriteFile(filePath, data, FilePerm)
 }
