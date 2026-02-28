@@ -7,7 +7,10 @@ Welcome to the **Mau** developer documentation! This guide will help you underst
 ### Getting Started
 - **[Introduction](01-introduction.md)** - What is Mau and why it exists
 - **[Core Concepts](02-core-concepts.md)** - Understanding Mau's fundamental architecture
-- **[Quick Start Guide](03-quickstart.md)** - Build your first Mau application in 15 minutes
+- **Quick Start Tutorials** - Three progressive tutorials:
+  - **[GPG Fundamentals](03a-quickstart-gpg.md)** - Understand the primitives (15 min)
+  - **[Mau CLI](03b-quickstart-cli.md)** - Use the command-line tool (10 min)
+  - **[Mau Package](03c-quickstart-package.md)** - Build applications with Go (20 min)
 
 ### Building Applications
 - **[Storage and Data Format](04-storage-and-data.md)** - Working with files, JSON-LD, and Schema.org
