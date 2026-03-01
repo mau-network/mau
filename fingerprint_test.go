@@ -67,7 +67,7 @@ func TestFingerprint(t *testing.T) {
 			var fpr Fingerprint
 			err := fpr.UnmarshalJSON([]byte(fprStr))
 			assert.NoError(t, err)
-			assert.Equal(t, Fingerprint{}, fpr)
+			assert.Nil(t, fpr)
 		})
 	})
 }
