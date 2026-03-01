@@ -19,12 +19,12 @@ import (
 
 	_ "crypto/sha256"
 
-	//nolint:staticcheck // SA1019: openpgp deprecated but required for this project
-	"golang.org/x/crypto/openpgp"
-	//nolint:staticcheck // SA1019: openpgp deprecated but required for this project
-	"golang.org/x/crypto/openpgp/armor"
-	//nolint:staticcheck // SA1019: openpgp deprecated but required for this project
-	"golang.org/x/crypto/openpgp/packet"
+	
+	"github.com/ProtonMail/go-crypto/openpgp"
+	
+	"github.com/ProtonMail/go-crypto/openpgp/armor"
+	
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
 )
 
 var (
@@ -222,7 +222,9 @@ func (a *Account) Fingerprint() Fingerprint {
 	if a == nil || a.entity == nil || a.entity.PrimaryKey == nil {
 		return Fingerprint{}
 	}
-	return a.entity.PrimaryKey.Fingerprint
+	var fp Fingerprint
+	copy(fp[:], a.entity.PrimaryKey.Fingerprint)
+	return fp
 }
 
 func (a *Account) Export(w io.Writer) error {
