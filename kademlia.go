@@ -638,6 +638,11 @@ func (p *peerRequestSet) len() int {
 
 // xor two fingerprints
 func xor(a, b Fingerprint) Fingerprint {
+	// Handle nil inputs
+	if a == nil || b == nil {
+		return nil
+	}
+	
 	// Use length of shortest fingerprint for XOR
 	minLen := len(a)
 	if len(b) < minLen {
