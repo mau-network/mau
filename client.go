@@ -335,7 +335,7 @@ func (c *Client) verifyPeerCertificate(rawCerts [][]byte, _ [][]*x509.Certificat
 			return fmt.Errorf("failed to extract fingerprint from certificate: %w", err)
 		}
 
-		if id == c.peer {
+		if id.Equal(c.peer) {
 			return nil
 		}
 	}

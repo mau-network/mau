@@ -225,11 +225,9 @@ func (a *Account) Email() string {
 
 func (a *Account) Fingerprint() Fingerprint {
 	if a == nil || a.entity == nil || a.entity.PrimaryKey == nil {
-		return Fingerprint{}
+		return nil
 	}
-	var fp Fingerprint
-	copy(fp[:], a.entity.PrimaryKey.Fingerprint)
-	return fp
+	return a.entity.PrimaryKey.Fingerprint
 }
 
 func (a *Account) Export(w io.Writer) error {

@@ -20,14 +20,14 @@ func (k *Keyring) Name() string {
 }
 
 func (k *Keyring) FriendsSet() []*Friend {
-	friends := map[Fingerprint]*Friend{}
+	friends := map[string]*Friend{} // key: fingerprint hex string
 	for _, f := range k.Friends {
-		friends[f.Fingerprint()] = f
+		friends[f.Fingerprint().String()] = f
 	}
 
 	for _, sk := range k.SubKeyrings {
 		for _, f := range sk.FriendsSet() {
-			friends[f.Fingerprint()] = f
+			friends[f.Fingerprint().String()] = f
 		}
 	}
 
@@ -45,7 +45,7 @@ func (k *Keyring) FindByFingerprint(fingerprint Fingerprint) *Friend {
 	}
 	
 	for _, friend := range k.Friends {
-		if friend.Fingerprint() == fingerprint {
+		if friend.Fingerprint().Equal(fingerprint) {
 			return friend
 		}
 	}
