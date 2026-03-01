@@ -7,12 +7,12 @@ import (
 	"path"
 	"path/filepath"
 
-	//nolint:staticcheck // SA1019: openpgp deprecated but required for this project
-	"golang.org/x/crypto/openpgp"
-	//nolint:staticcheck // SA1019: openpgp deprecated but required for this project
-	"golang.org/x/crypto/openpgp/armor"
-	//nolint:staticcheck // SA1019: openpgp deprecated but required for this project
-	"golang.org/x/crypto/openpgp/packet"
+	
+	"github.com/ProtonMail/go-crypto/openpgp"
+	
+	"github.com/ProtonMail/go-crypto/openpgp/armor"
+	
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
 )
 
 type Friend struct {
@@ -56,7 +56,9 @@ func (f *Friend) Fingerprint() Fingerprint {
 	if f == nil || f.entity == nil || f.entity.PrimaryKey == nil {
 		return Fingerprint{}
 	}
-	return f.entity.PrimaryKey.Fingerprint
+	var fp Fingerprint
+	copy(fp[:], f.entity.PrimaryKey.Fingerprint)
+	return fp
 }
 
 func readFriend(account *Account, reader io.Reader) (*Friend, error) {
