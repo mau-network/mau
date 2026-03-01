@@ -3,9 +3,11 @@ package mau
 import (
 	"bytes"
 	"crypto"
+	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -23,6 +25,8 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 	
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
+	
+	"github.com/ProtonMail/go-crypto/openpgp/eddsa"
 	
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 )
@@ -85,7 +89,8 @@ func createAccountEntity(name, email string) (*openpgp.Entity, error) {
 	return openpgp.NewEntity(name, "", email, &packet.Config{
 		DefaultHash:            crypto.SHA256,
 		DefaultCompressionAlgo: packet.CompressionZIP,
-		RSABits:                rsaKeyLength,
+		Algorithm:              packet.PubKeyAlgoEdDSA,
+		Curve:                  packet.Curve25519,
 	})
 }
 
@@ -251,18 +256,45 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 		return
 	}
 
-	template := buildCertificateTemplate(DNSNames, a.entity.PrimaryKey.CreationTime)
-	rsakey, err := extractRSAKeyFromEntity(a.entity)
-	if err != nil {
-		return tls.Certificate{}, err
+	// For Ed25519 keys, embed the PGP fingerprint as a DNSName
+	// This allows proper fingerprint extraction since we can't reconstruct it from the certificate
+	var dnsNamesWithFingerprint []string
+	if _, isEdDSA := a.entity.PrivateKey.PrivateKey.(*eddsa.PrivateKey); isEdDSA {
+		fpHex := hex.EncodeToString(a.entity.PrimaryKey.Fingerprint)
+		dnsNamesWithFingerprint = append(DNSNames, fpHex)
+	} else {
+		dnsNamesWithFingerprint = DNSNames
 	}
 
-	derBytes, err := x509.CreateCertificate(nil, &template, &template, &rsakey.PublicKey, rsakey)
-	if err != nil {
-		return tls.Certificate{}, err
-	}
+	template := buildCertificateTemplate(dnsNamesWithFingerprint, a.entity.PrimaryKey.CreationTime)
+	privKey := a.entity.PrivateKey.PrivateKey
 
-	return encodeCertificateAndKey(rsakey, derBytes)
+	// Support both RSA and Ed25519 keys
+	var derBytes []byte
+	switch priv := privKey.(type) {
+	case *rsa.PrivateKey:
+		rsaPub, ok := a.entity.PrimaryKey.PublicKey.(*rsa.PublicKey)
+		if !ok {
+			return tls.Certificate{}, ErrCannotConvertPublicKey
+		}
+		rsakey := buildRSAKeyFromParts(priv, rsaPub)
+		derBytes, err = x509.CreateCertificate(nil, &template, &template, &rsakey.PublicKey, rsakey)
+		if err != nil {
+			return tls.Certificate{}, err
+		}
+		return encodeCertificateAndKey(rsakey, derBytes)
+	case *eddsa.PrivateKey:
+		// Convert OpenPGP EdDSA key to crypto/ed25519
+		secretBytes := priv.MarshalByteSecret()
+		ed25519Key := ed25519.NewKeyFromSeed(secretBytes)
+		derBytes, err = x509.CreateCertificate(nil, &template, &template, ed25519Key.Public(), ed25519Key)
+		if err != nil {
+			return tls.Certificate{}, err
+		}
+		return encodeCertificateAndKeyGeneric(ed25519Key, derBytes)
+	default:
+		return tls.Certificate{}, ErrCannotConvertPrivateKey
+	}
 }
 
 func buildCertificateTemplate(dnsNames []string, creationTime time.Time) x509.Certificate {
@@ -320,6 +352,28 @@ func buildRSAKeyFromParts(privkey *rsa.PrivateKey, pubkey *rsa.PublicKey) *rsa.P
 
 func encodeCertificateAndKey(rsakey *rsa.PrivateKey, derBytes []byte) (tls.Certificate, error) {
 	keyPem := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(rsakey)}
+	certPem := &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}
+
+	var keyPemBytes bytes.Buffer
+	if err := pem.Encode(&keyPemBytes, keyPem); err != nil {
+		return tls.Certificate{}, err
+	}
+
+	var certPemBytes bytes.Buffer
+	if err := pem.Encode(&certPemBytes, certPem); err != nil {
+		return tls.Certificate{}, err
+	}
+
+	return tls.X509KeyPair(certPemBytes.Bytes(), keyPemBytes.Bytes())
+}
+
+func encodeCertificateAndKeyGeneric(privKey crypto.PrivateKey, derBytes []byte) (tls.Certificate, error) {
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(privKey)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+
+	keyPem := &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes}
 	certPem := &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}
 
 	var keyPemBytes bytes.Buffer

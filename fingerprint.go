@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 
-	
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 )
 
@@ -73,6 +72,20 @@ func fingerprintFromPublicKey(cert *x509.Certificate) ([]byte, error) {
 		if pubkey, ok := cert.PublicKey.(*rsa.PublicKey); ok {
 			return packet.NewRSAPublicKey(cert.NotBefore, pubkey).Fingerprint, nil
 		}
+	case x509.Ed25519:
+		// For Ed25519, try to extract fingerprint from DNSNames first
+		// (it's embedded there during certificate creation)
+		for _, name := range cert.DNSNames {
+			if len(name) == 40 { // SHA-1 fingerprint is 40 hex chars
+				fpBytes, err := hex.DecodeString(name)
+				if err == nil && len(fpBytes) == 20 {
+					return fpBytes, nil
+				}
+			}
+		}
+		// Fallback: Should not reach here for Mau-generated Ed25519 certs
+		return nil, errors.New("Ed25519 fingerprint not found in certificate DNSNames")
+	
 	case x509.ECDSA:
 		// ECDSA support: ProtonMail fork may have slightly different type handling
 		// For now, skip ECDSA as Mau primarily uses RSA 4096
