@@ -256,45 +256,56 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 		return
 	}
 
+	dnsNames := a.prepareDNSNames(DNSNames)
+	template := buildCertificateTemplate(dnsNames, a.entity.PrimaryKey.CreationTime)
+	
+	return a.generateCertificate(template)
+}
+
+func (a *Account) prepareDNSNames(dnsNames []string) []string {
 	// For Ed25519 keys, embed the PGP fingerprint as a DNSName
 	// This allows proper fingerprint extraction since we can't reconstruct it from the certificate
-	var dnsNamesWithFingerprint []string
 	if _, isEdDSA := a.entity.PrivateKey.PrivateKey.(*eddsa.PrivateKey); isEdDSA {
 		fpHex := hex.EncodeToString(a.entity.PrimaryKey.Fingerprint)
-		dnsNamesWithFingerprint = append(DNSNames, fpHex)
-	} else {
-		dnsNamesWithFingerprint = DNSNames
+		return append(dnsNames, fpHex)
 	}
+	return dnsNames
+}
 
-	template := buildCertificateTemplate(dnsNamesWithFingerprint, a.entity.PrimaryKey.CreationTime)
+func (a *Account) generateCertificate(template x509.Certificate) (tls.Certificate, error) {
 	privKey := a.entity.PrivateKey.PrivateKey
 
-	// Support both RSA and Ed25519 keys
-	var derBytes []byte
 	switch priv := privKey.(type) {
 	case *rsa.PrivateKey:
-		rsaPub, ok := a.entity.PrimaryKey.PublicKey.(*rsa.PublicKey)
-		if !ok {
-			return tls.Certificate{}, ErrCannotConvertPublicKey
-		}
-		rsakey := buildRSAKeyFromParts(priv, rsaPub)
-		derBytes, err = x509.CreateCertificate(nil, &template, &template, &rsakey.PublicKey, rsakey)
-		if err != nil {
-			return tls.Certificate{}, err
-		}
-		return encodeCertificateAndKey(rsakey, derBytes)
+		return a.generateRSACertificate(template, priv)
 	case *eddsa.PrivateKey:
-		// Convert OpenPGP EdDSA key to crypto/ed25519
-		secretBytes := priv.MarshalByteSecret()
-		ed25519Key := ed25519.NewKeyFromSeed(secretBytes)
-		derBytes, err = x509.CreateCertificate(nil, &template, &template, ed25519Key.Public(), ed25519Key)
-		if err != nil {
-			return tls.Certificate{}, err
-		}
-		return encodeCertificateAndKeyGeneric(ed25519Key, derBytes)
+		return a.generateEd25519Certificate(template, priv)
 	default:
 		return tls.Certificate{}, ErrCannotConvertPrivateKey
 	}
+}
+
+func (a *Account) generateRSACertificate(template x509.Certificate, priv *rsa.PrivateKey) (tls.Certificate, error) {
+	rsaPub, ok := a.entity.PrimaryKey.PublicKey.(*rsa.PublicKey)
+	if !ok {
+		return tls.Certificate{}, ErrCannotConvertPublicKey
+	}
+	rsakey := buildRSAKeyFromParts(priv, rsaPub)
+	derBytes, err := x509.CreateCertificate(nil, &template, &template, &rsakey.PublicKey, rsakey)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+	return encodeCertificateAndKey(rsakey, derBytes)
+}
+
+func (a *Account) generateEd25519Certificate(template x509.Certificate, priv *eddsa.PrivateKey) (tls.Certificate, error) {
+	secretBytes := priv.MarshalByteSecret()
+	ed25519Key := ed25519.NewKeyFromSeed(secretBytes)
+	derBytes, err := x509.CreateCertificate(nil, &template, &template, ed25519Key.Public(), ed25519Key)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+	return encodeCertificateAndKeyGeneric(ed25519Key, derBytes)
 }
 
 func buildCertificateTemplate(dnsNames []string, creationTime time.Time) x509.Certificate {
