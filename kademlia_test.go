@@ -60,7 +60,7 @@ func TestBucket(t *testing.T) {
 	assert.NotNil(t, rando)
 	assert.True(
 		t,
-		rando.Fingerprint == fpr1 || rando.Fingerprint == fpr2,
+		rando.Fingerprint.Equal(fpr1) || rando.Fingerprint.Equal(fpr2),
 		"rando should have returned one of the fingerprints instead: %s",
 		rando.Fingerprint,
 	)
@@ -215,7 +215,7 @@ func TestDHTServer(t *testing.T) {
 	t.Run("Lookup each other", func(t *testing.T) {
 		for _, s := range servers {
 			for _, p := range peers {
-				if p.Fingerprint() == s.account.Fingerprint() {
+				if p.Fingerprint().Equal(s.account.Fingerprint()) {
 					continue
 				}
 

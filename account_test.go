@@ -60,7 +60,7 @@ func TestNewAccount(t *testing.T) {
 		account1, _ := NewAccount(t.TempDir(), "Ahmed Mohamed", "ahmed@example.com", "password")
 		account2, _ := NewAccount(t.TempDir(), "Ahmed Mohamed", "ahmed@example.com", "password")
 
-		assert.NotEqual(t, account1.Fingerprint(), account2.Fingerprint())
+		assert.False(t, account1.Fingerprint().Equal(account2.Fingerprint()), "Two accounts should have different fingerprints")
 	})
 }
 

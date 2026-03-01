@@ -17,7 +17,7 @@ import (
 // Kademlia: A Peer-to-Peer Information System Based on the XOR Metric
 
 const (
-	dht_B                = FINGERPRINT_LEN * 8 // number of buckets
+	dht_B                = 20 * 8              // number of buckets (160 bits for v4 keys, adaptable) // number of buckets
 	dht_K                = 20                  // max length of k bucket (replication parameter)
 	dht_ALPHA            = 3                   // parallelism factor
 	dht_STALL_PERIOD     = time.Hour
@@ -38,7 +38,7 @@ type dhtServer struct {
 	address       string
 	buckets       [dht_B]bucket
 	cancelRefresh context.CancelFunc
-	lastPing      map[Fingerprint]time.Time
+	lastPing      map[string]time.Time // key: fingerprint hex string
 	lastPingMutex sync.RWMutex
 }
 
@@ -47,7 +47,7 @@ func newDHTServer(account *Account, address string) *dhtServer {
 		mux:      http.NewServeMux(),
 		account:  account,
 		address:  address,
-		lastPing: make(map[Fingerprint]time.Time),
+		lastPing: make(map[string]time.Time),
 	}
 
 	d.mux.HandleFunc("GET /kad/ping", d.receivePing)
@@ -82,7 +82,7 @@ func (d *dhtServer) sendPing(ctx context.Context, peer *Peer) error {
 
 func (d *dhtServer) shouldSkipPing(fingerprint Fingerprint) bool {
 	d.lastPingMutex.RLock()
-	lastPingTime, exists := d.lastPing[fingerprint]
+	lastPingTime, exists := d.lastPing[fingerprint.String()]
 	d.lastPingMutex.RUnlock()
 
 	return exists && time.Since(lastPingTime) < dht_PING_MIN_BACKOFF
@@ -101,7 +101,7 @@ func (d *dhtServer) executePing(ctx context.Context, client *Client, address str
 
 func (d *dhtServer) updateLastPingTime(fingerprint Fingerprint) {
 	d.lastPingMutex.Lock()
-	d.lastPing[fingerprint] = time.Now()
+	d.lastPing[fingerprint.String()] = time.Now()
 	d.lastPingMutex.Unlock()
 }
 
@@ -117,7 +117,7 @@ func (d *dhtServer) receivePing(w http.ResponseWriter, r *http.Request) {
 // Lookup a peer by fingerprint
 func (d *dhtServer) findPeerInNearest(nearest []*Peer, fingerprint Fingerprint) *Peer {
 	for _, n := range nearest {
-		if n.Fingerprint == fingerprint {
+		if n.Fingerprint.Equal(fingerprint) {
 			return n
 		}
 	}
@@ -253,7 +253,7 @@ func (d *dhtServer) executeFindPeerRequest(ctx context.Context, client *Client, 
 
 func (d *dhtServer) findTargetInPeers(peers []*Peer, fingerprint Fingerprint) *Peer {
 	for i := range peers {
-		if peers[i].Fingerprint == fingerprint {
+		if peers[i].Fingerprint.Equal(fingerprint) {
 			return peers[i]
 		}
 	}
@@ -348,7 +348,7 @@ func (d *dhtServer) addPeerFromRequest(r *http.Request) error {
 // removes the first peer and adds the new peer to the bucket
 func (d *dhtServer) addPeer(peer *Peer) {
 	// don't add yourself to the contact list
-	if peer.Fingerprint == d.account.Fingerprint() {
+	if peer.Fingerprint.Equal(d.account.Fingerprint()) {
 		return
 	}
 
@@ -489,7 +489,7 @@ func (b *bucket) get(fingerprint Fingerprint) *Peer {
 	defer b.mutex.RUnlock()
 
 	for i := range b.values {
-		if b.values[i].Fingerprint == fingerprint {
+		if b.values[i].Fingerprint.Equal(fingerprint) {
 			return b.values[i]
 		}
 	}
@@ -504,7 +504,7 @@ func (b *bucket) remove(peer *Peer) {
 
 	newValues := make([]*Peer, 0, len(b.values))
 	for i := range b.values {
-		if b.values[i].Fingerprint != peer.Fingerprint {
+		if !b.values[i].Fingerprint.Equal(peer.Fingerprint) {
 			newValues = append(newValues, b.values[i])
 		}
 	}
@@ -528,7 +528,7 @@ func (b *bucket) moveToTail(peer *Peer) {
 
 	newValues := make([]*Peer, 0, len(b.values))
 	for i := range b.values {
-		if b.values[i].Fingerprint != peer.Fingerprint {
+		if !b.values[i].Fingerprint.Equal(peer.Fingerprint) {
 			newValues = append(newValues, b.values[i])
 		}
 	}
@@ -585,14 +585,14 @@ type peerRequestSet struct {
 	mutex       sync.Mutex
 	fingerprint Fingerprint
 	peers       []*Peer
-	added       map[Fingerprint]bool
+	added       map[string]bool // key: fingerprint hex string
 }
 
 func newPeerRequestSet(fpr Fingerprint, initial []*Peer) *peerRequestSet {
 	peers := peerRequestSet{
 		fingerprint: fpr,
 		peers:       []*Peer{},
-		added:       map[Fingerprint]bool{},
+		added:       map[string]bool{},
 	}
 
 	peers.add(initial...)
@@ -605,11 +605,12 @@ func (p *peerRequestSet) add(peers ...*Peer) {
 	defer p.mutex.Unlock()
 
 	for i := range peers {
-		if p.added[peers[i].Fingerprint] {
+		fprStr := peers[i].Fingerprint.String()
+		if p.added[fprStr] {
 			continue
 		}
 
-		p.added[peers[i].Fingerprint] = true
+		p.added[fprStr] = true
 		p.peers = append(p.peers, peers[i])
 	}
 
@@ -636,12 +637,19 @@ func (p *peerRequestSet) len() int {
 }
 
 // xor two fingerprints
-func xor(a, b Fingerprint) (c Fingerprint) {
-	for i := range a {
+func xor(a, b Fingerprint) Fingerprint {
+	// Use length of shortest fingerprint for XOR
+	minLen := len(a)
+	if len(b) < minLen {
+		minLen = len(b)
+	}
+	
+	c := make([]byte, minLen)
+	for i := 0; i < minLen; i++ {
 		c[i] = a[i] ^ b[i]
 	}
-
-	return
+	
+	return Fingerprint(c)
 }
 
 // prefixLen returns the number of leading zeros in a.

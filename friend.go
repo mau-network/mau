@@ -54,11 +54,9 @@ func (f *Friend) Email() string {
 
 func (f *Friend) Fingerprint() Fingerprint {
 	if f == nil || f.entity == nil || f.entity.PrimaryKey == nil {
-		return Fingerprint{}
+		return nil
 	}
-	var fp Fingerprint
-	copy(fp[:], f.entity.PrimaryKey.Fingerprint)
-	return fp
+	return f.entity.PrimaryKey.Fingerprint
 }
 
 func readFriend(account *Account, reader io.Reader) (*Friend, error) {

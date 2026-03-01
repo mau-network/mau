@@ -394,7 +394,7 @@ func isPermitted(certs []*x509.Certificate, recipients []*Friend) bool {
 	}
 
 	for _, r := range recipients {
-		if fpr == r.Fingerprint() {
+		if fpr.Equal(r.Fingerprint()) {
 			return true
 		}
 	}

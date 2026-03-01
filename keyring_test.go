@@ -99,14 +99,14 @@ func TestKeyring_FriendsSet(t *testing.T) {
 		assert.Len(t, friendsSet, 3)
 
 		// Verify all friends are present by fingerprint
-		fingerprints := make(map[Fingerprint]bool)
+		fingerprints := make(map[string]bool) // key: fingerprint hex string
 		for _, f := range friendsSet {
-			fingerprints[f.Fingerprint()] = true
+			fingerprints[f.Fingerprint().String()] = true
 		}
 
-		assert.True(t, fingerprints[friend1.Fingerprint()])
-		assert.True(t, fingerprints[friend2.Fingerprint()])
-		assert.True(t, fingerprints[friend3.Fingerprint()])
+		assert.True(t, fingerprints[friend1.Fingerprint().String()])
+		assert.True(t, fingerprints[friend2.Fingerprint().String()])
+		assert.True(t, fingerprints[friend3.Fingerprint().String()])
 	})
 
 	t.Run("deduplicates friends across keyrings", func(t *testing.T) {
@@ -183,7 +183,7 @@ func TestKeyring_FindByFingerprint(t *testing.T) {
 
 	t.Run("returns nil for non-existent fingerprint", func(t *testing.T) {
 		// Create a properly formatted but non-existent fingerprint
-		nonExistentFP := Fingerprint([20]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+		nonExistentFP := Fingerprint([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
 		found := keyring.FindByFingerprint(nonExistentFP)
 		assert.Nil(t, found)
 	})

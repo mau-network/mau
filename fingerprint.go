@@ -13,17 +13,23 @@ import (
 )
 
 var (
-	ErrIncorrectFingerprintLength = errors.New("Provided fingerprint length is not correct")
-	ErrCantFindFingerprint        = errors.New("Can't find fingerprint.")
-	ErrCantFindAddress            = errors.New("Can't find address (DNSName) in certificate.")
+	ErrCantFindFingerprint = errors.New("Can't find fingerprint.")
+	ErrCantFindAddress     = errors.New("Can't find address (DNSName) in certificate.")
 )
 
-const FINGERPRINT_LEN = 20
-
-type Fingerprint [FINGERPRINT_LEN]byte
+// Fingerprint represents an OpenPGP key fingerprint.
+// Length varies by key version:
+//   - v4 keys: 20 bytes (SHA-1 hash)
+//   - v5/v6 keys: 32 bytes (SHA-256 hash)
+type Fingerprint []byte
 
 func (f Fingerprint) String() string {
-	return hex.EncodeToString(f[:])
+	return hex.EncodeToString(f)
+}
+
+// Equal compares two fingerprints for equality.
+func (f Fingerprint) Equal(other Fingerprint) bool {
+	return bytes.Equal(f, other)
 }
 
 func (f Fingerprint) MarshalJSON() ([]byte, error) {
@@ -35,8 +41,9 @@ func (f *Fingerprint) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 
-	if len(b) != (FINGERPRINT_LEN*2)+2 {
-		return fmt.Errorf("%w %s", ErrIncorrectFingerprintLength, b)
+	// Remove quotes
+	if len(b) < 2 {
+		return fmt.Errorf("invalid fingerprint JSON: too short")
 	}
 
 	v := string(b[1 : len(b)-1])
@@ -46,25 +53,15 @@ func (f *Fingerprint) UnmarshalJSON(b []byte) error {
 	}
 
 	*f = pf
-
 	return nil
 }
 
-func FingerprintFromString(s string) (fpr Fingerprint, err error) {
-	decodeLen := hex.DecodedLen(len(s))
-	if decodeLen != cap(fpr) {
-		err = fmt.Errorf("%w : provided: %d", ErrIncorrectFingerprintLength, decodeLen)
-		return
-	}
-
-	var fprParsed []byte
-	fprParsed, err = hex.DecodeString(s)
+func FingerprintFromString(s string) (Fingerprint, error) {
+	fprParsed, err := hex.DecodeString(s)
 	if err != nil {
-		return
+		return nil, err
 	}
-
-	copy(fpr[:], fprParsed)
-	return
+	return Fingerprint(fprParsed), nil
 }
 
 func fingerprintFromPublicKey(cert *x509.Certificate) ([]byte, error) {
@@ -74,7 +71,7 @@ func fingerprintFromPublicKey(cert *x509.Certificate) ([]byte, error) {
 			return packet.NewRSAPublicKey(cert.NotBefore, pubkey).Fingerprint, nil
 		}
 	case x509.ECDSA:
-		// ECDSA support: ProtonMail fork may have slightly different type handling
+		// TODO: ECDSA support needs investigation - ProtonMail fork may have different signature
 		// For now, skip ECDSA as Mau primarily uses RSA 4096
 		return nil, nil
 	default:
@@ -87,15 +84,13 @@ func FingerprintFromCert(certs []*x509.Certificate) (Fingerprint, error) {
 	for _, cert := range certs {
 		fpSlice, err := fingerprintFromPublicKey(cert)
 		if err != nil {
-			return Fingerprint{}, err
+			return nil, err
 		}
 		if fpSlice != nil {
-			var fp Fingerprint
-			copy(fp[:], fpSlice)
-			return fp, nil
+			return Fingerprint(fpSlice), nil
 		}
 	}
-	return Fingerprint{}, ErrCantFindFingerprint
+	return nil, ErrCantFindFingerprint
 }
 
 func certToAddress(certs []*x509.Certificate) (string, error) {

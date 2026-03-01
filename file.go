@@ -151,7 +151,7 @@ func checkSignerIdentity(md *openpgp.MessageDetails, expectedSigner Fingerprint)
 	}
 
 	actualSigner := Fingerprint(md.SignedBy.PublicKey.Fingerprint)
-	if actualSigner != expectedSigner {
+	if !actualSigner.Equal(expectedSigner) {
 		return fmt.Errorf("file signed by unexpected key: got %s, expected %s",
 			actualSigner, expectedSigner)
 	}
