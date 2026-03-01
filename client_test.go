@@ -290,3 +290,133 @@ func TempListener() (*net.Listener, string) {
 	url := address
 	return &listener, url
 }
+
+func TestFetchFileList(t *testing.T) {
+	account_dir := t.TempDir()
+	account, err := NewAccount(account_dir, "Ahmed Mohamed", "ahmed@example.com", "strong password")
+	assert.NoError(t, err)
+	var account_key bytes.Buffer
+	err = account.Export(&account_key)
+	assert.NoError(t, err)
+
+	friend_dir := t.TempDir()
+	friend, err := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
+	assert.NoError(t, err)
+	
+	// Friend adds account as a friend so it can share files
+	aFriend, err := friend.AddFriend(bytes.NewReader(account_key.Bytes()))
+	assert.NoError(t, err)
+	
+	server, err := friend.Server(nil)
+	assert.NoError(t, err)
+
+	listener, address := TempListener()
+	go func() {
+		_ = server.Serve(*listener, "")
+	}()
+	defer server.Close()
+
+	client, err := account.Client(friend.Fingerprint(), nil)
+	assert.NoError(t, err)
+
+	t.Run("fetchFileList with no files", func(t T) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		list, err := client.fetchFileList(ctx, friend.Fingerprint(), address, time.Now().Add(-time.Hour))
+		assert.NoError(t, err)
+		assert.NotNil(t, list)
+		assert.Empty(t, list)
+	})
+
+	t.Run("fetchFileList with files", func(t T) {
+		// Add some files to friend's account that are shared with account
+		_, err := friend.AddFile(strings.NewReader("Hello world!"), "hello.txt", []*Friend{aFriend})
+		assert.NoError(t, err)
+		_, err = friend.AddFile(strings.NewReader("Goodbye!"), "goodbye.txt", []*Friend{aFriend})
+		assert.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		list, err := client.fetchFileList(ctx, friend.Fingerprint(), address, time.Now().Add(-time.Hour))
+		assert.NoError(t, err)
+		assert.NotNil(t, list)
+		assert.Len(t, list, 2)
+		
+		// Verify file list contains expected items
+		var filenames []string
+		for _, item := range list {
+			filenames = append(filenames, path.Base(item.Path))
+			assert.Greater(t, item.Size, int64(0))
+			assert.NotEmpty(t, item.Sum)
+		}
+		assert.Contains(t, filenames, "hello.txt.pgp")
+		assert.Contains(t, filenames, "goodbye.txt.pgp")
+	})
+
+	t.Run("fetchFileList with If-Modified-Since filter", func(t T) {
+		// Record current time
+		beforeNewFile := time.Now()
+		time.Sleep(10 * time.Millisecond) // Ensure timestamp difference
+
+		// Add a new file
+		_, err := friend.AddFile(strings.NewReader("New file"), "new.txt", []*Friend{aFriend})
+		assert.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		// Fetch only files modified after beforeNewFile
+		list, err := client.fetchFileList(ctx, friend.Fingerprint(), address, beforeNewFile)
+		assert.NoError(t, err)
+		assert.NotNil(t, list)
+		// Should only see the new file
+		assert.GreaterOrEqual(t, len(list), 1)
+		
+		// Verify new file is in the list
+		found := false
+		for _, item := range list {
+			if path.Base(item.Path) == "new.txt.pgp" {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "Expected new.txt.pgp in file list")
+	})
+
+	t.Run("fetchFileList with invalid address returns error", func(t T) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		// Use an invalid address that won't connect
+		_, err := client.fetchFileList(ctx, friend.Fingerprint(), "127.0.0.1:1", time.Now())
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to fetch file list")
+	})
+
+	t.Run("fetchFileList with cancelled context", func(t T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Cancel immediately
+
+		_, err := client.fetchFileList(ctx, friend.Fingerprint(), address, time.Now())
+		assert.Error(t, err)
+	})
+	
+	t.Run("fetchFileList excludes private files", func(t T) {
+		// Add a private file (no recipients)
+		_, err := friend.AddFile(strings.NewReader("Private content"), "private.txt", []*Friend{})
+		assert.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		list, err := client.fetchFileList(ctx, friend.Fingerprint(), address, time.Now().Add(-time.Hour))
+		assert.NoError(t, err)
+		
+		// Verify private file is NOT in the list
+		for _, item := range list {
+			assert.NotEqual(t, "private.txt.pgp", path.Base(item.Path), "Private file should not be in list")
+		}
+	})
+}
