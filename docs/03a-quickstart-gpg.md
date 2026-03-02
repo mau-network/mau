@@ -22,12 +22,14 @@ gpg --full-generate-key
 ```
 
 Follow the prompts:
-- **Kind:** `(1) RSA and RSA`
-- **Key size:** `4096` bits
+- **Kind:** `(9) ECC (sign and encrypt) *default: Curve 25519*` (recommended, Ed25519)
+  - Alternative: `(1) RSA and RSA` with `4096` bits for compatibility
 - **Expiration:** `0` (no expiration) or your preference
 - **Name:** Your real name or pseudonym
 - **Email:** Your email address
 - **Passphrase:** Strong password (you'll need this often)
+
+**Note:** Mau defaults to Ed25519 keys (faster, smaller, modern crypto). RSA 4096 still works for compatibility.
 
 Get your fingerprint:
 
@@ -35,9 +37,9 @@ Get your fingerprint:
 gpg --fingerprint your-email@example.com
 ```
 
-Output example:
+Output example (Ed25519):
 ```
-pub   rsa4096 2026-02-28 [SC]
+pub   ed25519 2026-03-02 [SC]
       5D00 0B2F 2C04 0A16 75B4  9D7F 0C7C B7DC 3699 9D56
 uid           [ultimate] Alice <alice@example.com>
 ```

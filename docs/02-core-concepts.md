@@ -220,15 +220,21 @@ Your **identity** in Mau is your PGP public key fingerprint.
 
 #### Key Generation
 
+**Default:** Mau now defaults to **Ed25519** keys for new accounts (faster, smaller, modern cryptography).
+
 ```bash
 # Generate a new identity
 gpg --full-generate-key
 
-# Choose:
-# - RSA (or ECC for smaller keys)
-# - 4096 bits (or 256-bit curve for ECC)
+# Recommended choices:
+# - (9) ECC (sign and encrypt) *default: Curve 25519*
 # - No expiration (or set expiration for security)
 # - Passphrase to protect private key
+
+# Alternative (RSA for compatibility):
+# - (1) RSA and RSA
+# - 4096 bits
+# - No expiration
 
 # Export public key
 gpg --export alice@example.com > ~/.mau/.mau/account.pub.pgp
@@ -236,6 +242,12 @@ gpg --export alice@example.com > ~/.mau/.mau/account.pub.pgp
 # Export private key (encrypted with passphrase)
 gpg --export-secret-keys alice@example.com > ~/.mau/.mau/account.pgp
 ```
+
+**Ed25519 benefits:**
+- Smaller keys (~256 bits vs 4096 bits RSA)
+- Faster signing and verification
+- Modern, well-audited cryptography
+- Still compatible with PGP/GPG ecosystem
 
 #### Signing Content
 
