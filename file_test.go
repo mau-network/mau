@@ -2,6 +2,7 @@ package mau
 
 import (
 	"encoding/hex"
+	"errors"
 	"io"
 	"path"
 	"strings"
@@ -98,4 +99,228 @@ func TestFile(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "hello there", string(content))
 	})
+}
+
+func TestContainsPathSeparator(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		expected bool
+	}{
+		{
+			name:     "simple filename",
+			filename: "document.txt",
+			expected: false,
+		},
+		{
+			name:     "filename with spaces",
+			filename: "my document.txt",
+			expected: false,
+		},
+		{
+			name:     "filename with forward slash",
+			filename: "path/to/file.txt",
+			expected: true,
+		},
+		{
+			name:     "filename with backward slash",
+			filename: "path\\to\\file.txt",
+			expected: true,
+		},
+		{
+			name:     "filename starting with slash",
+			filename: "/etc/passwd",
+			expected: true,
+		},
+		{
+			name:     "filename with mixed slashes",
+			filename: "path/to\\file.txt",
+			expected: true,
+		},
+		{
+			name:     "filename with special characters",
+			filename: "file@#$%.txt",
+			expected: false,
+		},
+		{
+			name:     "unicode filename",
+			filename: "文档.txt",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := containsPathSeparator(tt.filename)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIsRelativePathComponent(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		expected bool
+	}{
+		{
+			name:     "simple filename",
+			filename: "document.txt",
+			expected: false,
+		},
+		{
+			name:     "current directory dot",
+			filename: ".",
+			expected: true,
+		},
+		{
+			name:     "parent directory",
+			filename: "..",
+			expected: true,
+		},
+		{
+			name:     "dot prefix with separator",
+			filename: "./file.txt",
+			expected: true,
+		},
+		{
+			name:     "double dot prefix with separator",
+			filename: "../file.txt",
+			expected: true,
+		},
+		{
+			name:     "hidden file",
+			filename: ".hidden",
+			expected: false,
+		},
+		{
+			name:     "file starting with double dot",
+			filename: "..config",
+			expected: false,
+		},
+		{
+			name:     "normal filename with dot",
+			filename: "file.name.txt",
+			expected: false,
+		},
+		{
+			name:     "filename ending with dots",
+			filename: "file..",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isRelativePathComponent(tt.filename)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestValidateFileName(t *testing.T) {
+	tests := []struct {
+		name        string
+		filename    string
+		expectError bool
+		errorType   error
+	}{
+		{
+			name:        "valid simple filename",
+			filename:    "document.txt",
+			expectError: false,
+		},
+		{
+			name:        "valid filename with spaces",
+			filename:    "my document.txt",
+			expectError: false,
+		},
+		{
+			name:        "valid filename with special chars",
+			filename:    "file@#$%.txt",
+			expectError: false,
+		},
+		{
+			name:        "valid unicode filename",
+			filename:    "文档.txt",
+			expectError: false,
+		},
+		{
+			name:        "valid hidden file",
+			filename:    ".hidden",
+			expectError: false,
+		},
+		{
+			name:        "empty filename",
+			filename:    "",
+			expectError: true,
+			errorType:   ErrInvalidFileName,
+		},
+		{
+			name:        "filename with forward slash",
+			filename:    "path/to/file.txt",
+			expectError: true,
+			errorType:   ErrInvalidFileName,
+		},
+		{
+			name:        "filename with backward slash",
+			filename:    "path\\to\\file.txt",
+			expectError: true,
+			errorType:   ErrInvalidFileName,
+		},
+		{
+			name:        "absolute path",
+			filename:    "/etc/passwd",
+			expectError: true,
+			errorType:   ErrInvalidFileName,
+		},
+		{
+			name:        "current directory",
+			filename:    ".",
+			expectError: true,
+			errorType:   ErrInvalidFileName,
+		},
+		{
+			name:        "parent directory",
+			filename:    "..",
+			expectError: true,
+			errorType:   ErrInvalidFileName,
+		},
+		{
+			name:        "relative path with dot",
+			filename:    "./file.txt",
+			expectError: true,
+			errorType:   ErrInvalidFileName,
+		},
+		{
+			name:        "relative path with double dot",
+			filename:    "../file.txt",
+			expectError: true,
+			errorType:   ErrInvalidFileName,
+		},
+		{
+			name:        "path traversal attempt",
+			filename:    "../../etc/passwd",
+			expectError: true,
+			errorType:   ErrInvalidFileName,
+		},
+		{
+			name:        "windows path",
+			filename:    "C:\\Windows\\System32",
+			expectError: true,
+			errorType:   ErrInvalidFileName,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateFileName(tt.filename)
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.True(t, errors.Is(err, tt.errorType))
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
