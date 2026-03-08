@@ -133,15 +133,24 @@ The `.mau/` directory stores system metadata:
 
 ### File Names as IDs
 
-In Mau, **the filename IS the content ID**. This is important:
+In Mau, **the filename IS the content ID**, including the `.pgp` extension:
 
 ```
 hello-world.json.pgp
-└── Content ID: "hello-world.json"
+└── Content ID: "hello-world.json.pgp"
 ```
 
+**The `.pgp` extension is required everywhere:**
+
+- **On disk:** `hello-world.json.pgp`
+- **Content ID:** `hello-world.json.pgp` (includes `.pgp`)
+- **In URLs:** `/p2p/<fingerprint>/hello-world.json.pgp`
+- **In JSON-LD @id:** `/p2p/<fingerprint>/hello-world.json.pgp`
+
+When you call `AddFile(reader, "hello.txt", recipients)`, Mau automatically appends `.pgp` if not present, storing it as `hello.txt.pgp`. All references to the file must include the `.pgp` extension.
+
 **Rules:**
-- Filenames must be unique within a user's directory
+- Filenames must be unique within a user's directory (including `.pgp`)
 - IDs are scoped by user (two users can use the same filename)
 - Updating the file (same name) creates a new version
 - Deleting the file deletes the content
@@ -149,27 +158,34 @@ hello-world.json.pgp
 
 ### Full Content Address
 
-A content's full address combines the user fingerprint and filename:
+A content's full address combines the user fingerprint and filename (with `.pgp`):
 
 ```
-/p2p/<user-fingerprint>/<filename>
+/p2p/<user-fingerprint>/<filename.pgp>
 ```
 
 **Examples:**
 ```
-/p2p/5d000b2f2c040a1675b49d7f0c7cb7dc36999d56/hello-world.json
-/p2p/5d000b2f2c040a1675b49d7f0c7cb7dc36999d56/recipe-pasta.json
+/p2p/5d000b2f2c040a1675b49d7f0c7cb7dc36999d56/hello-world.json.pgp
+/p2p/5d000b2f2c040a1675b49d7f0c7cb7dc36999d56/recipe-pasta.json.pgp
 ```
 
 ### Naming Conventions
 
-**Good filenames:**
+**Good filenames (before `.pgp` is added automatically):**
 ```
-hello-world.json.pgp
-post-2026-03-08-morning.json.pgp
-recipe-pasta-carbonara.json.pgp
-photo-vacation-beach.json.pgp
+hello-world.json           → stored as hello-world.json.pgp
+post-2026-03-08.json       → stored as post-2026-03-08.json.pgp
+recipe-pasta.json          → stored as recipe-pasta.json.pgp
+photo-vacation.json        → stored as photo-vacation.json.pgp
 ```
+
+**If you include `.pgp` manually:**
+```
+hello-world.json.pgp       → stored as hello-world.json.pgp (no double .pgp)
+```
+
+Mau's `AddFile()` checks if the name ends with `.pgp` and adds it only if missing. Either way, the final filename always includes `.pgp`.
 
 **Avoid:**
 - Spaces (use hyphens or underscores)
@@ -245,7 +261,7 @@ Schema.org provides a shared vocabulary for structured content. Here are common 
   "dateCreated": "2026-03-08T10:45:00Z",
   "parentItem": {
     "@type": "SocialMediaPosting",
-    "@id": "/p2p/5d000b.../hello-world.json"
+    "@id": "/p2p/5d000b.../hello-world.json.pgp"
   }
 }
 ```
@@ -322,7 +338,7 @@ Schema.org provides a shared vocabulary for structured content. Here are common 
   "agent": { "@type": "Person", "identifier": "5d000b..." },
   "object": {
     "@type": "SocialMediaPosting",
-    "@id": "/p2p/a12345.../post.json"
+    "@id": "/p2p/a12345.../post.json.pgp"
   },
   "startTime": "2026-03-08T13:00:00Z"
 }
@@ -347,7 +363,7 @@ Schema.org provides a shared vocabulary for structured content. Here are common 
   "agent": { "@type": "Person", "identifier": "5d000b..." },
   "object": {
     "@type": "Article",
-    "@id": "/p2p/a12345.../article.json"
+    "@id": "/p2p/a12345.../article.json.pgp"
   },
   "startTime": "2026-03-08T15:00:00Z"
 }
