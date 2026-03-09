@@ -1,38 +1,87 @@
 # Mau TypeScript - Browser Testing
 
-## Quick Start
+## ✅ VERIFIED WORKING IN BROWSER
 
-1. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+All tests pass in both Chromium (Puppeteer) and Node.js environments.
 
-2. **Build for browser:**
-   ```bash
-   npm run build:browser
-   ```
+## Test Results
 
-3. **Start dev server:**
-   ```bash
-   npm run dev
-   ```
+### Browser Tests (Chromium + Puppeteer)
 
-4. **Open browser:**
-   Navigate to `http://localhost:5173/demo.html`
+```
+🧪 Mau Browser Integration Test
+
+✅ 1. Testing module import... PASSED
+   - createAccount: function
+   - File: function
+   - BrowserStorage: function
+
+✅ 2. Creating account... PASSED
+   - Account stored in IndexedDB
+   - Fingerprint generated correctly
+
+✅ 3. Writing a test file... PASSED
+   - File encrypted and stored in IndexedDB
+
+✅ 4. Reading file back... PASSED
+   - File decrypted successfully
+   - Content verified
+
+✅ 5. Listing files... PASSED
+   - Files enumerated from IndexedDB
+
+✅ 6. Testing versioning... PASSED
+   - Previous versions archived
+   - Version history working
+
+✅ 7. Exporting public key... PASSED
+   - PGP key export successful
+```
+
+### Node.js Tests
+
+```
+✅ Account creation
+✅ File writing with encryption
+✅ File reading with decryption
+✅ File listing
+✅ Versioning system
+```
+
+## Running Tests
+
+### Automated Browser Test
+
+```bash
+npm install
+npm run build
+npm run build:browser
+node test-browser.cjs
+```
+
+### Manual Browser Test
+
+```bash
+npm run dev
+# Open http://localhost:5173/test-standalone.html
+```
+
+### Node.js Test
+
+```bash
+npm run build
+node test-integration.mjs
+```
 
 ## What Works
 
 - ✅ Account creation in IndexedDB
-- ✅ Post writing with encryption
-- ✅ File listing
+- ✅ PGP key generation (Ed25519)
+- ✅ File encryption/signing
+- ✅ File decryption/verification
+- ✅ File versioning
 - ✅ Friend management
-- ✅ Content viewing
-
-## Browser Storage
-
-All data is stored in IndexedDB under the database name `mau-storage`.
-
-You can inspect it in Chrome DevTools → Application → IndexedDB.
+- ✅ Storage abstraction (filesystem/browser)
 
 ## WebRTC Support
 
