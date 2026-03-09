@@ -19,8 +19,10 @@ export function staticResolver(
 /**
  * DNS resolver (placeholder - requires DNS TXT record lookup)
  */
-export function dnsResolver(domain: string): FingerprintResolver {
-  return async (fingerprint: Fingerprint) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function dnsResolver(_domain: string): FingerprintResolver {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  return async (_fingerprint: Fingerprint) => {
     // Would implement DNS TXT lookup for _mau.<fingerprint>.<domain>
     // This requires a DNS library
     console.warn('DNS resolver not yet implemented');
@@ -32,7 +34,8 @@ export function dnsResolver(domain: string): FingerprintResolver {
  * mDNS resolver (placeholder - requires mDNS library)
  */
 export function mdnsResolver(): FingerprintResolver {
-  return async (fingerprint: Fingerprint, timeout?: number) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  return async (_fingerprint: Fingerprint, _timeout?: number) => {
     // Would implement mDNS discovery
     console.warn('mDNS resolver not yet implemented');
     return null;
@@ -42,8 +45,10 @@ export function mdnsResolver(): FingerprintResolver {
 /**
  * DHT resolver (placeholder - requires Kademlia implementation)
  */
-export function dhtResolver(bootstrapNodes: string[]): FingerprintResolver {
-  return async (fingerprint: Fingerprint, timeout?: number) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function dhtResolver(_bootstrapNodes: string[]): FingerprintResolver {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  return async (_fingerprint: Fingerprint, _timeout?: number) => {
     // Would implement Kademlia DHT lookup
     console.warn('DHT resolver not yet implemented');
     return null;

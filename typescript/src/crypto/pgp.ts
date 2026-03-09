@@ -8,8 +8,6 @@ import * as openpgp from 'openpgp';
 import type {
   Fingerprint,
   AccountOptions,
-  PassphraseRequiredError,
-  IncorrectPassphraseError,
   CertificateInfo,
 } from '../types/index.js';
 import { MauError } from '../types/index.js';
@@ -261,7 +259,8 @@ export async function sha256(data: Uint8Array): Promise<string> {
  */
 export async function generateCertificate(
   privateKey: openpgp.PrivateKey,
-  dnsNames: string[] = []
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _dnsNames: string[] = []
 ): Promise<CertificateInfo> {
   // This would require a full X.509 implementation
   // For now, return a placeholder that should be implemented with a proper crypto library

@@ -6,7 +6,7 @@
 
 import type { Fingerprint, Storage } from '../types/index.js';
 import type { Account } from '../account.js';
-import { signAndEncrypt, decryptAndVerify } from '../crypto/index.js';
+import {  } from '../crypto/index.js';
 
 export interface WebRTCConfig {
   iceServers?: RTCIceServer[];

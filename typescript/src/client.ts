@@ -15,7 +15,6 @@ import type {
 } from './types/index.js';
 import { HTTP_TIMEOUT_MS, URI_PROTOCOL_NAME, PeerNotFoundError } from './types/index.js';
 import type { Account } from './account.js';
-import { File } from './file.js';
 
 export class Client {
   private account: Account;

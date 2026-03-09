@@ -7,9 +7,9 @@
 
 import type { Storage, Fingerprint } from '../types/index.js';
 import type { Account } from '../account.js';
-import type { ServerRequest, ServerResponse } from '../server.js';
+import type { ServerRequest } from '../server.js';
 import { Server } from '../server.js';
-import { verify, getFingerprint, deserializePublicKey } from '../crypto/index.js';
+import { getFingerprint, deserializePublicKey } from '../crypto/index.js';
 
 export interface WebRTCServerConfig {
   iceServers?: RTCIceServer[];

@@ -18,7 +18,6 @@ import {
   AccountAlreadyExistsError,
   NoIdentityError,
   PassphraseRequiredError,
-  IncorrectPassphraseError,
 } from './types/index.js';
 import {
   generateKeyPair,

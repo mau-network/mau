@@ -4,11 +4,10 @@
  * Serves account files over HTTP for peer synchronization.
  */
 
-import type { Storage, Fingerprint, ServerConfig, FileListItem } from './types/index.js';
+import type { Storage, ServerConfig, FileListItem } from './types/index.js';
 import { SERVER_RESULT_LIMIT } from './types/index.js';
 import type { Account } from './account.js';
 import { File } from './file.js';
-import { sha256 } from './crypto/index.js';
 
 export interface ServerRequest {
   method: string;
@@ -86,9 +85,11 @@ export class Server {
   /**
    * Handle file list request
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async handleFileList(req: ServerRequest): Promise<ServerResponse> {
-    const afterParam = req.query.after;
-    const afterTime = afterParam ? new Date(afterParam).getTime() : 0;
+    // TODO: Implement timestamp filtering
+    // const afterParam = req.query.after;
+    // const afterTime = afterParam ? new Date(afterParam).getTime() : 0;
 
     const files = await File.list(this.account, this.storage);
     const fileList: FileListItem[] = [];

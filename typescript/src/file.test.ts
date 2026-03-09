@@ -28,7 +28,7 @@ describe('File', () => {
   afterEach(async () => {
     try {
       await fs.rm(TEST_DIR, { recursive: true, force: true });
-    } catch {}
+    } catch (err) { /* cleanup error ignored */ }
   });
 
   it('should write and read text', async () => {

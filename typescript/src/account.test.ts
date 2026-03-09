@@ -21,7 +21,7 @@ describe('Account', () => {
   afterEach(async () => {
     try {
       await fs.rm(TEST_DIR, { recursive: true, force: true });
-    } catch {}
+    } catch (err) { /* cleanup error ignored */ }
   });
 
   it('should create a new account', async () => {
