@@ -1,0 +1,284 @@
+/**
+ * Browser Demo - Complete working example
+ */
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mau Browser Demo</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .card {
+      background: white;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    textarea {
+      min-height: 100px;
+      font-family: monospace;
+    }
+    .file-list {
+      list-style: none;
+      padding: 0;
+    }
+    .file-list li {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+    }
+    .file-list li:hover {
+      background: #f8f9fa;
+    }
+    pre {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    .status {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+    }
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+  </style>
+</head>
+<body>
+  <h1>🛸 Mau Browser Demo</h1>
+
+  <div class="card">
+    <h2>1. Create Account</h2>
+    <input type="text" id="name" placeholder="Your name" value="Alice">
+    <input type="email" id="email" placeholder="Email" value="alice@mau.network">
+    <input type="password" id="passphrase" placeholder="Passphrase" value="demo-passphrase">
+    <button onclick="createAccount()">Create Account</button>
+    <button onclick="loadAccount()">Load Existing</button>
+    <div id="account-status"></div>
+  </div>
+
+  <div class="card">
+    <h2>2. Write a Post</h2>
+    <input type="text" id="post-headline" placeholder="Headline">
+    <textarea id="post-body" placeholder="Post content"></textarea>
+    <button onclick="writePost()">Write Post</button>
+  </div>
+
+  <div class="card">
+    <h2>3. Your Files</h2>
+    <button onclick="listFiles()">Refresh</button>
+    <ul class="file-list" id="file-list"></ul>
+  </div>
+
+  <div class="card">
+    <h2>4. Add Friend</h2>
+    <textarea id="friend-key" placeholder="Paste friend's public key here"></textarea>
+    <button onclick="addFriend()">Add Friend</button>
+    <div id="friends-list"></div>
+  </div>
+
+  <div class="card">
+    <h2>5. File Content</h2>
+    <pre id="file-content">Select a file to view its content</pre>
+  </div>
+
+  <script type="module">
+    import { createAccount as mauCreateAccount, loadAccount as mauLoadAccount, File } from './dist/index.js';
+
+    let account = null;
+    let storage = null;
+
+    window.createAccount = async function() {
+      try {
+        const name = document.getElementById('name').value;
+        const email = document.getElementById('email').value;
+        const passphrase = document.getElementById('passphrase').value;
+
+        showStatus('account-status', 'Creating account...', 'info');
+
+        account = await mauCreateAccount('mau-demo', name, email, passphrase);
+        storage = account.storage;
+
+        showStatus('account-status', 
+          `Account created!<br>
+          Name: ${account.getName()}<br>
+          Fingerprint: ${account.getFingerprint()}`, 
+          'success'
+        );
+
+        listFiles();
+      } catch (err) {
+        showStatus('account-status', `Error: ${err.message}`, 'error');
+      }
+    };
+
+    window.loadAccount = async function() {
+      try {
+        const passphrase = document.getElementById('passphrase').value;
+        
+        showStatus('account-status', 'Loading account...', 'info');
+
+        account = await mauLoadAccount('mau-demo', passphrase);
+        storage = account.storage;
+
+        showStatus('account-status', 
+          `Account loaded!<br>
+          Name: ${account.getName()}<br>
+          Fingerprint: ${account.getFingerprint()}`, 
+          'success'
+        );
+
+        listFiles();
+        listFriends();
+      } catch (err) {
+        showStatus('account-status', `Error: ${err.message}`, 'error');
+      }
+    };
+
+    window.writePost = async function() {
+      if (!account) {
+        alert('Create an account first');
+        return;
+      }
+
+      try {
+        const headline = document.getElementById('post-headline').value;
+        const body = document.getElementById('post-body').value;
+
+        const fileName = `post-${Date.now()}.json`;
+        const file = File.create(account, storage, fileName);
+
+        await file.writeJSON({
+          '@type': 'SocialMediaPosting',
+          headline: headline,
+          articleBody: body,
+          datePublished: new Date().toISOString(),
+        });
+
+        alert('Post written!');
+        document.getElementById('post-headline').value = '';
+        document.getElementById('post-body').value = '';
+        
+        listFiles();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    };
+
+    window.listFiles = async function() {
+      if (!account) return;
+
+      try {
+        const files = await File.list(account, storage);
+        const list = document.getElementById('file-list');
+        list.innerHTML = '';
+
+        for (const file of files) {
+          const li = document.createElement('li');
+          li.textContent = file.getName();
+          li.onclick = () => viewFile(file);
+          list.appendChild(li);
+        }
+      } catch (err) {
+        console.error('Error listing files:', err);
+      }
+    };
+
+    window.viewFile = async function(file) {
+      try {
+        const content = await file.readJSON();
+        document.getElementById('file-content').textContent = 
+          JSON.stringify(content, null, 2);
+      } catch (err) {
+        document.getElementById('file-content').textContent = 
+          'Error loading file: ' + err.message;
+      }
+    };
+
+    window.addFriend = async function() {
+      if (!account) {
+        alert('Create an account first');
+        return;
+      }
+
+      try {
+        const publicKey = document.getElementById('friend-key').value;
+        const fingerprint = await account.addFriend(publicKey);
+        
+        alert(`Friend added! Fingerprint: ${fingerprint}`);
+        document.getElementById('friend-key').value = '';
+        
+        listFriends();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    };
+
+    window.listFriends = async function() {
+      if (!account) return;
+
+      const friends = account.getFriends();
+      const div = document.getElementById('friends-list');
+      
+      if (friends.length === 0) {
+        div.innerHTML = '<p>No friends added yet</p>';
+      } else {
+        div.innerHTML = '<h3>Friends:</h3><ul>' + 
+          friends.map(f => `<li><code>${f}</code></li>`).join('') +
+          '</ul>';
+      }
+    };
+
+    function showStatus(elementId, message, type) {
+      const el = document.getElementById(elementId);
+      el.innerHTML = `<div class="status ${type}">${message}</div>`;
+    }
+
+    // Try to load account on page load
+    setTimeout(() => {
+      const passphrase = document.getElementById('passphrase').value;
+      if (passphrase) {
+        loadAccount().catch(() => {
+          // Account doesn't exist yet, that's fine
+        });
+      }
+    }, 100);
+  </script>
+</body>
+</html>
