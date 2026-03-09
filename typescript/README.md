@@ -7,11 +7,13 @@ TypeScript/JavaScript implementation of the [Mau P2P social network protocol](ht
 ## Features
 
 - ✅ **Universal**: Works in browser (IndexedDB) and Node.js (filesystem)
+- ✅ **WebRTC P2P**: Native browser-to-browser communication over data channels
+- ✅ **mTLS Security**: Mutual TLS authentication over WebRTC
 - ✅ **OpenPGP**: Ed25519 and RSA key generation, signing, and encryption
-- ✅ **P2P Sync**: HTTP-based file synchronization with peers
+- ✅ **P2P Sync**: HTTP-style protocol over WebRTC or traditional HTTP
 - ✅ **Versioning**: Automatic content versioning with SHA-256 checksums
 - ✅ **Type-safe**: Full TypeScript definitions
-- ✅ **Zero dependencies on native modules**: Pure JavaScript crypto
+- ✅ **Zero native dependencies**: Pure JavaScript, runs anywhere
 
 ## Installation
 
@@ -129,6 +131,102 @@ httpServer.listen(8080, () => {
 });
 ```
 
+### Browser P2P with WebRTC
+
+```typescript
+import { createAccount, WebRTCServer, WebRTCClient, WebSocketSignaling } from '@mau-network/mau';
+
+// ============== Peer A: Start Server ==============
+const aliceAccount = await createAccount('mau-alice', 'Alice', 'alice@mau.network', 'secret');
+const aliceFpr = aliceAccount.getFingerprint();
+
+// Start WebRTC server (accepts incoming connections)
+const server = new WebRTCServer(aliceAccount, aliceAccount.storage);
+
+// Connect to signaling server
+const signaling = new WebSocketSignaling('wss://signaling.mau.network', aliceFpr);
+
+// Handle incoming connection offers
+signaling.onMessage(async (message) => {
+  if (message.type === 'offer') {
+    const connectionId = `conn-${Date.now()}`;
+    const answer = await server.acceptConnection(connectionId, message.data);
+    
+    // Send answer back through signaling
+    await signaling.send({
+      from: aliceFpr,
+      to: message.from,
+      type: 'answer',
+      data: answer
+    });
+  }
+});
+
+console.log('Alice is ready:', aliceFpr);
+
+// ============== Peer B: Connect to Alice ==============
+const bobAccount = await createAccount('mau-bob', 'Bob', 'bob@mau.network', 'secret');
+const bobFpr = bobAccount.getFingerprint();
+
+// Follow Alice
+await bobAccount.addFriend(aliceAccount.getPublicKey());
+
+// Create WebRTC client
+const client = new WebRTCClient(bobAccount, bobAccount.storage, aliceFpr);
+
+// Create offer and send via signaling
+const offer = await client.createOffer();
+await signaling.send({
+  from: bobFpr,
+  to: aliceFpr,
+  type: 'offer',
+  data: offer
+});
+
+// Wait for answer
+signaling.onMessage(async (message) => {
+  if (message.type === 'answer' && message.from === aliceFpr) {
+    await client.completeConnection(message.data);
+    
+    // Perform mTLS handshake
+    const authenticated = await client.performMTLS();
+    if (!authenticated) throw new Error('Authentication failed');
+    
+    // Now fetch files over WebRTC!
+    const fileList = await client.fetchFileList();
+    console.log('Files from Alice:', fileList);
+    
+    // Download a file
+    const data = await client.downloadFile('hello.json');
+    console.log('Downloaded:', data.length, 'bytes');
+  }
+});
+```
+
+### Signaling Server
+
+Run a simple HTTP signaling server for WebRTC coordination:
+
+```bash
+# Start signaling server
+npx tsx examples/signaling-server.ts 8080
+```
+
+Or deploy the `HTTPSignalingServer` to your infrastructure:
+
+```typescript
+import { HTTPSignalingServer } from '@mau-network/mau/examples/signaling-server';
+
+const server = new HTTPSignalingServer();
+await server.start(8080);
+
+console.log('Signaling server running on port 8080');
+```
+
+For full examples, see:
+- [`examples/browser-example.ts`](examples/browser-example.ts) - Complete browser P2P flow
+- [`examples/signaling-server.ts`](examples/signaling-server.ts) - HTTP signaling server
+
 ## API Reference
 
 ### Account
@@ -243,6 +341,126 @@ const response = await server.handleRequest({
 });
 ```
 
+### WebRTCServer
+
+```typescript
+// Create WebRTC server (for browser)
+const server = new WebRTCServer(account, storage, {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+  allowedPeers: ['allowed-fingerprint-1', 'allowed-fingerprint-2'], // optional whitelist
+});
+
+// Accept incoming connection
+const answer = await server.acceptConnection(connectionId, offer);
+
+// Add ICE candidate
+await server.addIceCandidate(connectionId, candidate);
+
+// Listen for signaling events (ICE candidates)
+server.onSignaling(connectionId, (signal) => {
+  // Send via signaling channel
+  signalingChannel.send(signal);
+});
+
+// Get active connections
+const connections = server.getConnections();
+
+// Close connection
+server.closeConnection(connectionId);
+
+// Stop server
+server.stop();
+```
+
+### WebRTCClient
+
+```typescript
+// Create WebRTC client
+const client = new WebRTCClient(account, storage, peerFingerprint, {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+  timeout: 30000,
+});
+
+// Create offer
+const offer = await client.createOffer();
+
+// Or accept offer and create answer
+const answer = await client.acceptOffer(offer);
+
+// Complete connection with answer
+await client.completeConnection(answer);
+
+// Add ICE candidate
+await client.addIceCandidate(candidate);
+
+// Perform mTLS authentication
+const authenticated = await client.performMTLS();
+if (!authenticated) throw new Error('Authentication failed');
+
+// HTTP-style requests over data channel
+const fileList = await client.fetchFileList();
+const fileData = await client.downloadFile('post.json');
+const versionData = await client.downloadFileVersion('post.json', 'hash123');
+
+// Close connection
+client.close();
+```
+
+### Signaling
+
+```typescript
+// WebSocket signaling (browser)
+import { WebSocketSignaling } from '@mau-network/mau';
+
+const signaling = new WebSocketSignaling('wss://signaling.example.com', fingerprint);
+
+// Send signaling message
+await signaling.send({
+  from: myFingerprint,
+  to: peerFingerprint,
+  type: 'offer',
+  data: offerData,
+});
+
+// Receive messages
+signaling.onMessage((message) => {
+  console.log('Received:', message.type, 'from', message.from);
+});
+
+// Close connection
+signaling.close();
+
+// HTTP signaling (polling-based)
+import { HTTPSignaling } from '@mau-network/mau';
+
+const signaling = new HTTPSignaling('https://signaling.example.com', fingerprint);
+
+// Start polling for messages
+signaling.startPolling();
+
+// Send and receive messages (same interface as WebSocket)
+signaling.onMessage((message) => { /* ... */ });
+await signaling.send(message);
+
+// Stop polling
+signaling.stopPolling();
+
+// Signaled connection helper
+import { SignaledConnection } from '@mau-network/mau';
+
+const connection = new SignaledConnection(signaling, myFingerprint, peerFingerprint);
+
+// Callbacks for connection events
+connection.onOffer(async (offer) => { /* handle offer */ });
+connection.onAnswer(async (answer) => { /* handle answer */ });
+connection.onICECandidate(async (candidate) => { /* handle ICE */ });
+
+// Send connection events
+await connection.sendOffer(offer);
+await connection.sendAnswer(answer);
+await connection.sendICECandidate(candidate);
+```
+
 ### Storage
 
 ```typescript
@@ -278,6 +496,44 @@ Mau uses a storage abstraction layer that works in both environments:
 - **Browser**: Uses IndexedDB for persistent storage
 
 Both implement the same `Storage` interface, making code portable.
+
+### Browser P2P with WebRTC
+
+In browser environments, Mau uses **WebRTC data channels** instead of traditional HTTP:
+
+```
+┌─────────────┐                    ┌─────────────┐
+│  Browser A  │◄──WebRTC Channel──►│  Browser B  │
+│             │                    │             │
+│ WebRTCServer│                    │WebRTCClient │
+│   (Alice)   │                    │   (Bob)     │
+└─────────────┘                    └─────────────┘
+       │                                  │
+       └────── Signaling Server ─────────┘
+              (offer/answer/ICE)
+```
+
+**How it works:**
+
+1. **Signaling Phase**: Peers exchange WebRTC offers/answers via a signaling server (WebSocket or HTTP)
+2. **Connection**: WebRTC establishes a direct peer-to-peer connection with data channel
+3. **mTLS Handshake**: Peers authenticate each other using PGP keys over the data channel
+4. **HTTP Protocol**: HTTP-style requests/responses flow over the authenticated channel
+
+**Key Components:**
+
+- **WebRTCServer**: Accepts incoming connections in the browser
+- **WebRTCClient**: Initiates connections to peers
+- **Signaling**: Coordinates WebRTC connection setup (offers, answers, ICE candidates)
+- **mTLS over Data Channel**: Authenticates peers using PGP signatures
+
+**Benefits:**
+
+- No server infrastructure needed (except lightweight signaling)
+- True peer-to-peer communication
+- End-to-end encrypted (WebRTC + PGP)
+- Works across NATs/firewalls (with STUN/TURN)
+- Same HTTP-style protocol as traditional client/server
 
 ### Encryption Flow
 

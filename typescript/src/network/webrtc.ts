@@ -169,16 +169,28 @@ export class WebRTCClient {
   }
 
   /**
-   * Send request over data channel
+   * Send HTTP-style request over data channel
    */
-  async sendRequest(request: { method: string; path: string }): Promise<any> {
+  async sendRequest(request: {
+    method: string;
+    path: string;
+    query?: Record<string, string>;
+    headers?: Record<string, string>;
+  }): Promise<{
+    status: number;
+    headers: Record<string, string>;
+    body: Uint8Array | string;
+  }> {
     if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
       throw new Error('Data channel not ready');
     }
 
     const message = JSON.stringify({
       type: 'request',
-      ...request,
+      method: request.method,
+      path: request.path,
+      query: request.query || {},
+      headers: request.headers || {},
     });
 
     this.dataChannel.send(message);
@@ -189,13 +201,24 @@ export class WebRTCClient {
 
       const handler = (event: MessageEvent) => {
         if (!this.dataChannel) return;
-        
+
         try {
           const response = JSON.parse(event.data);
           if (response.type === 'response') {
             clearTimeout(timeout);
             this.dataChannel.removeEventListener('message', handler);
-            resolve(response);
+
+            // Convert body back to Uint8Array if it's an array
+            let body = response.body;
+            if (Array.isArray(body)) {
+              body = new Uint8Array(body);
+            }
+
+            resolve({
+              status: response.status,
+              headers: response.headers || {},
+              body,
+            });
           }
         } catch (err) {
           clearTimeout(timeout);
@@ -208,6 +231,76 @@ export class WebRTCClient {
         this.dataChannel.addEventListener('message', handler);
       }
     });
+  }
+
+  /**
+   * Fetch file list from peer over WebRTC
+   */
+  async fetchFileList(after?: Date): Promise<any> {
+    const query: Record<string, string> = {};
+    if (after) {
+      query.after = after.toISOString();
+    }
+
+    const response = await this.sendRequest({
+      method: 'GET',
+      path: `/p2p/${this.peer}`,
+      query,
+    });
+
+    if (response.status !== 200) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const bodyText =
+      typeof response.body === 'string'
+        ? response.body
+        : new TextDecoder().decode(response.body);
+
+    return JSON.parse(bodyText);
+  }
+
+  /**
+   * Download file from peer over WebRTC
+   */
+  async downloadFile(fileName: string): Promise<Uint8Array> {
+    const response = await this.sendRequest({
+      method: 'GET',
+      path: `/p2p/${this.peer}/${encodeURIComponent(fileName)}`,
+    });
+
+    if (response.status !== 200) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    if (response.body instanceof Uint8Array) {
+      return response.body;
+    }
+
+    // Convert string to Uint8Array if needed
+    return new TextEncoder().encode(response.body);
+  }
+
+  /**
+   * Download file version from peer over WebRTC
+   */
+  async downloadFileVersion(fileName: string, version: string): Promise<Uint8Array> {
+    const response = await this.sendRequest({
+      method: 'GET',
+      path: `/p2p/${this.peer}/${encodeURIComponent(fileName)}.versions/${encodeURIComponent(
+        version
+      )}`,
+    });
+
+    if (response.status !== 200) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    if (response.body instanceof Uint8Array) {
+      return response.body;
+    }
+
+    return new TextEncoder().encode(response.body);
   }
 
   /**

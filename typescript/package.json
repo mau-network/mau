@@ -35,7 +35,7 @@
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
-    "@types/node": "^20.11.19",
+    "@types/node": "^20.19.37",
     "@typescript-eslint/eslint-plugin": "^7.0.2",
     "@typescript-eslint/parser": "^7.0.2",
     "buffer": "^6.0.3",
@@ -46,6 +46,7 @@
     "puppeteer": "^24.38.0",
     "stream-browserify": "^3.0.0",
     "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.3",
     "vite": "^5.1.4"
   },
