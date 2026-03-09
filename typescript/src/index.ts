@@ -35,9 +35,9 @@ export type {
   FingerprintResolver,
   CertificateInfo,
   FileListResponse,
-  ServerRequest,
-  ServerResponse,
 } from './types/index.js';
+
+export type { ServerRequest, ServerResponse } from './server.js';
 
 export {
   MAU_DIR_NAME,
@@ -74,6 +74,8 @@ export async function createAccount(
   passphrase: string,
   options: { algorithm?: 'ed25519' | 'rsa'; rsaBits?: 2048 | 4096 } = {}
 ) {
+  const { createStorage } = await import('./storage/index.js');
+  const { Account } = await import('./account.js');
   const storage = await createStorage();
   return await Account.create(storage, rootPath, {
     name,
@@ -87,6 +89,8 @@ export async function createAccount(
  * Convenience function to load an existing account
  */
 export async function loadAccount(rootPath: string, passphrase: string) {
+  const { createStorage } = await import('./storage/index.js');
+  const { Account } = await import('./account.js');
   const storage = await createStorage();
   return await Account.load(storage, rootPath, passphrase);
 }

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mau Simple Test</title>
+</head>
+<body>
+  <h1>Mau Browser Test</h1>
+  <div id="status">Testing...</div>
+  <pre id="output"></pre>
+
+  <script type="module">
+    const statusEl = document.getElementById('status');
+    const outputEl = document.getElementById('output');
+
+    function log(msg) {
+      console.log(msg);
+      outputEl.textContent += msg + '\n';
+    }
+
+    async function test() {
+      try {
+        log('1. Importing Mau...');
+        const { createAccount, File } = await import('./src/index.ts');
+        log('✓ Import successful');
+
+        log('2. Creating account...');
+        const account = await createAccount(
+          'test-account',
+          'Test User',
+          'test@example.com',
+          'test-passphrase'
+        );
+        log(`✓ Account created: ${account.getFingerprint()}`);
+
+        log('3. Writing test file...');
+        const file = File.create(account, account.storage, 'test.json');
+        await file.writeJSON({ message: 'Hello, Mau!' });
+        log('✓ File written');
+
+        log('4. Reading file back...');
+        const content = await file.readJSON();
+        log(`✓ File read: ${JSON.stringify(content)}`);
+
+        log('5. Listing files...');
+        const files = await File.list(account, account.storage);
+        log(`✓ Found ${files.length} file(s)`);
+
+        statusEl.textContent = '✅ All tests passed!';
+        statusEl.style.color = 'green';
+      } catch (err) {
+        log(`❌ Error: ${err.message}`);
+        log(err.stack);
+        statusEl.textContent = '❌ Tests failed';
+        statusEl.style.color = 'red';
+      }
+    }
+
+    test();
+  </script>
+</body>
+</html>

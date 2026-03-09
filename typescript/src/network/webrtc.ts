@@ -162,7 +162,9 @@ export class WebRTCClient {
         }
       };
 
-      this.dataChannel!.addEventListener('message', handler);
+      if (this.dataChannel) {
+        this.dataChannel.addEventListener('message', handler);
+      }
     });
   }
 
@@ -186,21 +188,25 @@ export class WebRTCClient {
       const timeout = setTimeout(() => reject(new Error('Request timeout')), 30000);
 
       const handler = (event: MessageEvent) => {
+        if (!this.dataChannel) return;
+        
         try {
           const response = JSON.parse(event.data);
           if (response.type === 'response') {
             clearTimeout(timeout);
-            this.dataChannel!.removeEventListener('message', handler);
+            this.dataChannel.removeEventListener('message', handler);
             resolve(response);
           }
         } catch (err) {
           clearTimeout(timeout);
-          this.dataChannel!.removeEventListener('message', handler);
+          this.dataChannel.removeEventListener('message', handler);
           reject(err);
         }
       };
 
-      this.dataChannel.addEventListener('message', handler);
+      if (this.dataChannel) {
+        this.dataChannel.addEventListener('message', handler);
+      }
     });
   }
 

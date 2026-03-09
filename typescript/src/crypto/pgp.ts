@@ -43,10 +43,26 @@ export async function generateKeyPair(options: AccountOptions): Promise<KeyPair>
     keyOptions.curve = 'ed25519';
   }
 
-  const { privateKey, publicKey } = await openpgp.generateKey(keyOptions);
+  const result = await openpgp.generateKey({
+    ...keyOptions,
+    format: 'armored',
+  });
+  
+  // Keys are returned as armored strings
+  const privateKeyArmored = result.privateKey;
+  const publicKeyArmored = result.publicKey;
 
-  const privKey = await openpgp.readPrivateKey({ armoredKey: privateKey });
-  const pubKey = await openpgp.readKey({ armoredKey: publicKey });
+  // Read keys
+  let privKey = await openpgp.readPrivateKey({ armoredKey: privateKeyArmored });
+  const pubKey = await openpgp.readKey({ armoredKey: publicKeyArmored });
+
+  // Decrypt private key if it's encrypted
+  if (!privKey.isDecrypted()) {
+    privKey = await openpgp.decryptKey({
+      privateKey: privKey,
+      passphrase: options.passphrase,
+    });
+  }
 
   return {
     publicKey: pubKey,
@@ -62,6 +78,13 @@ export async function serializePrivateKey(
   privateKey: openpgp.PrivateKey,
   passphrase: string
 ): Promise<string> {
+  // Check if key is already encrypted
+  if (!privateKey.isDecrypted()) {
+    // Already encrypted, just armor it
+    return privateKey.armor();
+  }
+  
+  // Encrypt the key
   const encrypted = await openpgp.encryptKey({
     privateKey,
     passphrase,
@@ -87,7 +110,11 @@ export async function deserializePrivateKey(
   
   if (!privateKey.isDecrypted()) {
     try {
-      await privateKey.decrypt(passphrase);
+      const decrypted = await openpgp.decryptKey({
+        privateKey,
+        passphrase,
+      });
+      return decrypted;
     } catch (err) {
       throw new MauError('Incorrect passphrase', 'INCORRECT_PASSPHRASE');
     }
@@ -214,7 +241,8 @@ export async function verify(
 export async function sha256(data: Uint8Array): Promise<string> {
   if (typeof crypto !== 'undefined' && crypto.subtle) {
     // Browser or modern Node.js with Web Crypto API
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data as any);
     return Array.from(new Uint8Array(hashBuffer))
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
@@ -222,7 +250,7 @@ export async function sha256(data: Uint8Array): Promise<string> {
     // Fallback for older Node.js
     const cryptoNode = await import('crypto');
     const hash = cryptoNode.createHash('sha256');
-    hash.update(data);
+    hash.update(Buffer.from(data));
     return hash.digest('hex');
   }
 }
