@@ -152,8 +152,25 @@ export class BrowserStorage implements Storage {
 
   async readDir(dirPath: string): Promise<string[]> {
     const allKeys = await this.getAllKeys();
-    const prefix = dirPath.endsWith('/') ? dirPath : dirPath + '/';
     
+    // Handle root directory
+    if (!dirPath || dirPath === '/') {
+      const entries = new Set<string>();
+      for (const key of allKeys) {
+        const slashIndex = key.indexOf('/');
+        if (slashIndex === -1) {
+          // File in root
+          entries.add(key);
+        } else {
+          // Directory in root
+          entries.add(key.slice(0, slashIndex));
+        }
+      }
+      return Array.from(entries);
+    }
+    
+    // Handle subdirectories
+    const prefix = dirPath.endsWith('/') ? dirPath : dirPath + '/';
     const entries = new Set<string>();
     for (const key of allKeys) {
       if (key.startsWith(prefix)) {
