@@ -45,23 +45,49 @@ if (typeof global.RTCPeerConnection === 'undefined') {
 
     async createOffer() {
       // node-datachannel doesn't have createOffer, but setting local description triggers it
-      this.localDescriptionPromise = new Promise((resolve) => {
+      this.localDescriptionPromise = new Promise((resolve, reject) => {
         this.localDescriptionResolve = resolve;
+        
+        // Timeout after 5 seconds
+        setTimeout(() => {
+          if (this.localDescriptionResolve) {
+            reject(new Error('createOffer timeout'));
+            this.localDescriptionResolve = null;
+          }
+        }, 5000);
       });
 
-      // Trigger offer creation by setting empty local description
-      this.peer.setLocalDescription('offer');
+      try {
+        // Trigger offer creation by setting empty local description
+        this.peer.setLocalDescription('offer');
+      } catch (error) {
+        this.localDescriptionResolve = null;
+        throw error;
+      }
 
       return this.localDescriptionPromise;
     }
 
     async createAnswer() {
-      this.localDescriptionPromise = new Promise((resolve) => {
+      this.localDescriptionPromise = new Promise((resolve, reject) => {
         this.localDescriptionResolve = resolve;
+        
+        // Timeout after 5 seconds
+        setTimeout(() => {
+          if (this.localDescriptionResolve) {
+            reject(new Error('createAnswer timeout'));
+            this.localDescriptionResolve = null;
+          }
+        }, 5000);
       });
 
-      // Trigger answer creation
-      this.peer.setLocalDescription('answer');
+      try {
+        // Trigger answer creation
+        this.peer.setLocalDescription('answer');
+      } catch (error) {
+        this.localDescriptionResolve = null;
+        throw error;
+      }
 
       return this.localDescriptionPromise;
     }
@@ -81,7 +107,7 @@ if (typeof global.RTCPeerConnection === 'undefined') {
     }
 
     set ondatachannel(handler: any) {
-      this.peer.onDataChannel = handler;
+      this.peer.onDataChannel(handler);
     }
 
     set onicecandidate(handler: any) {
