@@ -118,41 +118,24 @@ Every post, file, and message in Mau is **digitally signed** with your private k
 
 ### How Signing Works
 
-1. **Create content** (e.g., a social media post)
-2. **Hash the content** with SHA-256
-3. **Encrypt the hash** with your private key → **signature**
-4. **Attach signature** to the content
+Every file created in Mau is automatically signed and encrypted. This process does not embed a signature field inside the content (e.g., a JSON file). Instead, it wraps the content in a standard OpenPGP message format.
+
+1.  **Create Content:** You provide the raw content, such as a JSON object for a post.
+2.  **PGP Wrapping:** Mau uses the `openpgp.Sign` and `openpgp.Encrypt` functions to create a PGP message. This message bundles:
+    *   The original content (now encrypted).
+    *   The digital signature (proving it came from you).
+    *   The necessary data for recipients to decrypt it.
+3.  **Save as `.pgp`:** The final output is saved as a binary `.pgp` file.
 
 ### Verification Process
 
-When a peer receives your content:
+When a peer receives your `.pgp` file:
 
-1. **Extract signature** from content
-2. **Hash the content** with SHA-256
-3. **Decrypt signature** with your public key
-4. **Compare hashes** - if they match, content is authentic
+1.  **Read PGP Message:** The peer's client reads the `.pgp` file.
+2.  **Decrypt & Verify:** It uses its private key to decrypt the content and your public key to verify the signature.
+3.  **Extract Content:** If successful, the original, authentic content is extracted.
 
-### Example: Signed Post
-
-```json
-{
-  "@context": "https://schema.org",
-  "@type": "SocialMediaPosting",
-  "headline": "Hello, decentralized world!",
-  "author": {
-    "@type": "Person",
-    "name": "Alice",
-    "identifier": "A1B2C3D4E5F6..."
-  },
-  "datePublished": "2026-03-09T00:00:00Z",
-  "signature": {
-    "type": "PgpSignature2021",
-    "creator": "A1B2C3D4E5F6...",
-    "created": "2026-03-09T00:00:00Z",
-    "signatureValue": "iQIzBAABCAAdFiEE..."
-  }
-}
-```
+This process ensures both confidentiality (encryption) and authenticity (signing) without modifying the original content's structure.
 
 ### Benefits of Signing
 
@@ -347,23 +330,29 @@ Use a strong passphrase for your private key:
 
 ### Multi-Device Setup
 
-To use same identity on multiple devices:
+Using the same Mau identity across multiple devices requires securely transferring your private key. Since Mau does not have a built-in sync service for private keys, this must be done manually.
 
-**Option 1: Key Splitting (Recommended)**
-- Use **Shamir's Secret Sharing** to split key into N parts
-- Require M parts to reconstruct (e.g., 3 of 5)
-- Store parts on different devices
-- Even if one device is compromised, key is safe
+**The Recommended Method: Secure Manual Transfer**
 
-**Option 2: Secure Sync**
-- Encrypt private key with **device-specific password**
-- Sync encrypted key via secure channel
-- Each device has its own decryption password
+1.  **Export Your Account:** On your primary device, use the `mau export-account` command. This will create an encrypted archive of your private key.
+    ```bash
+    # on Device A
+    mau export-account > my-account-backup.mau
+    ```
+2.  **Securely Copy:** Transfer this `.mau` file to your second device using a secure method (e.g., a USB drive, `scp`, or an end-to-end encrypted messaging service). **Do not email it or upload it to an insecure cloud service.**
+3.  **Import Your Account:** On your second device, import the account.
+    ```bash
+    # on Device B
+    mau import-account my-account-backup.mau
+    ```
 
-**Option 3: Subkeys**
-- Create subkeys for each device
-- Master key stays offline
-- Revoke subkey if device is lost
+You will be prompted for the passphrase you used on your primary device. Once complete, both devices will have the same identity. Any content you create on one device will need to be synced to the other via the standard Mau peer-to-peer sync process.
+
+**Important Considerations:**
+
+*   **One Identity, One Key:** Mau's model is one private key per identity. The options of subkeys or key splitting (Shamir's Secret Sharing) are advanced PGP features that are not directly supported through Mau's command-line interface. While possible with external tools like `gpg`, it falls outside the standard Mau workflow.
+*   **Risk:** The biggest risk is the moment the private key is being transferred. Ensure the channel you use is secure. Once imported, the key is as secure as the device it's on.
+*   **Revocation:** If one of your devices is lost or stolen, you must revoke the key from another trusted device and generate a new identity to ensure your security.
 
 ### Threat Model
 
