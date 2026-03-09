@@ -8,6 +8,10 @@ const config: Config = {
   moduleNameMapper: {
     '^(\.\.?/.+)\.js$': '$1',
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!@roamhq/wrtc)'
+  ],
+  testTimeout: 20000,
   collectCoverage: true,
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],

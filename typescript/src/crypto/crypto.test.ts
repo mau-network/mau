@@ -67,7 +67,7 @@ describe('Crypto', () => {
       algorithm: 'ed25519',
     });
 
-    const serialized = await serializePrivateKey(privateKey);
+    const serialized = await serializePrivateKey(privateKey, passphrase);
     expect(serialized).toContain('BEGIN PGP PRIVATE KEY BLOCK');
 
     const deserialized = await deserializePrivateKey(serialized, passphrase);

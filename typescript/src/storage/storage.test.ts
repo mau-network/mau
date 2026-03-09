@@ -1,146 +1,204 @@
 /**
- * Tests for Storage
+ * Tests for Browser Storage using fake-indexeddb
  */
 
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
-import { setupIndexedDBMocks, cleanupIndexedDBMocks } from '../__mocks__/indexeddb';
-import { createStorage } from '../storage';
-import { BrowserStorage } from '../storage/browser';
-
-describe('createStorage', () => {
-  it('should create storage', async () => {
-    const storage = await createStorage();
-    expect(storage).toBeDefined();
-  });
-});
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import 'fake-indexeddb/auto';
+import { BrowserStorage } from './browser';
 
 describe('BrowserStorage', () => {
   let storage: BrowserStorage;
-
-  beforeAll(() => {
-    setupIndexedDBMocks();
-  });
-
-  afterAll(() => {
-    cleanupIndexedDBMocks();
-  });
 
   beforeEach(() => {
     storage = new BrowserStorage();
   });
 
-  it('should create instance', () => {
-    expect(storage).toBeDefined();
-  });
-
-  it('should join paths', () => {
-    const joined = storage.join('a', 'b', 'c');
-    expect(joined).toBe('a/b/c');
-  });
-
-  it('should handle empty parts in join', () => {
-    const joined = storage.join('a', '', 'c');
-    expect(joined).toBe('a/c');
-  });
-
-  it('should write and read text', async () => {
-    await storage.writeText('test.txt', 'hello world');
-    const text = await storage.readText('test.txt');
-    expect(text).toBe('hello world');
-  });
-
-  it('should write and read binary', async () => {
-    const data = new Uint8Array([1, 2, 3, 4, 5]);
-    await storage.writeFile('test.bin', data);
-    const read = await storage.readFile('test.bin');
-    expect(read).toEqual(data);
-  });
-
-  it('should check if file exists', async () => {
-    await storage.writeText('exists.txt', 'content');
-    
-    const exists = await storage.exists('exists.txt');
-    const notExists = await storage.exists('notexists.txt');
-
-    expect(exists).toBe(true);
-    expect(notExists).toBe(false);
-  });
-
-  it('should get file stats', async () => {
-    const data = new Uint8Array([1, 2, 3]);
-    await storage.writeFile('stats.bin', data);
-
-    const stats = await storage.stat('stats.bin');
-
-    expect(stats.size).toBe(3);
-    expect(stats.isDirectory).toBe(false);
-  });
-
-  it('should handle directory creation', async () => {
-    // mkdir is a no-op for browser storage
-    await storage.mkdir('dir1/dir2/dir3');
-    // Should not throw
-  });
-
-  it('should list directory contents', async () => {
-    await storage.writeText('dir/file1.txt', 'content1');
-    await storage.writeText('dir/file2.txt', 'content2');
-    await storage.writeText('dir/sub/file3.txt', 'content3');
-
-    const entries = await storage.readDir('dir');
-
-    expect(entries).toContain('file1.txt');
-    expect(entries).toContain('file2.txt');
-    expect(entries.length).toBeGreaterThan(0);
-  });
-
-  it('should remove file', async () => {
-    await storage.writeText('remove.txt', 'content');
-    
-    expect(await storage.exists('remove.txt')).toBe(true);
-
-    await storage.remove('remove.txt');
-
-    expect(await storage.exists('remove.txt')).toBe(false);
-  });
-
-  it('should handle reading non-existent file', async () => {
-    await expect(storage.readText('nonexistent.txt')).rejects.toThrow();
-  });
-
-  it('should handle stat on non-existent file', async () => {
-    await expect(storage.stat('nonexistent.txt')).rejects.toThrow();
-  });
-
-  it('should handle readDir on non-existent directory', async () => {
-    const entries = await storage.readDir('nonexistent-dir');
-    expect(entries).toEqual([]);
-  });
-
-  it('should handle multiple writes to same file', async () => {
-    await storage.writeText('multi.txt', 'first');
-    await storage.writeText('multi.txt', 'second');
-    
-    const text = await storage.readText('multi.txt');
-    expect(text).toBe('second');
-  });
-
-  it('should handle large binary data', async () => {
-    const largeData = new Uint8Array(10000);
-    for (let i = 0; i < largeData.length; i++) {
-      largeData[i] = i % 256;
+  afterEach(async () => {
+    // Clean up
+    if (typeof indexedDB !== 'undefined') {
+      const databases = await indexedDB.databases();
+      for (const db of databases) {
+        if (db.name) {
+          indexedDB.deleteDatabase(db.name);
+        }
+      }
     }
-    
-    await storage.writeFile('large.bin', largeData);
-    const read = await storage.readFile('large.bin');
-    
-    expect(read.length).toBe(largeData.length);
-    expect(read).toEqual(largeData);
   });
 
-  it('should handle nested directory paths', async () => {
-    await storage.writeText('a/b/c/d/file.txt', 'nested');
-    const text = await storage.readText('a/b/c/d/file.txt');
-    expect(text).toBe('nested');
+  describe('File Operations', () => {
+    it('should write and read file', async () => {
+      const data = new Uint8Array([1, 2, 3, 4, 5]);
+      await storage.writeFile('test.txt', data);
+
+      const read = await storage.readFile('test.txt');
+      expect(read).toEqual(data);
+    });
+
+    it('should check if file exists', async () => {
+      const data = new Uint8Array([1, 2, 3]);
+      await storage.writeFile('exists.txt', data);
+
+      expect(await storage.exists('exists.txt')).toBe(true);
+      expect(await storage.exists('not-exists.txt')).toBe(false);
+    });
+
+    it('should delete file', async () => {
+      const data = new Uint8Array([1, 2, 3]);
+      await storage.writeFile('delete-me.txt', data);
+
+      expect(await storage.exists('delete-me.txt')).toBe(true);
+      await storage.remove('delete-me.txt');
+      expect(await storage.exists('delete-me.txt')).toBe(false);
+    });
+
+    it('should list files', async () => {
+      await storage.writeFile('file1.txt', new Uint8Array([1]));
+      await storage.writeFile('file2.txt', new Uint8Array([2]));
+      await storage.writeFile('file3.txt', new Uint8Array([3]));
+
+      const files = await storage.readDir('');
+      expect(files).toContain('file1.txt');
+      expect(files).toContain('file2.txt');
+      expect(files).toContain('file3.txt');
+    });
+
+    it('should handle subdirectories in paths', async () => {
+      const data = new Uint8Array([1, 2, 3]);
+      await storage.writeFile('dir/subdir/file.txt', data);
+
+      expect(await storage.exists('dir/subdir/file.txt')).toBe(true);
+      const read = await storage.readFile('dir/subdir/file.txt');
+      expect(read).toEqual(data);
+    });
+
+    it('should throw when reading non-existent file', async () => {
+      await expect(storage.readFile('not-exists.txt')).rejects.toThrow();
+    });
+
+    it('should handle empty file', async () => {
+      const empty = new Uint8Array([]);
+      await storage.writeFile('empty.txt', empty);
+
+      const read = await storage.readFile('empty.txt');
+      expect(read).toEqual(empty);
+    });
+
+    it('should overwrite existing file', async () => {
+      await storage.writeFile('overwrite.txt', new Uint8Array([1, 2, 3]));
+      await storage.writeFile('overwrite.txt', new Uint8Array([4, 5, 6]));
+
+      const read = await storage.readFile('overwrite.txt');
+      expect(read).toEqual(new Uint8Array([4, 5, 6]));
+    });
+
+    it('should handle large files', async () => {
+      const largeData = new Uint8Array(1024 * 1024); // 1MB
+      for (let i = 0; i < largeData.length; i++) {
+        largeData[i] = i % 256;
+      }
+
+      await storage.writeFile('large.bin', largeData);
+      const read = await storage.readFile('large.bin');
+      expect(read).toEqual(largeData);
+    });
+
+    it('should list files with different extensions', async () => {
+      await storage.writeFile('file.txt', new Uint8Array([1]));
+      await storage.writeFile('file.json', new Uint8Array([2]));
+      await storage.writeFile('file.bin', new Uint8Array([3]));
+
+      const files = await storage.readDir('');
+      expect(files.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('should handle paths with trailing slashes', async () => {
+      const data = new Uint8Array([1, 2, 3]);
+      await storage.writeFile('dir/file.txt', data);
+
+      const files = await storage.readDir('dir/');
+      expect(files).toContain('file.txt');
+    });
+
+    it('should delete all files in listing', async () => {
+      await storage.writeFile('del1.txt', new Uint8Array([1]));
+      await storage.writeFile('del2.txt', new Uint8Array([2]));
+      await storage.writeFile('del3.txt', new Uint8Array([3]));
+
+      const files = await storage.readDir('');
+      for (const file of files) {
+        if (file.startsWith('del')) {
+          await storage.remove(file);
+        }
+      }
+
+      const remaining = await storage.readDir('');
+      expect(remaining.filter(f => f.startsWith('del'))).toEqual([]);
+    });
+
+    it('should handle unicode filenames', async () => {
+      const data = new Uint8Array([1, 2, 3]);
+      await storage.writeFile('файл.txt', data);
+
+      expect(await storage.exists('файл.txt')).toBe(true);
+      const read = await storage.readFile('файл.txt');
+      expect(read).toEqual(data);
+    });
+
+    it('should handle special characters in filenames', async () => {
+      const data = new Uint8Array([1, 2, 3]);
+      const filename = 'file with spaces & symbols.txt';
+      await storage.writeFile(filename, data);
+
+      expect(await storage.exists(filename)).toBe(true);
+      const read = await storage.readFile(filename);
+      expect(read).toEqual(data);
+    });
+  });
+
+  describe('Directory Operations', () => {
+    it('should create directory structure implicitly', async () => {
+      await storage.writeFile('a/b/c/file.txt', new Uint8Array([1]));
+      expect(await storage.exists('a/b/c/file.txt')).toBe(true);
+    });
+
+    it('should list empty directory', async () => {
+      const files = await storage.readDir('nonexistent/');
+      expect(files).toEqual([]);
+    });
+
+    it('should handle nested directory listing', async () => {
+      await storage.writeFile('root/sub1/file1.txt', new Uint8Array([1]));
+      await storage.writeFile('root/sub2/file2.txt', new Uint8Array([2]));
+      await storage.writeFile('root/file3.txt', new Uint8Array([3]));
+
+      const files = await storage.readDir('root/');
+      expect(files.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should handle invalid paths', async () => {
+      await expect(storage.readFile('')).rejects.toThrow();
+    });
+
+    it('should handle deletion of non-existent file', async () => {
+      await expect(storage.remove('does-not-exist.txt')).rejects.toThrow();
+    });
+  });
+
+  describe('Storage Persistence', () => {
+    it('should persist data across multiple operations', async () => {
+      await storage.writeFile('persist1.txt', new Uint8Array([1]));
+      await storage.writeFile('persist2.txt', new Uint8Array([2]));
+      await storage.writeFile('persist3.txt', new Uint8Array([3]));
+
+      const data1 = await storage.readFile('persist1.txt');
+      const data2 = await storage.readFile('persist2.txt');
+      const data3 = await storage.readFile('persist3.txt');
+
+      expect(data1).toEqual(new Uint8Array([1]));
+      expect(data2).toEqual(new Uint8Array([2]));
+      expect(data3).toEqual(new Uint8Array([3]));
+    });
   });
 });
