@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { Account } from '../account.js';
-import { FilesystemStorage } from '../storage/filesystem.js';
+import { Account } from './account';
+import { FilesystemStorage } from './storage/filesystem';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 

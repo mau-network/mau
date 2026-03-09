@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { Account } from '../account.js';
-import { File } from '../file.js';
-import { FilesystemStorage } from '../storage/filesystem.js';
+import { Account } from './account';
+import { File } from './file';
+import { FilesystemStorage } from './storage/filesystem';
 import * as fs from 'fs/promises';
 
 const TEST_DIR = './test-data-file';
