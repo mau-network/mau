@@ -3,13 +3,14 @@ import type { Config } from 'jest';
 const config: Config = {
   preset: 'ts-jest',
   testEnvironment: 'node',
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   roots: ['<rootDir>/src'],
   testMatch: ['**/*.test.ts', '!**/*.browser.test.ts'],
   moduleNameMapper: {
-    '^(\.\.?/.+)\.js$': '$1',
+    '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!@roamhq/wrtc)'
+    'node_modules/(?!node-datachannel)'
   ],
   testTimeout: 20000,
   collectCoverage: true,
