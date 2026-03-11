@@ -3,6 +3,10 @@
  */
 
 import type { Fingerprint, FingerprintResolver } from '../types/index.js';
+import DNS2 from 'dns2';
+import multicastDNS from 'multicast-dns';
+
+const { Packet } = DNS2;
 
 /**
  * Static address resolver
@@ -17,41 +21,185 @@ export function staticResolver(
 }
 
 /**
- * DNS resolver (placeholder - requires DNS TXT record lookup)
+ * DNS resolver - looks up TXT records for _mau.<fingerprint>.<domain>
+ * 
+ * @param domain Base domain for DNS lookups (e.g., "mau.network")
+ * @param dnsServer Optional DNS server address (defaults to system resolver)
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function dnsResolver(_domain: string): FingerprintResolver {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  return async (_fingerprint: Fingerprint) => {
-    // Would implement DNS TXT lookup for _mau.<fingerprint>.<domain>
-    // This requires a DNS library
-    console.warn('DNS resolver not yet implemented');
-    return null;
+export function dnsResolver(
+  domain: string,
+  dnsServer?: string
+): FingerprintResolver {
+  return async (fingerprint: Fingerprint, timeout = 5000) => {
+    try {
+      const options: any = {};
+      if (dnsServer) {
+        options.nameServers = [dnsServer];
+      }
+
+      const resolver = new DNS2(options);
+
+      const hostname = `_mau.${fingerprint}.${domain}`;
+      
+      const response = await Promise.race([
+        resolver.resolve(hostname, 'TXT'),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('DNS timeout')), timeout)
+        ),
+      ]);
+
+      // Parse TXT records for address
+      if (response && 'answers' in response && response.answers.length > 0) {
+        for (const answer of response.answers) {
+          if (answer.type === Packet.TYPE.TXT && 'data' in answer) {
+            // TXT record format: "mau-address=hostname:port"
+            const txtData = String(answer.data || '');
+            const match = txtData.match(/mau-address=(.+)/);
+            if (match) {
+              return match[1];
+            }
+          }
+        }
+      }
+
+      return null;
+    } catch (err) {
+      // DNS lookup failed
+      return null;
+    }
   };
 }
 
 /**
- * mDNS resolver (placeholder - requires mDNS library)
+ * mDNS resolver - discovers peers on local network
+ * 
+ * @param serviceType Service type (default: "_mau._tcp")
  */
-export function mdnsResolver(): FingerprintResolver {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  return async (_fingerprint: Fingerprint, _timeout?: number) => {
-    // Would implement mDNS discovery
-    console.warn('mDNS resolver not yet implemented');
-    return null;
+export function mdnsResolver(
+  serviceType = '_mau._tcp'
+): FingerprintResolver {
+  return async (fingerprint: Fingerprint, timeout = 3000) => {
+    return new Promise((resolve) => {
+      const mdns = multicastDNS();
+      let found = false;
+
+      // Set timeout
+      const timer = setTimeout(() => {
+        if (!found) {
+          mdns.destroy();
+          resolve(null);
+        }
+      }, timeout);
+
+      // Listen for responses
+      mdns.on('response', (response) => {
+        if (found) return;
+
+        // Look for matching service in answers
+        for (const answer of response.answers) {
+          if (answer.type === 'PTR' && answer.name === `${serviceType}.local`) {
+            // Found service, check if it matches our fingerprint
+            const instanceName = answer.data as string;
+            if (instanceName.startsWith(fingerprint)) {
+              // Look for SRV and A/AAAA records
+              for (const additional of response.additionals || []) {
+                if (additional.type === 'SRV' && additional.name === instanceName) {
+                  const srvData = additional.data as { target: string; port: number };
+                  
+                  // Look for A/AAAA record
+                  for (const addr of response.additionals || []) {
+                    if ((addr.type === 'A' || addr.type === 'AAAA') && addr.name === srvData.target) {
+                      found = true;
+                      clearTimeout(timer);
+                      mdns.destroy();
+                      resolve(`${addr.data}:${srvData.port}`);
+                      return;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Query for service
+      mdns.query({
+        questions: [{
+          name: `${serviceType}.local`,
+          type: 'PTR',
+        }],
+      });
+    });
   };
 }
 
 /**
- * DHT resolver (placeholder - requires Kademlia implementation)
+ * DHT resolver - uses Kademlia DHT for peer discovery
+ * 
+ * @param bootstrapNodes List of known bootstrap node addresses
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function dhtResolver(_bootstrapNodes: string[]): FingerprintResolver {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  return async (_fingerprint: Fingerprint, _timeout?: number) => {
-    // Would implement Kademlia DHT lookup
-    console.warn('DHT resolver not yet implemented');
-    return null;
+export function dhtResolver(bootstrapNodes: string[]): FingerprintResolver {
+  // Simple in-memory DHT implementation
+  // In production, this would use a full Kademlia implementation
+  const routingTable = new Map<Fingerprint, string>();
+  
+  return async (fingerprint: Fingerprint, timeout = 5000) => {
+    // Check local routing table first
+    const cached = routingTable.get(fingerprint);
+    if (cached) {
+      return cached;
+    }
+
+    // Query bootstrap nodes
+    // This is a simplified implementation - a full DHT would:
+    // 1. Calculate XOR distance to target
+    // 2. Query K closest nodes iteratively
+    // 3. Update routing table with discovered peers
+    
+    try {
+      // For now, we'll make HTTP requests to bootstrap nodes
+      // to find the peer (simplified Kademlia FIND_NODE)
+      
+      for (const bootstrapNode of bootstrapNodes) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeout);
+          
+          // Query bootstrap node's DHT endpoint
+          const response = await fetch(`https://${bootstrapNode}/kad/find_peer/${fingerprint}`, {
+            signal: controller.signal,
+            headers: {
+              'Accept': 'application/json',
+            },
+          });
+          
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const peers = await response.json() as Array<{ fingerprint: string; address: string }>;
+            
+            // Cache discovered peers in routing table
+            for (const peer of peers) {
+              routingTable.set(peer.fingerprint, peer.address);
+            }
+            
+            // Check if we found the target
+            const result = routingTable.get(fingerprint);
+            if (result) {
+              return result;
+            }
+          }
+        } catch (err) {
+          // Bootstrap node unreachable, try next
+          continue;
+        }
+      }
+
+      return null;
+    } catch (err) {
+      return null;
+    }
   };
 }
 

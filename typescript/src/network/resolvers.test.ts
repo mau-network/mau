@@ -49,76 +49,81 @@ describe('Network Resolvers', () => {
   });
 
   describe('dnsResolver', () => {
-    it('should return null (not implemented)', async () => {
-      const resolver = dnsResolver('example.com');
-      const address = await resolver('fingerprint123');
+    it('should return null for non-existent domain', async () => {
+      const resolver = dnsResolver('nonexistent-test-domain-12345.com');
+      const address = await resolver('fingerprint123', 1000);
 
       expect(address).toBeNull();
     });
 
-    it('should warn about not being implemented', async () => {
-      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    it('should handle DNS timeout', async () => {
+      const resolver = dnsResolver('slow-dns-test.example.com');
+      const address = await resolver('fingerprint123', 100); // Very short timeout
 
-      const resolver = dnsResolver('example.com');
-      await resolver('fingerprint123');
+      expect(address).toBeNull();
+    });
 
-      expect(warnSpy).toHaveBeenCalledWith('DNS resolver not yet implemented');
+    it('should accept custom DNS server', async () => {
+      const resolver = dnsResolver('example.com', '8.8.8.8');
+      const address = await resolver('fingerprint123', 1000);
 
-      warnSpy.mockRestore();
+      // Will return null since we're not actually setting up TXT records
+      expect(address).toBeNull();
     });
   });
 
   describe('mdnsResolver', () => {
-    it('should return null (not implemented)', async () => {
+    it('should return null when no peers found', async () => {
       const resolver = mdnsResolver();
-      const address = await resolver('fingerprint123');
+      const address = await resolver('nonexistent-fingerprint', 500);
 
       expect(address).toBeNull();
     });
 
-    it('should warn about not being implemented', async () => {
-      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
-
-      const resolver = mdnsResolver();
-      await resolver('fingerprint123');
-
-      expect(warnSpy).toHaveBeenCalledWith('mDNS resolver not yet implemented');
-
-      warnSpy.mockRestore();
-    });
-
-    it('should accept timeout parameter', async () => {
-      const resolver = mdnsResolver();
-      const address = await resolver('fingerprint123', 5000);
+    it('should accept custom service type', async () => {
+      const resolver = mdnsResolver('_custom-service._tcp');
+      const address = await resolver('fingerprint123', 500);
 
       expect(address).toBeNull();
+    });
+
+    it('should respect timeout', async () => {
+      const resolver = mdnsResolver();
+      const start = Date.now();
+      await resolver('fingerprint123', 300);
+      const elapsed = Date.now() - start;
+
+      // Should complete within timeout + some tolerance
+      expect(elapsed).toBeLessThan(600);
     });
   });
 
   describe('dhtResolver', () => {
-    it('should return null (not implemented)', async () => {
-      const resolver = dhtResolver(['bootstrap1:8080', 'bootstrap2:8080']);
-      const address = await resolver('fingerprint123');
+    it('should return null when bootstrap nodes unreachable', async () => {
+      const resolver = dhtResolver(['unreachable-node-12345.example.com:8080']);
+      const address = await resolver('fingerprint123', 1000);
 
       expect(address).toBeNull();
     });
 
-    it('should warn about not being implemented', async () => {
-      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
-
-      const resolver = dhtResolver(['bootstrap:8080']);
-      await resolver('fingerprint123');
-
-      expect(warnSpy).toHaveBeenCalledWith('DHT resolver not yet implemented');
-
-      warnSpy.mockRestore();
-    });
-
-    it('should accept timeout parameter', async () => {
-      const resolver = dhtResolver(['bootstrap:8080']);
-      const address = await resolver('fingerprint123', 10000);
+    it('should query multiple bootstrap nodes', async () => {
+      const resolver = dhtResolver([
+        'bootstrap1-unreachable.example.com:8080',
+        'bootstrap2-unreachable.example.com:8080',
+      ]);
+      const address = await resolver('fingerprint123', 1000);
 
       expect(address).toBeNull();
+    });
+
+    it('should respect timeout', async () => {
+      const resolver = dhtResolver(['slow-bootstrap.example.com:8080']);
+      const start = Date.now();
+      await resolver('fingerprint123', 500);
+      const elapsed = Date.now() - start;
+
+      // Should complete within timeout + some tolerance
+      expect(elapsed).toBeLessThan(1000);
     });
   });
 
