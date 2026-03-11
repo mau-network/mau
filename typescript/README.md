@@ -27,10 +27,9 @@ TypeScript/JavaScript implementation of the [Mau P2P social network protocol](ht
 
 ### ⚠️ Node.js Only
 - **DNS resolver** - Requires UDP sockets (not available in browsers)
-- **mDNS resolver** - Requires UDP multicast (not available in browsers)
 - **HTTP Server** - Use WebRTC or browser extensions for serving files
 
-**Browser Peer Discovery:** Use `staticResolver` or `dhtResolver` (HTTP-based). The DNS and mDNS resolvers will gracefully return `null` in browser environments.
+**Browser Peer Discovery:** Use `staticResolver` or `dhtResolver` (HTTP-based). The DNS resolver will gracefully return `null` in browser environments.
 
 ## Installation
 

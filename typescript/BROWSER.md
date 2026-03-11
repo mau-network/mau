@@ -110,7 +110,6 @@ const address = await resolver('fingerprint123');
 - ✅ `staticResolver` - Hardcoded address map
 - ✅ `dhtResolver` - HTTP-based Kademlia (uses `fetch()`)
 - ⚠️ `dnsResolver` - Node.js only (requires UDP sockets)
-- ⚠️ `mdnsResolver` - Node.js only (requires UDP multicast)
 
 ## WebRTC Support
 
@@ -149,7 +148,7 @@ const response = await client.sendRequest({
 ## Known Limitations
 
 - **No traditional HTTP server in browser** - Use WebRTC P2P instead (browsers can't listen on ports)
-- **DNS/mDNS discovery unavailable** - Browser security model blocks UDP sockets; use DHT or static resolvers
+- **DNS discovery unavailable** - Browser security model blocks UDP sockets; use DHT or static resolvers
 - **No signaling server included** - Need external signaling for WebRTC connection setup (see examples/)
 
 ## What Works Now

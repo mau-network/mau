@@ -6,7 +6,6 @@ import { describe, it, expect } from '@jest/globals';
 import {
   staticResolver,
   dnsResolver,
-  mdnsResolver,
   dhtResolver,
   combinedResolver,
 } from './resolvers';
@@ -69,32 +68,6 @@ describe('Network Resolvers', () => {
 
       // Will return null since we're not actually setting up TXT records
       expect(address).toBeNull();
-    });
-  });
-
-  describe('mdnsResolver', () => {
-    it('should return null when no peers found', async () => {
-      const resolver = mdnsResolver();
-      const address = await resolver('nonexistent-fingerprint', 500);
-
-      expect(address).toBeNull();
-    });
-
-    it('should accept custom service type', async () => {
-      const resolver = mdnsResolver('_custom-service._tcp');
-      const address = await resolver('fingerprint123', 500);
-
-      expect(address).toBeNull();
-    });
-
-    it('should respect timeout', async () => {
-      const resolver = mdnsResolver();
-      const start = Date.now();
-      await resolver('fingerprint123', 300);
-      const elapsed = Date.now() - start;
-
-      // Should complete within timeout + some tolerance
-      expect(elapsed).toBeLessThan(600);
     });
   });
 
