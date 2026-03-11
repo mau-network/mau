@@ -320,11 +320,9 @@ export class WebRTCClient {
 
   private setupDataChannel(channel: RTCDataChannel): void {
     channel.onopen = () => {
-      console.log('Data channel opened');
     };
 
     channel.onclose = () => {
-      console.log('Data channel closed');
     };
 
     channel.onerror = (error) => {

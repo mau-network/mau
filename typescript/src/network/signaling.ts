@@ -95,7 +95,6 @@ export class WebSocketSignaling {
       };
 
       this.ws.onclose = () => {
-        console.log('[Signaling] Disconnected');
       };
     });
   }

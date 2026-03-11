@@ -133,11 +133,9 @@ export class WebRTCServer {
    */
   private setupDataChannel(connectionId: string, channel: RTCDataChannel): void {
     channel.onopen = () => {
-      console.log(`[WebRTCServer] Data channel opened: ${connectionId}`);
     };
 
     channel.onclose = () => {
-      console.log(`[WebRTCServer] Data channel closed: ${connectionId}`);
       this.closeConnection(connectionId);
     };
 
@@ -229,7 +227,6 @@ export class WebRTCServer {
       connection.channel.send(JSON.stringify(response));
       connection.authenticated = true;
 
-      console.log(`[WebRTCServer] mTLS authenticated: ${peerFingerprint.slice(0, 8)}...`);
     } catch (err) {
       console.error(`[WebRTCServer] mTLS handshake failed:`, err);
       this.sendError(connection.channel, 403, 'mTLS authentication failed');
