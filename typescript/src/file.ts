@@ -14,6 +14,20 @@ import {
   validateFileName,
 } from './crypto/index.js';
 
+/**
+ * File represents an encrypted content file in the Mau filesystem
+ * 
+ * Provides methods for reading/writing JSON and text data with automatic
+ * encryption, versioning, and checksum generation. All file operations
+ * are signed with the account's private key.
+ * 
+ * @example
+ * ```typescript
+ * const file = File.create(account, storage, 'posts/hello.json');
+ * await file.writeJSON({ '@type': 'SocialMediaPosting', headline: 'Hello!' });
+ * const data = await file.readJSON();
+ * ```
+ */
 export class File {
   private account: Account;
   private storage: Storage;

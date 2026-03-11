@@ -16,7 +16,19 @@ import { HttpError, NetworkError } from './types/index.js';
 import { HTTP_TIMEOUT_MS, URI_PROTOCOL_NAME, PeerNotFoundError } from './types/index.js';
 import type { Account } from './account.js';
 
-
+/**
+ * P2P HTTP Client for file synchronization
+ * 
+ * Handles communication with peers over HTTP to download files and track sync state.
+ * Supports peer discovery via resolvers and automatic retry with exponential backoff.
+ * 
+ * @example
+ * ```typescript
+ * const client = Client.create(account, storage, peer, [staticResolver(peers)]);
+ * const stats = await client.sync();
+ * console.log(`Downloaded ${stats.downloaded} files`);
+ * ```
+ */
 export class Client {
   private account: Account;
   private storage: Storage;
