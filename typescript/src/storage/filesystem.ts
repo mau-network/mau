@@ -52,11 +52,12 @@ export class FilesystemStorage implements Storage {
     }
   }
 
-  async stat(filePath: string): Promise<{ size: number; isDirectory: boolean }> {
+  async stat(filePath: string): Promise<{ size: number; isDirectory: boolean; modifiedTime?: number }> {
     const stats = await fs.stat(filePath);
     return {
       size: stats.size,
       isDirectory: stats.isDirectory(),
+      modifiedTime: stats.mtimeMs,
     };
   }
 

@@ -16,6 +16,7 @@ interface FileEntry {
   data: Uint8Array;
   size: number;
   isDirectory: boolean;
+  modifiedTime?: number;
 }
 
 export class BrowserStorage implements Storage {
@@ -137,6 +138,7 @@ export class BrowserStorage implements Storage {
       data,
       size: data.length,
       isDirectory: false,
+      modifiedTime: Date.now(),
     });
   }
 
@@ -194,6 +196,7 @@ export class BrowserStorage implements Storage {
         data: new Uint8Array(0),
         size: 0,
         isDirectory: true,
+        modifiedTime: Date.now(),
       });
     }
   }
@@ -210,7 +213,7 @@ export class BrowserStorage implements Storage {
     }
   }
 
-  async stat(path: string): Promise<{ size: number; isDirectory: boolean }> {
+  async stat(path: string): Promise<{ size: number; isDirectory: boolean; modifiedTime?: number }> {
     const entry = await this.getEntry(path);
     if (!entry) {
       throw new Error(`Path not found: ${path}`);
@@ -218,6 +221,7 @@ export class BrowserStorage implements Storage {
     return {
       size: entry.size,
       isDirectory: entry.isDirectory,
+      modifiedTime: entry.modifiedTime,
     };
   }
 

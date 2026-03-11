@@ -63,7 +63,7 @@ export interface Storage {
   remove(path: string): Promise<void>;
   
   /** Get file stats */
-  stat(path: string): Promise<{ size: number; isDirectory: boolean }>;
+  stat(path: string): Promise<{ size: number; isDirectory: boolean; modifiedTime?: number }>;
   
   /** Join path components */
   join(...parts: string[]): string;

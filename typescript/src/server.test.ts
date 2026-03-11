@@ -248,4 +248,66 @@ describe('Server', () => {
     expect(mockNext).toHaveBeenCalled();
     expect(mockRes.status).not.toHaveBeenCalled();
   });
+
+  it('should filter files by If-Modified-Since header', async () => {
+    // Get current timestamp
+    const now = new Date();
+    const futureDate = new Date(now.getTime() + 10000); // 10 seconds in the future
+
+    // Create file list request with If-Modified-Since in the future
+    const response = await server.handleRequest({
+      method: 'GET',
+      url: `/p2p/${account.getFingerprint()}`,
+      path: `/p2p/${account.getFingerprint()}`,
+      query: {},
+      headers: {
+        'if-modified-since': futureDate.toUTCString(),
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = JSON.parse(response.body as string);
+    
+    // Since all files were created before the future date, none should be returned
+    expect(body.files.length).toBe(0);
+  });
+
+  it('should include all files when If-Modified-Since is in the past', async () => {
+    // Use a date well in the past
+    const pastDate = new Date('2020-01-01');
+
+    const response = await server.handleRequest({
+      method: 'GET',
+      url: `/p2p/${account.getFingerprint()}`,
+      path: `/p2p/${account.getFingerprint()}`,
+      query: {},
+      headers: {
+        'if-modified-since': pastDate.toUTCString(),
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = JSON.parse(response.body as string);
+    
+    // All files should be included
+    expect(body.files.length).toBeGreaterThan(0);
+  });
+
+  it('should handle invalid If-Modified-Since header gracefully', async () => {
+    const response = await server.handleRequest({
+      method: 'GET',
+      url: `/p2p/${account.getFingerprint()}`,
+      path: `/p2p/${account.getFingerprint()}`,
+      query: {},
+      headers: {
+        'if-modified-since': 'invalid-date',
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = JSON.parse(response.body as string);
+    
+    // Should return all files when date is invalid
+    expect(body.files.length).toBeGreaterThan(0);
+  });
 });

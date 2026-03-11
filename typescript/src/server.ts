@@ -85,16 +85,29 @@ export class Server {
   /**
    * Handle file list request
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async handleFileList(req: ServerRequest): Promise<ServerResponse> {
-    // TODO: Implement timestamp filtering
-    // const afterParam = req.query.after;
-    // const afterTime = afterParam ? new Date(afterParam).getTime() : 0;
+    // Parse If-Modified-Since header for incremental sync
+    let modifiedSince = 0;
+    const ifModifiedSinceHeader = req.headers['if-modified-since'];
+    if (ifModifiedSinceHeader) {
+      const parsed = Date.parse(ifModifiedSinceHeader);
+      if (!isNaN(parsed)) {
+        modifiedSince = parsed;
+      }
+    }
 
     const files = await File.list(this.account, this.storage);
     const fileList: FileListItem[] = [];
 
     for (const file of files) {
+      // Check modification time if filtering is requested
+      if (modifiedSince > 0) {
+        const stats = await this.storage.stat(file.getPath());
+        if (stats.modifiedTime && stats.modifiedTime <= modifiedSince) {
+          continue; // Skip files not modified since the specified time
+        }
+      }
+
       const [sum, size] = await Promise.all([file.getChecksum(), file.getSize()]);
 
       fileList.push({
