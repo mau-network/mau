@@ -121,11 +121,11 @@ type FingerprintResolver = (
 ```
 
 Available resolvers:
-- **staticResolver**: Hardcoded address map
-- **dnsResolver**: DNS TXT record lookup (`_mau.<fingerprint>.<domain>`)
-- **mdnsResolver**: Local network discovery (`_mau._tcp.local`)
-- **dhtResolver**: Kademlia DHT via `/kad/find_peer` endpoint
-- **combinedResolver**: Try multiple resolvers in parallel
+- **staticResolver** ✅ Universal: Hardcoded address map
+- **dhtResolver** ✅ Universal: Kademlia DHT via `/kad/find_peer` endpoint (HTTP-based)
+- **dnsResolver** ⚠️ Node.js only: DNS TXT record lookup (`_mau.<fingerprint>.<domain>`)
+- **mdnsResolver** ⚠️ Node.js only: Local network discovery (`_mau._tcp.local`)
+- **combinedResolver** ✅ Universal: Try multiple resolvers in parallel
 
 ### File Encryption Flow
 ```
@@ -270,12 +270,16 @@ await Promise.race([
 
 ## Dependencies
 
-### Production
-- **openpgp**: PGP encryption/signing (RFC 4880)
-- **node-fetch**: HTTP client for Node.js (polyfill)
-- **dns2**: DNS client for TXT record lookups
-- **multicast-dns**: mDNS/DNS-SD for local network discovery
+### Production (Universal)
+- **openpgp**: PGP encryption/signing (RFC 4880) - works everywhere
+- **node-fetch**: HTTP client for Node.js (polyfill) - not needed in browser
+
+### Optional (Node.js only)
+- **dns2**: DNS client for TXT record lookups (requires UDP sockets)
+- **multicast-dns**: mDNS/DNS-SD for local network discovery (requires UDP multicast)
 - **k-bucket**: Kademlia routing table
+
+**Note:** Optional dependencies use dynamic imports and fail gracefully in browser environments.
 
 ### Development
 - **typescript**: TypeScript compiler
@@ -324,6 +328,37 @@ if (typeof window !== 'undefined') {
 // ✅ Right: Feature detection + storage abstraction
 const storage = await createStorage();  // Auto-detects environment
 ```
+
+**Node.js-Only Features:**
+
+Some resolvers require Node.js-only capabilities (UDP sockets):
+
+```typescript
+// ⚠️ Node.js only - Will return null in browser
+const dnsRes = dnsResolver('mau.network');
+const mdnsRes = mdnsResolver();
+
+// ✅ Works everywhere (browser + Node.js)
+const staticRes = staticResolver(knownPeers);
+const dhtRes = dhtResolver(['bootstrap1:443']);  // Uses fetch()
+
+// ✅ Browser-safe combined resolver
+const resolver = combinedResolver([
+  staticResolver(knownPeers),
+  dhtResolver(['bootstrap1:443']),
+  // dnsResolver/mdnsResolver gracefully fail in browser
+]);
+```
+
+**Why DNS/mDNS don't work in browsers:**
+- Require UDP socket access (not available in browsers for security)
+- Browsers can only use fetch/WebSocket/WebRTC
+- Use DHT resolver (HTTP-based) or static resolver instead
+
+**Dependencies:**
+- `dns2` and `multicast-dns` are marked as `optionalDependencies`
+- Dynamic imports with try/catch handle missing modules gracefully
+- Browser bundles won't include these Node.js-only modules
 
 ### Async Constructor
 ```typescript

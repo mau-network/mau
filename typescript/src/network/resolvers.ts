@@ -3,10 +3,6 @@
  */
 
 import type { Fingerprint, FingerprintResolver } from '../types/index.js';
-import DNS2 from 'dns2';
-import multicastDNS from 'multicast-dns';
-
-const { Packet } = DNS2;
 
 /**
  * Static address resolver
@@ -23,6 +19,8 @@ export function staticResolver(
 /**
  * DNS resolver - looks up TXT records for _mau.<fingerprint>.<domain>
  * 
+ * ⚠️ **Node.js only** - Requires UDP sockets (not available in browsers)
+ * 
  * @param domain Base domain for DNS lookups (e.g., "mau.network")
  * @param dnsServer Optional DNS server address (defaults to system resolver)
  */
@@ -32,6 +30,10 @@ export function dnsResolver(
 ): FingerprintResolver {
   return async (fingerprint: Fingerprint, timeout = 5000) => {
     try {
+      // Dynamic import for Node.js-only library
+      const DNS2 = (await import('dns2')).default;
+      const { Packet } = DNS2;
+
       const options: any = {};
       if (dnsServer) {
         options.nameServers = [dnsServer];
@@ -64,7 +66,10 @@ export function dnsResolver(
 
       return null;
     } catch (err) {
-      // DNS lookup failed
+      // DNS lookup failed or dns2 not available (browser)
+      if ((err as any)?.code === 'MODULE_NOT_FOUND' || (err as any)?.message?.includes('Cannot find module')) {
+        console.warn('DNS resolver not available in browser environment');
+      }
       return null;
     }
   };
@@ -73,64 +78,77 @@ export function dnsResolver(
 /**
  * mDNS resolver - discovers peers on local network
  * 
+ * ⚠️ **Node.js only** - Requires UDP multicast (not available in browsers)
+ * 
  * @param serviceType Service type (default: "_mau._tcp")
  */
 export function mdnsResolver(
   serviceType = '_mau._tcp'
 ): FingerprintResolver {
   return async (fingerprint: Fingerprint, timeout = 3000) => {
-    return new Promise((resolve) => {
-      const mdns = multicastDNS();
-      let found = false;
+    try {
+      // Dynamic import for Node.js-only library
+      const multicastDNS = (await import('multicast-dns')).default;
 
-      // Set timeout
-      const timer = setTimeout(() => {
-        if (!found) {
-          mdns.destroy();
-          resolve(null);
-        }
-      }, timeout);
+      return new Promise((resolve) => {
+        const mdns = multicastDNS();
+        let found = false;
 
-      // Listen for responses
-      mdns.on('response', (response) => {
-        if (found) return;
+        // Set timeout
+        const timer = setTimeout(() => {
+          if (!found) {
+            mdns.destroy();
+            resolve(null);
+          }
+        }, timeout);
 
-        // Look for matching service in answers
-        for (const answer of response.answers) {
-          if (answer.type === 'PTR' && answer.name === `${serviceType}.local`) {
-            // Found service, check if it matches our fingerprint
-            const instanceName = answer.data as string;
-            if (instanceName.startsWith(fingerprint)) {
-              // Look for SRV and A/AAAA records
-              for (const additional of response.additionals || []) {
-                if (additional.type === 'SRV' && additional.name === instanceName) {
-                  const srvData = additional.data as { target: string; port: number };
-                  
-                  // Look for A/AAAA record
-                  for (const addr of response.additionals || []) {
-                    if ((addr.type === 'A' || addr.type === 'AAAA') && addr.name === srvData.target) {
-                      found = true;
-                      clearTimeout(timer);
-                      mdns.destroy();
-                      resolve(`${addr.data}:${srvData.port}`);
-                      return;
+        // Listen for responses
+        mdns.on('response', (response: any) => {
+          if (found) return;
+
+          // Look for matching service in answers
+          for (const answer of response.answers) {
+            if (answer.type === 'PTR' && answer.name === `${serviceType}.local`) {
+              // Found service, check if it matches our fingerprint
+              const instanceName = answer.data as string;
+              if (instanceName.startsWith(fingerprint)) {
+                // Look for SRV and A/AAAA records
+                for (const additional of response.additionals || []) {
+                  if (additional.type === 'SRV' && additional.name === instanceName) {
+                    const srvData = additional.data as { target: string; port: number };
+                    
+                    // Look for A/AAAA record
+                    for (const addr of response.additionals || []) {
+                      if ((addr.type === 'A' || addr.type === 'AAAA') && addr.name === srvData.target) {
+                        found = true;
+                        clearTimeout(timer);
+                        mdns.destroy();
+                        resolve(`${addr.data}:${srvData.port}`);
+                        return;
+                      }
                     }
                   }
                 }
               }
             }
           }
-        }
-      });
+        });
 
-      // Query for service
-      mdns.query({
-        questions: [{
-          name: `${serviceType}.local`,
-          type: 'PTR',
-        }],
+        // Query for service
+        mdns.query({
+          questions: [{
+            name: `${serviceType}.local`,
+            type: 'PTR',
+          }],
+        });
       });
-    });
+    } catch (err) {
+      // mDNS not available (browser) or query failed
+      if ((err as any)?.code === 'MODULE_NOT_FOUND' || (err as any)?.message?.includes('Cannot find module')) {
+        console.warn('mDNS resolver not available in browser environment');
+      }
+      return null;
+    }
   };
 }
 

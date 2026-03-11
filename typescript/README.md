@@ -15,6 +15,23 @@ TypeScript/JavaScript implementation of the [Mau P2P social network protocol](ht
 - ✅ **Type-safe**: Full TypeScript definitions
 - ✅ **Zero native dependencies**: Pure JavaScript, runs anywhere
 
+## Browser vs Node.js
+
+### ✅ Works Everywhere (Browser + Node.js)
+- Account management (PGP key generation)
+- File encryption/decryption
+- WebRTC P2P connections
+- HTTP client sync
+- Static peer resolver
+- DHT resolver (HTTP-based)
+
+### ⚠️ Node.js Only
+- **DNS resolver** - Requires UDP sockets (not available in browsers)
+- **mDNS resolver** - Requires UDP multicast (not available in browsers)
+- **HTTP Server** - Use WebRTC or browser extensions for serving files
+
+**Browser Peer Discovery:** Use `staticResolver` or `dhtResolver` (HTTP-based). The DNS and mDNS resolvers will gracefully return `null` in browser environments.
+
 ## Installation
 
 ```bash
