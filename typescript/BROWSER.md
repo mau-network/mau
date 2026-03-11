@@ -73,15 +73,44 @@ npm run build
 node test-integration.mjs
 ```
 
-## What Works
+## What Works in Browser
 
 - ✅ Account creation in IndexedDB
-- ✅ PGP key generation (Ed25519)
+- ✅ PGP key generation (Ed25519 / RSA)
 - ✅ File encryption/signing
 - ✅ File decryption/verification
 - ✅ File versioning
 - ✅ Friend management
-- ✅ Storage abstraction (filesystem/browser)
+- ✅ Storage abstraction (IndexedDB)
+- ✅ **WebRTC P2P connections** (browser-to-browser)
+- ✅ **Peer discovery** (staticResolver, dhtResolver)
+- ✅ **HTTP client** (fetch-based sync)
+
+## Browser Peer Discovery
+
+```typescript
+import { createAccount, staticResolver, dhtResolver, combinedResolver } from '@mau-network/mau';
+
+// Static addresses (for known peers)
+const static = staticResolver(new Map([
+  ['fingerprint123', 'peer1.example.com:443'],
+]));
+
+// DHT resolver (HTTP-based, works in browser!)
+const dht = dhtResolver(['bootstrap.mau.network:443']);
+
+// Combined (try multiple in parallel)
+const resolver = combinedResolver([static, dht]);
+
+// Find peer
+const address = await resolver('fingerprint123');
+```
+
+**Browser-compatible resolvers:**
+- ✅ `staticResolver` - Hardcoded address map
+- ✅ `dhtResolver` - HTTP-based Kademlia (uses `fetch()`)
+- ⚠️ `dnsResolver` - Node.js only (requires UDP sockets)
+- ⚠️ `mdnsResolver` - Node.js only (requires UDP multicast)
 
 ## WebRTC Support
 
@@ -119,13 +148,20 @@ const response = await client.sendRequest({
 
 ## Known Limitations
 
-- **No network sync yet** - Files stay local until WebRTC or HTTPS client is connected
-- **No peer discovery** - Must manually exchange WebRTC offers/answers
-- **No signaling server** - Need external signaling for WebRTC connection setup
+- **No traditional HTTP server in browser** - Use WebRTC P2P instead (browsers can't listen on ports)
+- **DNS/mDNS discovery unavailable** - Browser security model blocks UDP sockets; use DHT or static resolvers
+- **No signaling server included** - Need external signaling for WebRTC connection setup (see examples/)
+
+## What Works Now
+
+- ✅ **WebRTC P2P**: Full browser-to-browser file sync
+- ✅ **Peer discovery**: DHT resolver (HTTP-based) works in browser
+- ✅ **Network sync**: WebRTC data channels for direct P2P
+- ✅ **mTLS authentication**: PGP-based mutual authentication over WebRTC
 
 ## Next Steps
 
-1. Add signaling server for WebRTC
-2. Implement DHT in browser
-3. Add browser extension for better access control
-4. Create React components
+1. ✅ ~~Add signaling server for WebRTC~~ - Available in `examples/signaling-server.ts`
+2. ✅ ~~Implement DHT in browser~~ - `dhtResolver()` works with `fetch()`
+3. Add browser extension for better access control (optional)
+4. Create React/Vue components (optional)
