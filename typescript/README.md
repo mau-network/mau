@@ -8,12 +8,16 @@ TypeScript/JavaScript implementation of the [Mau P2P social network protocol](ht
 
 - ✅ **Universal**: Works in browser (IndexedDB) and Node.js (filesystem)
 - ✅ **WebRTC P2P**: Native browser-to-browser communication over data channels
-- ✅ **mTLS Security**: Mutual TLS authentication over WebRTC
+- ✅ **PGP Authentication**: Challenge-response authentication over WebRTC
 - ✅ **OpenPGP**: Ed25519 and RSA key generation, signing, and encryption
 - ✅ **P2P Sync**: HTTP-style protocol over WebRTC or traditional HTTP
 - ✅ **Versioning**: Automatic content versioning with SHA-256 checksums
 - ✅ **Type-safe**: Full TypeScript definitions
 - ✅ **Zero native dependencies**: Pure JavaScript, runs anywhere
+
+## Security Note
+
+⚠️ **HTTP Client**: The HTTP client does not yet implement mTLS authentication. For authenticated P2P connections, use the WebRTC client which implements PGP-based challenge-response authentication. Traditional mTLS over HTTPS requires X.509 certificates and is planned for a future release.
 
 ## Browser vs Node.js
 

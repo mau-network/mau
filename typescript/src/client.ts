@@ -91,9 +91,10 @@ export class Client {
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
     try {
+      // TODO: mTLS authentication not yet implemented for HTTP client
+      // Use WebRTC client for authenticated P2P connections
       const response = await this.fetchImpl(url.toString(), {
         signal: controller.signal,
-        // Note: mTLS authentication would be configured here in a full implementation
       });
 
       if (!response.ok) {

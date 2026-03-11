@@ -16,7 +16,7 @@ export async function createStorage(): Promise<Storage> {
   // Check if we're in browser environment
   if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
     const { BrowserStorage } = await import('./browser.js');
-    return new BrowserStorage();
+    return await BrowserStorage.create();
   }
   
   throw new Error('Unable to determine storage backend for this environment');

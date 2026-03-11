@@ -10,9 +10,7 @@ describe('BrowserStorage', () => {
   let storage: BrowserStorage;
 
   beforeEach(async () => {
-    storage = new BrowserStorage();
-    // Wait for IndexedDB to initialize
-    await new Promise(resolve => setTimeout(resolve, 100));
+    storage = await BrowserStorage.create();
   });
 
   afterEach(() => {

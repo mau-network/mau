@@ -28,11 +28,20 @@ export function dnsResolver(
   domain: string,
   dnsServer?: string
 ): FingerprintResolver {
+  let resolverAvailable: boolean | null = null;
+  
   return async (fingerprint: Fingerprint, timeout = 5000) => {
     try {
+      // Check if resolver was already determined to be unavailable
+      if (resolverAvailable === false) {
+        return null;
+      }
+      
       // Dynamic import for Node.js-only library
       const DNS2 = (await import('dns2')).default;
       const { Packet } = DNS2;
+      
+      resolverAvailable = true;
 
       const options: any = {};
       if (dnsServer) {
@@ -64,12 +73,27 @@ export function dnsResolver(
         }
       }
 
+      // No matching TXT record found (peer not published)
       return null;
     } catch (err) {
-      // DNS lookup failed or dns2 not available (browser)
-      if ((err as any)?.code === 'MODULE_NOT_FOUND' || (err as any)?.message?.includes('Cannot find module')) {
-        console.warn('DNS resolver not available in browser environment');
+      const error = err as any;
+      
+      // Module not available (browser environment)
+      if (error?.code === 'MODULE_NOT_FOUND' || error?.message?.includes('Cannot find module')) {
+        if (resolverAvailable === null) {
+          console.warn('DNS resolver not available in browser environment');
+          resolverAvailable = false;
+        }
+        return null;
       }
+      
+      // Timeout (treat as peer not found, could retry)
+      if (error?.message === 'DNS timeout') {
+        return null;
+      }
+      
+      // Network errors or invalid DNS server - log but return null
+      console.error(`DNS resolution failed for ${fingerprint}:`, error.message);
       return null;
     }
   };
@@ -78,39 +102,42 @@ export function dnsResolver(
 
 
 /**
- * DHT resolver - uses Kademlia DHT for peer discovery
+ * DHT resolver - HTTP-based peer discovery (stub implementation)
  * 
- * @param bootstrapNodes List of known bootstrap node addresses
+ * ⚠️ **Stub Implementation**: This is a simplified HTTP-based DHT that requires
+ * bootstrap nodes to expose a `/dht/peers/<fingerprint>` HTTP endpoint.
+ * 
+ * **Not compatible with Go implementation's UDP-based Kademlia DHT.**
+ * 
+ * For production use, either:
+ * 1. Implement the `/dht/peers/<fingerprint>` endpoint on bootstrap nodes
+ * 2. Use full Kademlia protocol (requires UDP, Node.js only)
+ * 3. Use staticResolver for known peers
+ * 
+ * @param bootstrapNodes List of HTTP bootstrap node addresses (e.g., "bootstrap.mau.network:8080")
  */
 export function dhtResolver(bootstrapNodes: string[]): FingerprintResolver {
-  // Simple in-memory DHT implementation
-  // In production, this would use a full Kademlia implementation
+  // Simple in-memory cache
   const routingTable = new Map<Fingerprint, string>();
   
   return async (fingerprint: Fingerprint, timeout = 5000) => {
-    // Check local routing table first
+    // Check local cache first
     const cached = routingTable.get(fingerprint);
     if (cached) {
       return cached;
     }
 
-    // Query bootstrap nodes
-    // This is a simplified implementation - a full DHT would:
-    // 1. Calculate XOR distance to target
-    // 2. Query K closest nodes iteratively
-    // 3. Update routing table with discovered peers
+    // Query bootstrap nodes via HTTP
+    // NOTE: This requires bootstrap nodes to implement HTTP DHT endpoint
     
     try {
-      // For now, we'll make HTTP requests to bootstrap nodes
-      // to find the peer (simplified Kademlia FIND_NODE)
-      
       for (const bootstrapNode of bootstrapNodes) {
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), timeout);
           
-          // Query bootstrap node's DHT endpoint
-          const response = await fetch(`https://${bootstrapNode}/kad/find_peer/${fingerprint}`, {
+          // HTTP-based DHT query (requires custom endpoint implementation)
+          const response = await fetch(`https://${bootstrapNode}/dht/peers/${fingerprint}`, {
             signal: controller.signal,
             headers: {
               'Accept': 'application/json',
@@ -120,21 +147,16 @@ export function dhtResolver(bootstrapNodes: string[]): FingerprintResolver {
           clearTimeout(timeoutId);
 
           if (response.ok) {
-            const peers = await response.json() as Array<{ fingerprint: string; address: string }>;
+            const data = await response.json() as { address?: string };
             
-            // Cache discovered peers in routing table
-            for (const peer of peers) {
-              routingTable.set(peer.fingerprint, peer.address);
-            }
-            
-            // Check if we found the target
-            const result = routingTable.get(fingerprint);
-            if (result) {
-              return result;
+            if (data.address) {
+              // Cache the result
+              routingTable.set(fingerprint, data.address);
+              return data.address;
             }
           }
         } catch (err) {
-          // Bootstrap node unreachable, try next
+          // Bootstrap node unreachable or timeout, try next
           continue;
         }
       }

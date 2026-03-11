@@ -21,6 +21,9 @@ export interface KeyPair {
 
 /**
  * Generate a new PGP key pair
+ * 
+ * @param options Account options including algorithm choice
+ * @throws {MauError} If passphrase is missing or RSA key is too weak
  */
 export async function generateKeyPair(options: AccountOptions): Promise<KeyPair> {
   if (!options.passphrase) {
@@ -32,10 +35,20 @@ export async function generateKeyPair(options: AccountOptions): Promise<KeyPair>
     passphrase: options.passphrase,
   };
 
-  // Use Ed25519 by default, RSA if specified
+  // Use Ed25519 by default (modern, fast, secure), RSA if specified
   if (options.algorithm === 'rsa') {
     keyOptions.type = 'rsa';
-    keyOptions.rsaBits = options.rsaBits || 4096;
+    const rsaBits = options.rsaBits || 4096;
+    
+    // Validate key strength (2048 bits minimum per NIST recommendations)
+    if (rsaBits < 2048) {
+      throw new MauError(
+        'RSA keys must be at least 2048 bits for security. Recommended: 4096 bits.',
+        'WEAK_KEY'
+      );
+    }
+    
+    keyOptions.rsaBits = rsaBits;
   } else {
     keyOptions.type = 'ecc';
     keyOptions.curve = 'ed25519';
@@ -54,7 +67,7 @@ export async function generateKeyPair(options: AccountOptions): Promise<KeyPair>
   let privKey = await openpgp.readPrivateKey({ armoredKey: privateKeyArmored });
   const pubKey = await openpgp.readKey({ armoredKey: publicKeyArmored });
 
-  // Decrypt private key if it's encrypted
+  // Generated keys are encrypted with passphrase, decrypt for immediate use
   if (!privKey.isDecrypted()) {
     privKey = await openpgp.decryptKey({
       privateKey: privKey,
@@ -71,18 +84,24 @@ export async function generateKeyPair(options: AccountOptions): Promise<KeyPair>
 
 /**
  * Serialize private key to armored format
+ * 
+ * @param privateKey The private key to serialize (must be decrypted)
+ * @param passphrase Passphrase to encrypt the key with
+ * @throws {MauError} If the key is already encrypted
  */
 export async function serializePrivateKey(
   privateKey: openpgp.PrivateKey,
   passphrase: string
 ): Promise<string> {
-  // Check if key is already encrypted
+  // Require decrypted key - prevents accidental passphrase mismatch
   if (!privateKey.isDecrypted()) {
-    // Already encrypted, just armor it
-    return privateKey.armor();
+    throw new MauError(
+      'Private key must be decrypted before serialization. Use deserializePrivateKey() to decrypt first.',
+      'KEY_ALREADY_ENCRYPTED'
+    );
   }
   
-  // Encrypt the key
+  // Encrypt the key with the provided passphrase
   const encrypted = await openpgp.encryptKey({
     privateKey,
     passphrase,

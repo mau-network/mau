@@ -21,9 +21,21 @@ interface FileEntry {
 
 export class BrowserStorage implements Storage {
   private db: IDBDatabase | null = null;
+  private initPromise: Promise<void>;
 
-  constructor() {
-    this.initDB();
+  private constructor() {
+    // Private constructor - use BrowserStorage.create() instead
+    this.initPromise = this.initDB();
+  }
+
+  /**
+   * Create a new BrowserStorage instance
+   * Use this instead of `new BrowserStorage()` to ensure DB is initialized
+   */
+  static async create(): Promise<BrowserStorage> {
+    const storage = new BrowserStorage();
+    await storage.initPromise;
+    return storage;
   }
 
   private async initDB(): Promise<void> {
@@ -50,9 +62,8 @@ export class BrowserStorage implements Storage {
   }
 
   private async ensureDB(): Promise<IDBDatabase> {
-    if (!this.db) {
-      await this.initDB();
-    }
+    // Wait for initialization to complete
+    await this.initPromise;
     if (!this.db) {
       throw new Error('Failed to initialize database');
     }
@@ -153,40 +164,65 @@ export class BrowserStorage implements Storage {
   }
 
   async readDir(dirPath: string): Promise<string[]> {
-    const allKeys = await this.getAllKeys();
+    const db = await this.ensureDB();
     
-    // Handle root directory
-    if (!dirPath || dirPath === '/') {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      
+      // Handle root directory
+      if (!dirPath || dirPath === '/') {
+        const entries = new Set<string>();
+        const request = store.openCursor();
+        
+        request.onsuccess = () => {
+          const cursor = request.result;
+          if (cursor) {
+            const key = cursor.value.path;
+            const slashIndex = key.indexOf('/');
+            if (slashIndex === -1) {
+              entries.add(key);
+            } else {
+              entries.add(key.slice(0, slashIndex));
+            }
+            cursor.continue();
+          } else {
+            resolve(Array.from(entries));
+          }
+        };
+        
+        request.onerror = () => reject(request.error);
+        return;
+      }
+      
+      // Handle subdirectories with cursor range query
+      const prefix = dirPath.endsWith('/') ? dirPath : dirPath + '/';
+      const range = IDBKeyRange.bound(prefix, prefix + '\uffff');
+      
       const entries = new Set<string>();
-      for (const key of allKeys) {
-        const slashIndex = key.indexOf('/');
-        if (slashIndex === -1) {
-          // File in root
-          entries.add(key);
+      const request = store.openCursor(range);
+      
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (cursor) {
+          const key = cursor.value.path;
+          if (key.startsWith(prefix)) {
+            const rest = key.slice(prefix.length);
+            const nextSlash = rest.indexOf('/');
+            if (nextSlash === -1) {
+              entries.add(rest);
+            } else {
+              entries.add(rest.slice(0, nextSlash));
+            }
+          }
+          cursor.continue();
         } else {
-          // Directory in root
-          entries.add(key.slice(0, slashIndex));
+          resolve(Array.from(entries));
         }
-      }
-      return Array.from(entries);
-    }
-    
-    // Handle subdirectories
-    const prefix = dirPath.endsWith('/') ? dirPath : dirPath + '/';
-    const entries = new Set<string>();
-    for (const key of allKeys) {
-      if (key.startsWith(prefix)) {
-        const rest = key.slice(prefix.length);
-        const nextSlash = rest.indexOf('/');
-        if (nextSlash === -1) {
-          entries.add(rest);
-        } else {
-          entries.add(rest.slice(0, nextSlash));
-        }
-      }
-    }
-    
-    return Array.from(entries);
+      };
+      
+      request.onerror = () => reject(request.error);
+    });
   }
 
   async mkdir(dirPath: string): Promise<void> {
@@ -202,15 +238,31 @@ export class BrowserStorage implements Storage {
   }
 
   async remove(path: string): Promise<void> {
-    const allKeys = await this.getAllKeys();
-    const prefix = path.endsWith('/') ? path : path + '/';
+    const db = await this.ensureDB();
     
-    // Delete the path itself and all children
-    const toDelete = allKeys.filter((key) => key === path || key.startsWith(prefix));
-    
-    for (const key of toDelete) {
-      await this.deleteEntry(key);
-    }
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const prefix = path.endsWith('/') ? path : path + '/';
+      
+      // Delete the path itself
+      store.delete(path);
+      
+      // Delete all children using cursor with range
+      const range = IDBKeyRange.bound(prefix, prefix + '\uffff');
+      const request = store.openCursor(range);
+      
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (cursor) {
+          cursor.delete();
+          cursor.continue();
+        }
+      };
+      
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
   }
 
   async stat(path: string): Promise<{ size: number; isDirectory: boolean; modifiedTime?: number }> {

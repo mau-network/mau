@@ -106,20 +106,8 @@ export class WebRTCClient {
       throw new Error('Data channel not ready');
     }
 
-    // Send our public key
-    const publicKey = this.account.getPublicKey();
-    const challenge = crypto.getRandomValues(new Uint8Array(32));
-
-    const handshakeOffer = JSON.stringify({
-      type: 'mtls_offer',
-      publicKey,
-      challenge: Array.from(challenge),
-    });
-
-    this.dataChannel.send(handshakeOffer);
-
-    // Wait for response
-    return new Promise((resolve, reject) => {
+    // Set up response handler BEFORE sending offer (avoid race condition)
+    const responsePromise = new Promise<boolean>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('mTLS timeout')), 10000);
 
       const handler = async (event: MessageEvent) => {
@@ -127,13 +115,12 @@ export class WebRTCClient {
           const response = JSON.parse(event.data);
 
           if (response.type === 'mtls_response') {
+            // Import crypto functions at top of promise to avoid repeated dynamic imports
+            const { deserializePublicKey, getFingerprint, verify } = await import('../crypto/index.js');
+            
             // Verify peer's public key matches expected fingerprint
-            const peerKey = await import('../crypto/index.js').then((m) =>
-              m.deserializePublicKey(response.publicKey)
-            );
-            const peerFingerprint = await import('../crypto/index.js').then((m) =>
-              m.getFingerprint(peerKey)
-            );
+            const peerKey = await deserializePublicKey(response.publicKey);
+            const peerFingerprint = getFingerprint(peerKey);
 
             if (peerFingerprint !== this.peer) {
               clearTimeout(timeout);
@@ -143,7 +130,6 @@ export class WebRTCClient {
             }
 
             // Verify challenge signature
-            const { verify } = await import('../crypto/index.js');
             const challengeBytes = new Uint8Array(response.challenge);
             const signatureValid = await verify(
               challengeBytes,
@@ -166,6 +152,21 @@ export class WebRTCClient {
         this.dataChannel.addEventListener('message', handler);
       }
     });
+    
+    // Now send offer (handler is already registered)
+    const publicKey = this.account.getPublicKey();
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+
+    const handshakeOffer = JSON.stringify({
+      type: 'mtls_offer',
+      publicKey,
+      challenge: Array.from(challenge),
+    });
+
+    this.dataChannel.send(handshakeOffer);
+
+    // Wait for response
+    return responsePromise;
   }
 
   /**
