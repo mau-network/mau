@@ -38,7 +38,7 @@ describe('Client Error Handling and Edge Cases', () => {
   afterAll(async () => {
     try {
       await fs.rm(TEST_DIR, { recursive: true, force: true });
-    } catch {}
+    } catch (error) { /* Ignore expected error */ }
   });
 
   describe('Constructor and Configuration', () => {

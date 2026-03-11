@@ -32,7 +32,7 @@ describe('Extended File Operations', () => {
   afterAll(async () => {
     try {
       await fs.rm(TEST_DIR, { recursive: true, force: true });
-    } catch {}
+    } catch (error) { /* Ignore expected error */ }
   });
 
 
@@ -119,7 +119,7 @@ describe('Extended File Operations', () => {
       const file = new File(account, storage, contentDir + '/version-read.txt');
 
       await file.write('First version');
-      const versions1 = await file.getVersions();
+      await file.getVersions(); // Check versioning works
       
       await file.write('Second version');
 

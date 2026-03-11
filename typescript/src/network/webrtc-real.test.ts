@@ -6,7 +6,6 @@ import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } from '@roamhq/wrtc';
 import { WebRTCClient } from './webrtc';
 import { WebRTCServer } from './webrtc-server';
-import { LocalSignalingServer } from './signaling';
 import { Account } from '../account';
 import { FilesystemStorage } from '../storage/filesystem';
 import * as fs from 'fs/promises';
@@ -45,7 +44,7 @@ describe('Real WebRTC E2E Tests', () => {
   afterAll(async () => {
     try {
       await fs.rm(TEST_DIR, { recursive: true, force: true });
-    } catch {}
+    } catch (error) { /* Ignore cleanup errors */ }
   });
 
   it('should create peer connection', () => {
@@ -93,7 +92,7 @@ describe('Real WebRTC E2E Tests', () => {
       };
 
       // Create data channel on peer1
-      const dc1 = peer1.createDataChannel('test');
+      peer1.createDataChannel('test');
 
       dc1.onopen = () => {
         dc1.send('Hello from Peer1');
@@ -161,7 +160,7 @@ describe('Real WebRTC E2E Tests', () => {
       };
 
       const testData = new Uint8Array([1, 2, 3, 4, 5]);
-      const dc1 = peer1.createDataChannel('test');
+      peer1.createDataChannel('test');
 
       dc1.onopen = () => {
         dc1.send(testData);
@@ -231,7 +230,7 @@ describe('Real WebRTC E2E Tests', () => {
         }
       };
 
-      const dc1 = peer1.createDataChannel('test');
+      peer1.createDataChannel('test');
 
       peer1.createOffer().then((offer) => {
         return peer1.setLocalDescription(offer);
@@ -329,7 +328,7 @@ describe('Real WebRTC E2E Tests', () => {
 
     try {
       await fs.rm(TEST_DIR + '/client2', { recursive: true });
-    } catch {}
+    } catch (error) { /* Ignore cleanup errors */ }
   });
 
   it('should close connections gracefully', () => {
@@ -337,7 +336,7 @@ describe('Real WebRTC E2E Tests', () => {
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     });
 
-    const dc = peer.createDataChannel('test');
+    peer.createDataChannel('test');
     
     expect(() => {
       peer.close();

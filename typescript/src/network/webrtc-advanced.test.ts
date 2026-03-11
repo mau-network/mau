@@ -44,7 +44,10 @@ describe('Advanced WebRTC E2E Tests', () => {
   afterAll(async () => {
     try {
       await fs.rm(TEST_DIR, { recursive: true, force: true });
-    } catch {}
+    } catch (error) {
+      // Ignore cleanup errors
+      console.error('Cleanup error:', error);
+    }
   });
 
   describe('Connection Lifecycle', () => {
@@ -167,7 +170,7 @@ describe('Advanced WebRTC E2E Tests', () => {
 
       try {
         await fs.rm(TEST_DIR + '/client2', { recursive: true });
-      } catch {}
+      } catch (error) { /* Ignore expected error */ }
     });
 
     it('should handle sequential connections', async () => {
@@ -225,7 +228,10 @@ describe('Advanced WebRTC E2E Tests', () => {
 
       try {
         await fs.rm(TEST_DIR + '/client3', { recursive: true });
-      } catch {}
+      } catch (error) {
+        // Ignore cleanup errors
+        console.error('Cleanup error:', error);
+      }
     });
   });
 

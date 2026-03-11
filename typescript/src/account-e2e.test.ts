@@ -20,7 +20,7 @@ describe('Account E2E Tests', () => {
   afterAll(async () => {
     try {
       await fs.rm(TEST_DIR, { recursive: true, force: true });
-    } catch {}
+    } catch (error) { /* Ignore expected error */ }
   });
 
   describe('Account Creation', () => {
