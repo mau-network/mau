@@ -183,3 +183,18 @@ export class IncorrectPeerCertificateError extends MauError {
     super('Incorrect peer certificate', 'INCORRECT_PEER_CERTIFICATE');
   }
 }
+
+export class HttpError extends MauError {
+  statusCode: number;
+  
+  constructor(statusCode: number, statusText: string) {
+    super(`HTTP ${statusCode}: ${statusText}`, 'HTTP_ERROR');
+    this.statusCode = statusCode;
+  }
+}
+
+export class NetworkError extends MauError {
+  constructor(message: string) {
+    super(message, 'NETWORK_ERROR');
+  }
+}

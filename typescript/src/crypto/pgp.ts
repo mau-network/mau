@@ -265,8 +265,7 @@ export async function verify(
 export async function sha256(data: Uint8Array): Promise<string> {
   if (typeof crypto !== 'undefined' && crypto.subtle) {
     // Browser or modern Node.js with Web Crypto API
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data as any);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data as BufferSource);
     return Array.from(new Uint8Array(hashBuffer))
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');

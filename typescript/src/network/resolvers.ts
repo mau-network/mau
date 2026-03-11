@@ -76,10 +76,10 @@ export function dnsResolver(
       // No matching TXT record found (peer not published)
       return null;
     } catch (err) {
-      const error = err as any;
+      const error = err instanceof Error ? err : new Error(String(err));
       
       // Module not available (browser environment)
-      if (error?.code === 'MODULE_NOT_FOUND' || error?.message?.includes('Cannot find module')) {
+      if ('code' in error && (error as NodeJS.ErrnoException).code === 'MODULE_NOT_FOUND' || error?.message?.includes('Cannot find module')) {
         if (resolverAvailable === null) {
           console.warn('DNS resolver not available in browser environment');
           resolverAvailable = false;

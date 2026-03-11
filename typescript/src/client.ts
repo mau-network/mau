@@ -11,10 +11,11 @@ import type {
   FileListItem,
   FileListResponse,
   Peer,
-  FingerprintResolver,
 } from './types/index.js';
+import { HttpError, NetworkError } from './types/index.js';
 import { HTTP_TIMEOUT_MS, URI_PROTOCOL_NAME, PeerNotFoundError } from './types/index.js';
 import type { Account } from './account.js';
+
 
 export class Client {
   private account: Account;
@@ -48,7 +49,7 @@ export class Client {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       return require('node-fetch');
     } catch {
-      throw new Error('fetch not available - install node-fetch for Node.js environments');
+      throw new NetworkError('fetch not available - install node-fetch for Node.js environments');
     }
   }
 
@@ -138,7 +139,7 @@ export class Client {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new HttpError(response.status, response.statusText);
       }
 
       const data: FileListResponse = await response.json();
@@ -166,7 +167,7 @@ export class Client {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new HttpError(response.status, response.statusText);
       }
 
       const buffer = await response.arrayBuffer();
@@ -194,7 +195,7 @@ export class Client {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new HttpError(response.status, response.statusText);
       }
 
       const buffer = await response.arrayBuffer();
@@ -274,7 +275,7 @@ export class Client {
     account: Account,
     storage: Storage,
     peer: Peer,
-    resolvers: FingerprintResolver[] = []
+    resolvers: any[] = []
   ): Client {
     return new Client(account, storage, peer.fingerprint, {
       resolvers: [

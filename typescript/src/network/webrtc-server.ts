@@ -55,7 +55,7 @@ export class WebRTCServer {
 
     const connection: WebRTCConnection = {
       peer,
-      channel: null as any,
+      channel: null!,
       fingerprint: null,
       authenticated: false,
     };
