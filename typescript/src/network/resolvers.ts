@@ -186,3 +186,46 @@ export function combinedResolver(resolvers: FingerprintResolver[]): FingerprintR
     return null;
   };
 }
+
+/**
+ * Retry resolver with exponential backoff
+ * 
+ * Wraps another resolver and retries on failure with exponential delays
+ * 
+ * @param resolver Base resolver to retry
+ * @param maxRetries Maximum number of retry attempts (default: 3)
+ * @param initialDelayMs Initial delay in milliseconds (default: 100ms)
+ */
+export function retryResolver(
+  resolver: FingerprintResolver,
+  maxRetries = 3,
+  initialDelayMs = 100
+): FingerprintResolver {
+  return async (fingerprint: Fingerprint, timeout?: number) => {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await resolver(fingerprint, timeout);
+        if (result) {
+          return result;
+        }
+        // Null result = not found, don't retry
+        return null;
+      } catch (err) {
+        lastError = err as Error;
+        
+        // Don't retry on last attempt
+        if (attempt < maxRetries) {
+          // Exponential backoff: 100ms, 200ms, 400ms, etc.
+          const delayMs = initialDelayMs * Math.pow(2, attempt);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
+    }
+    
+    // All retries exhausted
+    console.error(`Resolver failed after ${maxRetries + 1} attempts:`, lastError?.message);
+    return null;
+  };
+}

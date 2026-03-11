@@ -34,6 +34,8 @@ export interface AccountOptions {
   passphrase: string;
   algorithm?: 'ed25519' | 'rsa';
   rsaBits?: 2048 | 4096;
+  /** Key expiration in years (default: 2 years, 0 = no expiration) */
+  expirationYears?: number;
 }
 
 /** Storage interface - abstraction for filesystem or localStorage */

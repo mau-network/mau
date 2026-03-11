@@ -283,4 +283,63 @@ export class BrowserStorage implements Storage {
       .replace(/\/+/g, '/')
       .replace(/^\//, '');
   }
+
+  /**
+   * Batch write multiple files in a single transaction
+   * Much faster than individual writeFile calls for bulk operations
+   */
+  async writeBatch(files: Array<{ path: string; data: Uint8Array }>): Promise<void> {
+    const db = await this.ensureDB();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const timestamp = Date.now();
+      
+      for (const file of files) {
+        store.put({
+          path: file.path,
+          data: file.data,
+          size: file.data.length,
+          isDirectory: false,
+          modifiedTime: timestamp,
+        });
+      }
+      
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  }
+
+  /**
+   * Batch read multiple files in a single transaction
+   * Returns Map of path -> data (null if file doesn't exist)
+   */
+  async readBatch(paths: string[]): Promise<Map<string, Uint8Array | null>> {
+    const db = await this.ensureDB();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const results = new Map<string, Uint8Array | null>();
+      
+      let completed = 0;
+      for (const path of paths) {
+        const request = store.get(path);
+        request.onsuccess = () => {
+          results.set(path, request.result?.data || null);
+          completed++;
+          if (completed === paths.length) {
+            resolve(results);
+          }
+        };
+        request.onerror = () => reject(request.error);
+      }
+      
+      // Handle empty array case
+      if (paths.length === 0) {
+        resolve(results);
+      }
+    });
+  }
 }

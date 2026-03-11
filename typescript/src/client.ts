@@ -77,6 +77,46 @@ export class Client {
   }
 
   /**
+   * Fetch with retry and exponential backoff
+   * Retries on network errors and 5xx server errors
+   */
+  private async fetchWithRetry(
+    url: string,
+    options: RequestInit,
+    maxRetries = 2
+  ): Promise<Response> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await this.fetchImpl(url, options);
+        
+        // Retry on 5xx server errors (but not 4xx client errors)
+        if (response.status >= 500 && attempt < maxRetries) {
+          const delayMs = 100 * Math.pow(2, attempt); // 100ms, 200ms, 400ms
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          continue;
+        }
+        
+        return response;
+      } catch (err) {
+        lastError = err as Error;
+        
+        // Don't retry on timeout (abort signal) or last attempt
+        if ((err as Error).name === 'AbortError' || attempt >= maxRetries) {
+          throw err;
+        }
+        
+        // Exponential backoff for network errors
+        const delayMs = 100 * Math.pow(2, attempt);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+    
+    throw lastError || new Error('Fetch failed after retries');
+  }
+
+  /**
    * Fetch file list from peer
    */
   async fetchFileList(after?: Date): Promise<FileListItem[]> {
@@ -93,7 +133,7 @@ export class Client {
     try {
       // TODO: mTLS authentication not yet implemented for HTTP client
       // Use WebRTC client for authenticated P2P connections
-      const response = await this.fetchImpl(url.toString(), {
+      const response = await this.fetchWithRetry(url.toString(), {
         signal: controller.signal,
       });
 
@@ -121,7 +161,7 @@ export class Client {
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
     try {
-      const response = await this.fetchImpl(url, {
+      const response = await this.fetchWithRetry(url, {
         signal: controller.signal,
       });
 
@@ -149,7 +189,7 @@ export class Client {
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
     try {
-      const response = await this.fetchImpl(url, {
+      const response = await this.fetchWithRetry(url, {
         signal: controller.signal,
       });
 

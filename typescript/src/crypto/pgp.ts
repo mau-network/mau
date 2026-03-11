@@ -34,6 +34,13 @@ export async function generateKeyPair(options: AccountOptions): Promise<KeyPair>
     userIDs: [{ name: options.name, email: options.email }],
     passphrase: options.passphrase,
   };
+  
+  // Set key expiration (default: 2 years)
+  const expirationYears = options.expirationYears ?? 2;
+  if (expirationYears > 0) {
+    // Convert years to seconds
+    keyOptions.keyExpirationTime = expirationYears * 365 * 24 * 60 * 60;
+  }
 
   // Use Ed25519 by default (modern, fast, secure), RSA if specified
   if (options.algorithm === 'rsa') {
