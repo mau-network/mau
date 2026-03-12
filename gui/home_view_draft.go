@@ -20,7 +20,7 @@ func (hv *HomeView) saveDraftDelayed() {
 	})
 }
 
-// saveDraft saves the current post content to disk
+// saveDraft saves the current post content to disk atomically
 func (hv *HomeView) saveDraft() {
 	buffer := hv.postEntry.Buffer()
 	start := buffer.StartIter()
@@ -32,8 +32,18 @@ func (hv *HomeView) saveDraft() {
 	}
 
 	draftPath := filepath.Join(hv.app.dataDir, draftFile)
-	if err := os.WriteFile(draftPath, []byte(text), 0600); err != nil {
+	
+	// Atomic write: write to temp file, then rename
+	tmpPath := draftPath + ".tmp"
+	if err := os.WriteFile(tmpPath, []byte(text), 0600); err != nil {
 		hv.app.showToast("Failed to save draft")
+		return
+	}
+
+	// Rename is atomic on POSIX systems - prevents corruption on crash
+	if err := os.Rename(tmpPath, draftPath); err != nil {
+		hv.app.showToast("Failed to save draft")
+		os.Remove(tmpPath) // Clean up temp file on failure
 	}
 }
 

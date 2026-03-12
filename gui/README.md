@@ -568,10 +568,11 @@ This section lists areas for improvement identified through critical code review
    - Could crash or fail silently on invalid input
    - Add format validation before calling `AddFriend()`
 
-4. **Unsafe File Operations**
-   - No atomic writes for config/drafts (risk of corruption on crash)
-   - Should write to temp file + rename
-   - No backup before overwrite
+4. ~~**Unsafe File Operations**~~ **FIXED 2026-03-12**
+   - ~~No atomic writes for config/drafts (risk of corruption on crash)~~
+   - ✅ Config uses atomic writes (config.go:84-101)
+   - ✅ Draft now uses atomic writes (see ATOMIC_DRAFT_WRITES.md)
+   - ⚠️ TODO: Add backup before overwrite (low priority)
 
 5. **Missing Error Propagation**
    - Many errors logged with `log.Printf()` instead of returned
