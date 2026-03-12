@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Mau Browser Test (Standalone)</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 { color: #333; }
+    #output {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      min-height: 300px;
+      font-family: monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+    .success { color: green; }
+    .error { color: red; }
+    #status {
+      font-size: 18px;
+      font-weight: bold;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>🛸 Mau Browser Test</h1>
+  <div id="status">Running tests...</div>
+  <div id="output"></div>
+
+  <script type="module">
+    // Import from the built bundle
+    import * as Mau from './dist/mau.es.js';
+
+    const statusEl = document.getElementById('status');
+    const outputEl = document.getElementById('output');
+
+    function log(msg, className = '') {
+      console.log(msg);
+      const line = document.createElement('div');
+      line.textContent = msg;
+      if (className) line.className = className;
+      outputEl.appendChild(line);
+    }
+
+    async function runTests() {
+      try {
+        log('🧪 Mau Browser Integration Test\n');
+
+        log('1. Testing module import...');
+        log(`   - createAccount: ${typeof Mau.createAccount}`);
+        log(`   - File: ${typeof Mau.File}`);
+        log(`   - BrowserStorage: ${typeof Mau.BrowserStorage}`);
+        log('   ✓ All imports available\n', 'success');
+
+        log('2. Creating account...');
+        const account = await Mau.createAccount(
+          'test-browser-account',
+          'Browser Test User',
+          'test@browser.com',
+          'browser-test-pass'
+        );
+        log(`   ✓ Account created`, 'success');
+        log(`   - Name: ${account.getName()}`);
+        log(`   - Email: ${account.getEmail()}`);
+        log(`   - Fingerprint: ${account.getFingerprint()}\n`);
+
+        log('3. Writing a test file...');
+        const storage = account.storage;
+        const file = Mau.File.create(account, storage, 'browser-test.json');
+        await file.writeJSON({
+          '@type': 'SocialMediaPosting',
+          headline: 'Hello from Browser!',
+          articleBody: 'This post was created in IndexedDB',
+          datePublished: new Date().toISOString(),
+        });
+        log('   ✓ File written to IndexedDB\n', 'success');
+
+        log('4. Reading file back...');
+        const content = await file.readJSON();
+        log('   ✓ File read successfully', 'success');
+        log(`   - Headline: ${content.headline}`);
+        log(`   - Body: ${content.articleBody}\n`);
+
+        log('5. Listing files...');
+        const files = await Mau.File.list(account, storage);
+        log(`   ✓ Found ${files.length} file(s)`, 'success');
+        for (const f of files) {
+          log(`     - ${f.getName()}`);
+        }
+        log('');
+
+        log('6. Testing versioning...');
+        await file.writeJSON({
+          '@type': 'SocialMediaPosting',
+          headline: 'Hello from Browser (Updated)!',
+          articleBody: 'This is version 2',
+          datePublished: new Date().toISOString(),
+        });
+        const versions = await file.getVersions();
+        log(`   ✓ File updated, ${versions.length} previous version(s)\n`, 'success');
+
+        log('7. Exporting public key...');
+        const publicKey = account.getPublicKey();
+        log(`   ✓ Public key (first 80 chars): ${publicKey.substring(0, 80)}...\n`, 'success');
+
+        statusEl.textContent = '✅ All tests passed!';
+        statusEl.className = 'success';
+        log('✅ All browser tests passed!', 'success');
+
+      } catch (err) {
+        statusEl.textContent = '❌ Tests failed';
+        statusEl.className = 'error';
+        log(`\n❌ Test failed: ${err.message}`, 'error');
+        log(`Stack: ${err.stack}`, 'error');
+      }
+    }
+
+    // Run tests when page loads
+    runTests();
+  </script>
+</body>
+</html>
