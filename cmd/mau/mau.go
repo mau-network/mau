@@ -35,7 +35,8 @@ func main() {
 	delete:   Delete a file you shared previously
 	serve:    Open a server to allow followers to sync your content
 	sync:     Sync content from a friend`)
-		os.Exit(1)
+		exitFunc(1)
+		return
 	}
 
 	wd, _ := os.Getwd()
@@ -49,7 +50,7 @@ func main() {
 			log.Fatalf("Failed to parse init flags: %v", err)
 		}
 
-		passphrase := getPassword()
+		passphrase := getPasswordFunc()
 
 		fmt.Println("Initializing account...")
 		_, err := NewAccount(wd, *name, *email, passphrase)
@@ -411,7 +412,7 @@ func main() {
 
 func getAccount() *Account {
 	wd, _ := os.Getwd()
-	account, err := OpenAccount(wd, getPassword())
+	account, err := OpenAccount(wd, getPasswordFunc())
 	raise(err)
 	if account == nil {
 		log.Fatal("Failed to open account")
@@ -419,6 +420,12 @@ func getAccount() *Account {
 
 	return account
 }
+
+// Variables to allow mocking in tests
+var (
+	exitFunc        = os.Exit
+	getPasswordFunc = getPassword
+)
 
 func getPassword() string {
 	fmt.Print("Passphrase: ")
