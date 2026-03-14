@@ -43,7 +43,6 @@ export class Server {
       bootstrapNodes: [],
       enableMDNS: false,
       enableDHT: false,
-      enableUPnP: false,
       ...config,
     };
   }

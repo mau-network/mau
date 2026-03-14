@@ -85,7 +85,6 @@ export interface ServerConfig {
   port?: number; // Listen port
   enableMDNS?: boolean; // Enable mDNS discovery
   enableDHT?: boolean; // Enable Kademlia DHT
-  enableUPnP?: boolean; // Enable UPnP port forwarding
 }
 
 /** Sync state tracking */
