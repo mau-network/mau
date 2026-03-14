@@ -3,6 +3,7 @@
  */
 
 import type { Fingerprint, FingerprintResolver } from '../types/index.js';
+import type { KademliaDHT } from './dht.js';
 
 /**
  * Static address resolver
@@ -102,70 +103,15 @@ export function dnsResolver(
 
 
 /**
- * DHT resolver - HTTP-based peer discovery (stub implementation)
- * 
- * ⚠️ **Stub Implementation**: This is a simplified HTTP-based DHT that requires
- * bootstrap nodes to expose a `/dht/peers/<fingerprint>` HTTP endpoint.
- * 
- * **Not compatible with Go implementation's UDP-based Kademlia DHT.**
- * 
- * For production use, either:
- * 1. Implement the `/dht/peers/<fingerprint>` endpoint on bootstrap nodes
- * 2. Use full Kademlia protocol (requires UDP, Node.js only)
- * 3. Use staticResolver for known peers
- * 
- * @param bootstrapNodes List of HTTP bootstrap node addresses (e.g., "bootstrap.mau.network:8080")
+ * DHT resolver — wraps a {@link KademliaDHT} instance as a {@link FingerprintResolver}.
+ *
+ * Perform an iterative Kademlia lookup over the WebRTC-connected DHT network
+ * and return the peer's HTTP address, or null if not found.
+ *
+ * @param dht A joined KademliaDHT instance
  */
-export function dhtResolver(bootstrapNodes: string[]): FingerprintResolver {
-  // Simple in-memory cache
-  const routingTable = new Map<Fingerprint, string>();
-  
-  return async (fingerprint: Fingerprint, timeout = 5000) => {
-    // Check local cache first
-    const cached = routingTable.get(fingerprint);
-    if (cached) {
-      return cached;
-    }
-
-    // Query bootstrap nodes via HTTP
-    // NOTE: This requires bootstrap nodes to implement HTTP DHT endpoint
-    
-    try {
-      for (const bootstrapNode of bootstrapNodes) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), timeout);
-          
-          // HTTP-based DHT query (requires custom endpoint implementation)
-          const response = await fetch(`https://${bootstrapNode}/dht/peers/${fingerprint}`, {
-            signal: controller.signal,
-            headers: {
-              'Accept': 'application/json',
-            },
-          });
-          
-          clearTimeout(timeoutId);
-
-          if (response.ok) {
-            const data = await response.json() as { address?: string };
-            
-            if (data.address) {
-              // Cache the result
-              routingTable.set(fingerprint, data.address);
-              return data.address;
-            }
-          }
-        } catch (err) {
-          // Bootstrap node unreachable or timeout, try next
-          continue;
-        }
-      }
-
-      return null;
-    } catch (err) {
-      return null;
-    }
-  };
+export function dhtResolver(dht: KademliaDHT): FingerprintResolver {
+  return dht.resolver();
 }
 
 /**

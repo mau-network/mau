@@ -29,16 +29,14 @@ URI Subject Alternative Name, and returns DER-encoded cert + PKCS#8 key.
 
 ---
 
-### 4. Replace the DHT stub with a real Kademlia implementation
-**File:** `typescript/src/network/resolvers.ts:105`
-
-The current DHT resolver is an HTTP polling stub that queries a single
-bootstrap node at `/dht/peers/<fingerprint>`. It is **not compatible** with
-the Go implementation's UDP-based Kademlia DHT.
-
-**Fix:** Implement a UDP Kademlia DHT using the existing optional dependency
-`k-bucket`, or integrate a library such as `bittorrent-dht`. Ensure the wire
-protocol is compatible with the Go side.
+### ~~4. Replace the DHT stub with a real Kademlia implementation~~ ✓ Fixed
+Implemented `KademliaDHT` in `network/dht.ts`: 160 k-buckets, k=20, alpha=3,
+XOR distance on PGP fingerprints — same algorithm as Go's `kademlia.go`.
+Transport is WebRTC data channels instead of HTTP. Bootstrap peers are reached
+via `POST /p2p/dht/offer` (HTTP, one round-trip with complete ICE). All
+subsequent peer connections use DHT-relay signaling: an existing DHT peer
+forwards offer/answer/ICE between the two endpoints for NAT hole-punching.
+`dhtResolver()` now wraps a `KademliaDHT` instance directly.
 
 ---
 
@@ -143,7 +141,7 @@ without full mTLS.
 | ~~1~~ | ~~Signature verification not enforced~~ | ~~High~~ | ~~`file.ts:109`~~ ✓ |
 | ~~2~~ | ~~HTTP client missing mTLS auth~~ | ~~High~~ | ~~`client.ts:147`~~ ✓ |
 | ~~3~~ | ~~`generateCertificate()` not implemented~~ | ~~Medium~~ | ~~`crypto/pgp.ts`~~ ✓ |
-| 4 | DHT stub not Kademlia-compatible | Medium | `network/resolvers.ts:105` |
+| ~~4~~ | ~~DHT stub not Kademlia-compatible~~ | ~~Medium~~ | ~~`network/resolvers.ts`~~ ✓ |
 | 5 | No retry for failed file downloads | Medium | `client.ts:262` |
 | 6 | Type-unsafe `any` / `@ts-expect-error` | Medium | multiple |
 | 7 | Tests not runnable without CI workflow | Medium | CI config missing |
