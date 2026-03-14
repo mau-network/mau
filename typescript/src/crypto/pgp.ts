@@ -5,6 +5,11 @@
  */
 
 import * as openpgp from 'openpgp';
+import {
+  X509CertificateGenerator,
+  BasicConstraintsExtension,
+  SubjectAlternativeNameExtension,
+} from '@peculiar/x509';
 import type {
   Fingerprint,
   AccountOptions,
@@ -278,73 +283,6 @@ export async function sha256(data: Uint8Array): Promise<string> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Minimal ASN.1 DER helpers (used only by generateCertificate)
-// ---------------------------------------------------------------------------
-
-function derLen(len: number): Uint8Array {
-  if (len < 0x80) return new Uint8Array([len]);
-  const b: number[] = [];
-  let n = len;
-  while (n > 0) { b.unshift(n & 0xff); n >>>= 8; }
-  return new Uint8Array([0x80 | b.length, ...b]);
-}
-
-function derTLV(tag: number, val: Uint8Array): Uint8Array {
-  const l = derLen(val.length);
-  const out = new Uint8Array(1 + l.length + val.length);
-  out[0] = tag; out.set(l, 1); out.set(val, 1 + l.length);
-  return out;
-}
-
-function cat(...parts: Uint8Array[]): Uint8Array {
-  const total = parts.reduce((s, p) => s + p.length, 0);
-  const out = new Uint8Array(total);
-  let off = 0;
-  for (const p of parts) { out.set(p, off); off += p.length; }
-  return out;
-}
-
-function derSeq(...items: Uint8Array[]): Uint8Array { return derTLV(0x30, cat(...items)); }
-function derOID(b: number[]): Uint8Array { return derTLV(0x06, new Uint8Array(b)); }
-function derUTF8(s: string): Uint8Array { return derTLV(0x0c, new TextEncoder().encode(s)); }
-function derOctetStr(d: Uint8Array): Uint8Array { return derTLV(0x04, d); }
-function derBitStr(d: Uint8Array): Uint8Array { return derTLV(0x03, cat(new Uint8Array([0x00]), d)); }
-
-function derInt(v: Uint8Array): Uint8Array {
-  // Strip leading zeros (keep at least one byte)
-  let i = 0;
-  while (i < v.length - 1 && v[i] === 0) i++;
-  const trimmed = v.slice(i);
-  // Prepend 0x00 if the high bit would be interpreted as a sign bit
-  const content = (trimmed[0] & 0x80) ? cat(new Uint8Array([0x00]), trimmed) : trimmed;
-  return derTLV(0x02, content);
-}
-
-function derUTCTime(d: Date): Uint8Array {
-  const p = (n: number) => n.toString().padStart(2, '0');
-  const s = `${p(d.getUTCFullYear() % 100)}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}` +
-            `${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`;
-  return derTLV(0x17, new TextEncoder().encode(s));
-}
-
-// OID byte sequences (pre-encoded OID value octets)
-const OID_ECDSA_SHA256 = [0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x02];
-const OID_COMMON_NAME  = [0x55, 0x04, 0x03];
-const OID_SAN          = [0x55, 0x1d, 0x11]; // id-ce-subjectAltName
-const OID_BC           = [0x55, 0x1d, 0x13]; // id-ce-basicConstraints
-
-function buildX509Name(cn: string): Uint8Array {
-  return derSeq(derTLV(0x31, derSeq(derOID(OID_COMMON_NAME), derUTF8(cn))));
-}
-
-/** Convert Web Crypto P1363 (r‖s, each 32 bytes) to DER SEQUENCE { INTEGER r, INTEGER s } */
-function p1363ToDer(sig: Uint8Array): Uint8Array {
-  return derSeq(derInt(sig.slice(0, 32)), derInt(sig.slice(32, 64)));
-}
-
-// ---------------------------------------------------------------------------
-
 /**
  * Generate a self-signed ECDSA P-256 TLS certificate with the PGP fingerprint
  * embedded in the Subject CN and as a URI Subject Alternative Name.
@@ -365,54 +303,32 @@ export async function generateCertificate(
     ['sign', 'verify']
   );
 
-  const spkiDer  = new Uint8Array(await crypto.subtle.exportKey('spki',  tlsKeys.publicKey));
   const pkcs8Der = new Uint8Array(await crypto.subtle.exportKey('pkcs8', tlsKeys.privateKey));
 
-  // Validity: now → +1 year
   const now = new Date();
   const exp = new Date(now);
   exp.setFullYear(exp.getFullYear() + 1);
 
-  // Random positive serial number (16 bytes)
-  const serial = crypto.getRandomValues(new Uint8Array(16));
-  serial[0] &= 0x7f;
-
-  const sigAlgId = derSeq(derOID(OID_ECDSA_SHA256));
-  const name     = buildX509Name(pgpFpr);
-  const validity = derSeq(derUTCTime(now), derUTCTime(exp));
-
-  // Extensions
-  const exts: Uint8Array[] = [
-    // BasicConstraints: CA:false (critical in some validators, empty SEQUENCE = false)
-    derSeq(derOID(OID_BC), derOctetStr(derSeq())),
+  // SubjectAltName: caller-supplied DNS names + pgp: URI for the fingerprint
+  const sanEntries = [
+    ...dnsNames.map(n => ({ type: 'dns' as const, value: n })),
+    { type: 'url' as const, value: `pgp:${pgpFpr}` },
   ];
 
-  // SubjectAltName: caller-supplied DNS names + pgp: URI for the fingerprint
-  const sans: Uint8Array[] = dnsNames.map(n =>
-    derTLV(0x82, new TextEncoder().encode(n)) // [2] dNSName
-  );
-  sans.push(derTLV(0x86, new TextEncoder().encode(`pgp:${pgpFpr}`))); // [6] uniformResourceIdentifier
-  exts.push(derSeq(derOID(OID_SAN), derOctetStr(derSeq(...sans))));
+  const cert = await X509CertificateGenerator.createSelfSigned({
+    name: `CN=${pgpFpr}`,
+    keys: tlsKeys,
+    notBefore: now,
+    notAfter: exp,
+    extensions: [
+      new BasicConstraintsExtension(false),
+      new SubjectAlternativeNameExtension(sanEntries),
+    ],
+  });
 
-  // TBSCertificate
-  const tbs = derSeq(
-    derTLV(0xa0, derTLV(0x02, new Uint8Array([0x02]))), // [0] EXPLICIT version v3 = 2
-    derInt(serial),
-    sigAlgId,
-    name,      // issuer
-    validity,
-    name,      // subject (same as issuer for self-signed)
-    spkiDer,   // SubjectPublicKeyInfo (already DER from exportKey)
-    derTLV(0xa3, derSeq(...exts)),                      // [3] EXPLICIT extensions
-  );
-
-  // Sign TBSCertificate; Web Crypto returns P1363 format for ECDSA
-  const sigP1363 = new Uint8Array(
-    await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, tlsKeys.privateKey, tbs)
-  );
-
-  // Certificate ::= SEQUENCE { tbs, signatureAlgorithm, signatureValue BIT STRING }
-  const certDer = derSeq(tbs, sigAlgId, derBitStr(p1363ToDer(sigP1363)));
-
-  return { cert: certDer, key: pkcs8Der, fingerprint: pgpFpr };
+  return {
+    cert: new Uint8Array(cert.rawData),
+    key: pkcs8Der,
+    fingerprint: pgpFpr,
+  };
 }

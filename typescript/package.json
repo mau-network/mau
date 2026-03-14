@@ -30,6 +30,7 @@
     "directory": "typescript"
   },
   "dependencies": {
+    "@peculiar/x509": "^1.14.3",
     "node-fetch": "^3.3.2",
     "openpgp": "^5.11.1"
   },
