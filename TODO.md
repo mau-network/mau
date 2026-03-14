@@ -40,39 +40,31 @@ forwards offer/answer/ICE between the two endpoints for NAT hole-punching.
 
 ---
 
-### 5. Retry failed file downloads during sync
-**File:** `typescript/src/client.ts:262`
-
-When an individual file download fails during a sync cycle, the error is
-logged and `stats.errors` is incremented, but the file is never retried.
-Transient network errors will silently leave the local copy out of date.
-
-**Fix:** Apply the existing `withRetry()` helper around the per-file download,
-and optionally surface the list of permanently failed files to the caller.
+### ~~5. Retry failed file downloads during sync~~ ✓ Fixed
+Added `withRetry()` helper to `Client` that wraps the per-file `downloadFile()`
+call in the sync loop with exponential backoff (200ms, 400ms). The helper skips
+retries for `AbortError` and 4xx HTTP errors. `sync()` now returns a
+`failedFiles` list alongside the existing counters so callers can inspect which
+files permanently failed.
 
 ---
 
-### 6. Fix type-unsafe patterns across the codebase
-**Files:**
-- `typescript/src/network/resolvers.ts:46` — `any` type
-- `typescript/tests/client-edge.test.ts:106` — `as any` cast
-- `typescript/tests/client.test.ts:110` — `@ts-expect-error` for private
-  field access
-
-**Fix:** Replace `any` with proper types; expose internal state via protected
-accessors or test-only helpers instead of suppressing TypeScript errors.
+### ~~6. Fix type-unsafe patterns across the codebase~~ ✓ Fixed
+- `resolvers.ts:47` — replaced `any` with `{ nameServers?: string[] }`.
+- `client-edge.test.ts:106` — removed `null as any` casts (null is already
+  assignable to `string | null`).
+- `client.test.ts:110` — removed `@ts-expect-error` / private-field access by
+  adding `fetchImpl?: typeof fetch` to `ClientConfig`; tests now pass the mock
+  via config.
+- `client.ts` `create()` — replaced `resolvers: any[]` with
+  `FingerprintResolver[]`.
 
 ---
 
-### 7. Add a CI workflow to ensure tests are runnable
-**File:** CI config missing
-
-Running `npm test` in a clean environment fails because Jest is listed as a
-dev dependency but `node_modules` is absent. CI should install deps and run
-tests automatically.
-
-**Fix:** Add a GitHub Actions workflow (`.github/workflows/test.yml`) that
-runs `npm ci && npm test` and verify the Jest ESM config in `jest.config.ts`.
+### ~~7. Add a CI workflow to ensure tests are runnable~~ ✓ Fixed
+Added `.github/workflows/typescript-test.yml`: runs `npm ci --ignore-scripts`,
+`tsc --noEmit`, and `npm test` on every push/PR touching `typescript/**`.
+Coverage is uploaded to Codecov under the `typescript` flag.
 
 ---
 
@@ -142,9 +134,9 @@ without full mTLS.
 | ~~2~~ | ~~HTTP client missing mTLS auth~~ | ~~High~~ | ~~`client.ts:147`~~ ✓ |
 | ~~3~~ | ~~`generateCertificate()` not implemented~~ | ~~Medium~~ | ~~`crypto/pgp.ts`~~ ✓ |
 | ~~4~~ | ~~DHT stub not Kademlia-compatible~~ | ~~Medium~~ | ~~`network/resolvers.ts`~~ ✓ |
-| 5 | No retry for failed file downloads | Medium | `client.ts:262` |
-| 6 | Type-unsafe `any` / `@ts-expect-error` | Medium | multiple |
-| 7 | Tests not runnable without CI workflow | Medium | CI config missing |
+| ~~5~~ | ~~No retry for failed file downloads~~ | ~~Medium~~ | ~~`client.ts:262`~~ ✓ |
+| ~~6~~ | ~~Type-unsafe `any` / `@ts-expect-error`~~ | ~~Medium~~ | ~~multiple~~ ✓ |
+| ~~7~~ | ~~Tests not runnable without CI workflow~~ | ~~Medium~~ | ~~CI config missing~~ ✓ |
 | 8 | mDNS discovery unused | Low | `resolvers.ts` |
 | 9 | WebRTC mTLS handshake race condition | Low | `webrtc.ts:109` |
 | 10 | No retry on WebRTC request timeout | Low | `webrtc.ts` |

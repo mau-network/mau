@@ -84,6 +84,11 @@ describe('Client', () => {
   it('should resolve peer address using resolver', async () => {
     let resolverCalled = false;
 
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ files: [] }),
+    });
+
     const client = new Client(
       account,
       storage,
@@ -96,19 +101,9 @@ describe('Client', () => {
             return 'localhost:8080';
           },
         ],
+        fetchImpl: mockFetch as unknown as typeof fetch,
       }
     );
-
-    // Mock fetch before creating client
-    const mockFetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ files: [] }),
-    });
-
-    global.fetch = mockFetch as any;
-
-    // @ts-expect-error - Set fetchImpl to use our mock
-    client['fetchImpl'] = mockFetch as any;
 
     await client.fetchFileList();
 

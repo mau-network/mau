@@ -44,7 +44,7 @@ export function dnsResolver(
       
       resolverAvailable = true;
 
-      const options: any = {};
+      const options: { nameServers?: string[] } = {};
       if (dnsServer) {
         options.nameServers = [dnsServer];
       }

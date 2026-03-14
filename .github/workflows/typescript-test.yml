@@ -1,0 +1,46 @@
+name: TypeScript Tests
+
+on:
+  push:
+    branches: [ "master" ]
+    paths:
+      - 'typescript/**'
+      - '.github/workflows/typescript-test.yml'
+  pull_request:
+    branches: [ "master" ]
+    paths:
+      - 'typescript/**'
+      - '.github/workflows/typescript-test.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: typescript/package-lock.json
+
+      - name: Install dependencies
+        working-directory: typescript
+        run: npm ci --ignore-scripts
+
+      - name: Type check
+        working-directory: typescript
+        run: npx tsc --noEmit
+
+      - name: Run tests
+        working-directory: typescript
+        run: npm test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: typescript/coverage/lcov.info
+          flags: typescript
+          fail_ci_if_error: false

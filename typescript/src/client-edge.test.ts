@@ -103,8 +103,8 @@ describe('Client Error Handling and Edge Cases', () => {
     });
 
     it('should throw PeerNotFoundError when all resolvers return null', async () => {
-      const nullResolver1 = async () => null as any;
-      const nullResolver2 = async () => null as any;
+      const nullResolver1 = async () => null;
+      const nullResolver2 = async () => null;
 
       const client = new Client(account, storage, peerAccount.getFingerprint(), {
         resolvers: [nullResolver1, nullResolver2],

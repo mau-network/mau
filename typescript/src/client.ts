@@ -11,6 +11,7 @@ import type {
   FileListItem,
   FileListResponse,
   Peer,
+  FingerprintResolver,
 } from './types/index.js';
 import { HttpError, NetworkError, MauError } from './types/index.js';
 import { HTTP_TIMEOUT_MS, URI_PROTOCOL_NAME, PeerNotFoundError } from './types/index.js';
@@ -55,8 +56,8 @@ export class Client {
       ...config,
     };
 
-    // Use global fetch or node-fetch
-    this.fetchImpl = typeof fetch !== 'undefined' ? fetch : this.getNodeFetch();
+    // Use provided fetch, global fetch, or node-fetch
+    this.fetchImpl = config.fetchImpl ?? (typeof fetch !== 'undefined' ? fetch : this.getNodeFetch());
   }
 
   private getNodeFetch(): typeof fetch {
@@ -277,8 +278,8 @@ export class Client {
   /**
    * Sync files from peer
    */
-  async sync(): Promise<{ downloaded: number; updated: number; errors: number }> {
-    const stats = { downloaded: 0, updated: 0, errors: 0 };
+  async sync(): Promise<{ downloaded: number; updated: number; errors: number; failedFiles: string[] }> {
+    const stats = { downloaded: 0, updated: 0, errors: 0, failedFiles: [] as string[] };
 
     // Get last sync time
     const syncState = await this.account.getSyncState();
@@ -292,7 +293,7 @@ export class Client {
       // Download each file
       for (const fileInfo of fileList) {
         try {
-          const data = await this.downloadFile(fileInfo.path);
+          const data = await this.withRetry(() => this.downloadFile(fileInfo.path));
 
           // Save to friend's content directory
           const friendDir = this.account.getFriendContentDir(this.peer);
@@ -319,7 +320,12 @@ export class Client {
         } catch (err) {
           console.error(`Failed to download ${fileInfo.path}:`, err);
           stats.errors++;
+          stats.failedFiles.push(fileInfo.path);
         }
+      }
+
+      if (stats.failedFiles.length > 0) {
+        console.warn(`Sync completed with ${stats.failedFiles.length} failed file(s):`, stats.failedFiles);
       }
 
       // Update sync state
@@ -330,6 +336,32 @@ export class Client {
     }
 
     return stats;
+  }
+
+  /**
+   * Retry an async operation with exponential backoff.
+   * Aborts immediately on AbortError or 4xx HTTP errors.
+   */
+  private async withRetry<T>(
+    fn: () => Promise<T>,
+    maxRetries = 2,
+    initialDelayMs = 200
+  ): Promise<T> {
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        lastError = err as Error;
+        const isAbort = (err as Error).name === 'AbortError';
+        const isClientError = err instanceof HttpError && (err as HttpError).statusCode < 500;
+        if (isAbort || isClientError || attempt >= maxRetries) {
+          throw err;
+        }
+        await new Promise(resolve => setTimeout(resolve, initialDelayMs * Math.pow(2, attempt)));
+      }
+    }
+    throw lastError!;
   }
 
   private async calculateChecksum(data: Uint8Array): Promise<string> {
@@ -344,7 +376,7 @@ export class Client {
     account: Account,
     storage: Storage,
     peer: Peer,
-    resolvers: any[] = []
+    resolvers: FingerprintResolver[] = []
   ): Client {
     return new Client(account, storage, peer.fingerprint, {
       resolvers: [

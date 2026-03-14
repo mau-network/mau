@@ -76,6 +76,7 @@ export interface ClientConfig {
   timeout?: number; // HTTP timeout in milliseconds (default: 30000)
   dnsNames?: string[]; // DNS names for certificate
   resolvers?: FingerprintResolver[]; // Peer discovery resolvers
+  fetchImpl?: typeof fetch; // Override fetch implementation (useful in tests)
 }
 
 /** Server configuration */
