@@ -12,9 +12,10 @@ import type {
   FileListResponse,
   Peer,
 } from './types/index.js';
-import { HttpError, NetworkError } from './types/index.js';
+import { HttpError, NetworkError, MauError } from './types/index.js';
 import { HTTP_TIMEOUT_MS, URI_PROTOCOL_NAME, PeerNotFoundError } from './types/index.js';
 import type { Account } from './account.js';
+import { deserializePublicKey, getFingerprint, verify, normalizeFingerprint } from './crypto/index.js';
 
 /**
  * P2P HTTP Client for file synchronization
@@ -35,6 +36,8 @@ export class Client {
   private peer: Fingerprint;
   private config: ClientConfig;
   private fetchImpl: typeof fetch;
+  private resolvedAddress: string | null = null;
+  private authenticated = false;
 
   constructor(
     account: Account,
@@ -62,6 +65,62 @@ export class Client {
       return require('node-fetch');
     } catch {
       throw new NetworkError('fetch not available - install node-fetch for Node.js environments');
+    }
+  }
+
+  /**
+   * Resolve address once and run the mTLS handshake, then cache both results.
+   */
+  private async ensureReady(): Promise<string> {
+    if (!this.resolvedAddress) {
+      this.resolvedAddress = await this.resolvePeerAddress();
+    }
+    if (!this.authenticated) {
+      await this.performHandshake(this.resolvedAddress);
+    }
+    return this.resolvedAddress;
+  }
+
+  /**
+   * PGP challenge-response handshake: verify the server controls the private key
+   * that corresponds to the expected peer fingerprint.
+   */
+  private async performHandshake(address: string): Promise<void> {
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    const challengeHex = Array.from(challenge)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    const url = `${URI_PROTOCOL_NAME}://${address}/p2p/${this.peer}/auth?challenge=${challengeHex}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+
+    try {
+      const response = await this.fetchImpl(url, { signal: controller.signal });
+      if (!response.ok) {
+        throw new HttpError(response.status, response.statusText);
+      }
+
+      const data = await response.json() as { publicKey: string; signature: string };
+      const peerKey = await deserializePublicKey(data.publicKey);
+      const receivedFpr = normalizeFingerprint(getFingerprint(peerKey));
+      const expectedFpr = normalizeFingerprint(this.peer);
+
+      if (receivedFpr !== expectedFpr) {
+        throw new MauError(
+          `Peer fingerprint mismatch: expected ${expectedFpr}, got ${receivedFpr}`,
+          'PEER_FINGERPRINT_MISMATCH'
+        );
+      }
+
+      const valid = await verify(challenge, data.signature, peerKey);
+      if (!valid) {
+        throw new MauError('Peer signature verification failed during mTLS handshake', 'PEER_AUTH_FAILED');
+      }
+
+      this.authenticated = true;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -133,7 +192,7 @@ export class Client {
    * Fetch file list from peer
    */
   async fetchFileList(after?: Date): Promise<FileListItem[]> {
-    const address = await this.resolvePeerAddress();
+    const address = await this.ensureReady();
     const url = new URL(`${URI_PROTOCOL_NAME}://${address}/p2p/${this.peer}`);
 
     if (after) {
@@ -144,8 +203,6 @@ export class Client {
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
     try {
-      // TODO: mTLS authentication not yet implemented for HTTP client
-      // Use WebRTC client for authenticated P2P connections
       const response = await this.fetchWithRetry(url.toString(), {
         signal: controller.signal,
       });
@@ -165,7 +222,7 @@ export class Client {
    * Download a file from peer
    */
   async downloadFile(fileName: string): Promise<Uint8Array> {
-    const address = await this.resolvePeerAddress();
+    const address = await this.ensureReady();
     const url = `${URI_PROTOCOL_NAME}://${address}/p2p/${this.peer}/${encodeURIComponent(
       fileName
     )}`;
@@ -193,7 +250,7 @@ export class Client {
    * Download a specific file version
    */
   async downloadFileVersion(fileName: string, version: string): Promise<Uint8Array> {
-    const address = await this.resolvePeerAddress();
+    const address = await this.ensureReady();
     const url = `${URI_PROTOCOL_NAME}://${address}/p2p/${this.peer}/${encodeURIComponent(
       fileName
     )}.versions/${encodeURIComponent(version)}`;

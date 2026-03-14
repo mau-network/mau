@@ -8,6 +8,7 @@ import type { Storage, ServerConfig, FileListItem } from './types/index.js';
 import { SERVER_RESULT_LIMIT } from './types/index.js';
 import type { Account } from './account.js';
 import { File } from './file.js';
+import { sign, serializePublicKey } from './crypto/index.js';
 
 export interface ServerRequest {
   method: string;
@@ -73,6 +74,9 @@ export class Server {
     if (!resource) {
       // List files: /p2p/<fingerprint>
       return await this.handleFileList(req);
+    } else if (resource === 'auth') {
+      // mTLS challenge: /p2p/<fingerprint>/auth?challenge=<hex>
+      return await this.handleAuth(req);
     } else if (resource.includes('.versions/')) {
       // Get version: /p2p/<fingerprint>/<file>.versions/<hash>
       return await this.handleFileVersion(resource);
@@ -128,6 +132,36 @@ export class Server {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ files: fileList }),
+    };
+  }
+
+  /**
+   * Handle mTLS challenge-response: GET /p2p/<fingerprint>/auth?challenge=<hex>
+   *
+   * Signs the caller's challenge with the account private key so the client can
+   * verify this server controls the key for the advertised fingerprint.
+   */
+  private async handleAuth(req: ServerRequest): Promise<ServerResponse> {
+    const challengeHex = req.query['challenge'];
+    if (!challengeHex || !/^[0-9a-f]+$/i.test(challengeHex) || challengeHex.length % 2 !== 0) {
+      return {
+        status: 400,
+        headers: { 'Content-Type': 'text/plain' },
+        body: 'Bad Request: missing or invalid challenge',
+      };
+    }
+
+    const challenge = new Uint8Array(
+      (challengeHex.match(/.{2}/g) as string[]).map(b => parseInt(b, 16))
+    );
+
+    const signature = await sign(challenge, this.account.getPrivateKey());
+    const publicKey = serializePublicKey(this.account.getPublicKeyObject());
+
+    return {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publicKey, signature }),
     };
   }
 

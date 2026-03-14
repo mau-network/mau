@@ -7,43 +7,25 @@ identified during a code review of the `typescript/` directory.
 
 ## Critical / High Priority
 
-### 1. Enforce signature verification in `file.ts`
-**File:** `typescript/src/file.ts:109`
+### ~~1. Enforce signature verification in `file.ts`~~ ✓ Fixed
+`file.ts` now throws `MauError('SIGNATURE_VERIFICATION_FAILED')` instead of
+logging a warning when `decryptAndVerify()` returns `verified = false`.
 
-When `decryptAndVerify()` returns `verified = false`, the code only logs a
-warning and continues processing the file. This means tampered or unsigned
-files are silently accepted.
-
-**Fix:** Throw a `MauError` (or reject the read) when signature verification
-fails, and expose an optional `allowUnverified` flag for callers that need
-the escape hatch.
-
----
-
-### 2. Add mTLS authentication to the HTTP client
-**File:** `typescript/src/client.ts:147`
-
-The HTTP `Client` sends all sync requests unauthenticated. There is a TODO
-comment in the source confirming this is not yet implemented. Peer identity
-is never cryptographically verified, so a rogue server could serve arbitrary
-content.
-
-**Fix:** Implement a PGP-based challenge–response handshake (mirroring the
-WebRTC mTLS flow in `webrtc.ts`) before the HTTP sync begins, or add a
-signed header to every request.
+### ~~2. Add mTLS authentication to the HTTP client~~ ✓ Fixed
+`Client` now performs a PGP challenge-response handshake (`performHandshake`)
+before the first request to any peer, verifying the server's fingerprint and
+signature. `Server` exposes `GET /p2p/<fingerprint>/auth?challenge=<hex>` to
+respond to the handshake.
 
 ---
 
 ## Medium Priority
 
-### 3. Implement `generateCertificate()` in `crypto/pgp.ts`
-**File:** `typescript/src/crypto/pgp.ts:285`
-
-The function always throws `NOT_IMPLEMENTED`. TLS certificate generation is
-needed for native TLS transport support.
-
-**Fix:** Implement X.509 certificate generation using the Web Crypto API
-(`SubtleCrypto`) or an existing library such as `@peculiar/x509`.
+### ~~3. Implement `generateCertificate()` in `crypto/pgp.ts`~~ ✓ Fixed
+Implemented using Web Crypto API (`SubtleCrypto`) with a hand-rolled ASN.1 DER
+encoder. Generates an ephemeral ECDSA P-256 key pair, builds a self-signed
+X.509 v3 certificate with the PGP fingerprint in the Subject CN and a `pgp:`
+URI Subject Alternative Name, and returns DER-encoded cert + PKCS#8 key.
 
 ---
 
@@ -168,9 +150,9 @@ without full mTLS.
 
 | # | Area | Severity | File |
 |---|------|----------|------|
-| 1 | Signature verification not enforced | High | `file.ts:109` |
-| 2 | HTTP client missing mTLS auth | High | `client.ts:147` |
-| 3 | `generateCertificate()` not implemented | Medium | `crypto/pgp.ts:285` |
+| ~~1~~ | ~~Signature verification not enforced~~ | ~~High~~ | ~~`file.ts:109`~~ ✓ |
+| ~~2~~ | ~~HTTP client missing mTLS auth~~ | ~~High~~ | ~~`client.ts:147`~~ ✓ |
+| ~~3~~ | ~~`generateCertificate()` not implemented~~ | ~~Medium~~ | ~~`crypto/pgp.ts`~~ ✓ |
 | 4 | DHT stub not Kademlia-compatible | Medium | `network/resolvers.ts:105` |
 | 5 | No retry for failed file downloads | Medium | `client.ts:262` |
 | 6 | Type-unsafe `any` / `@ts-expect-error` | Medium | multiple |
