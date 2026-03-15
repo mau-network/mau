@@ -41,7 +41,8 @@ export class WebRTCClient {
   }
 
   /**
-   * Create WebRTC offer
+   * Create WebRTC offer. Waits for ICE gathering to complete so the returned
+   * SDP contains all candidates — no trickle-ICE signaling channel required.
    */
   async createOffer(): Promise<RTCSessionDescriptionInit> {
     this.connection = new RTCPeerConnection({ iceServers: this.config.iceServers });
@@ -55,12 +56,14 @@ export class WebRTCClient {
 
     const offer = await this.connection.createOffer();
     await this.connection.setLocalDescription(offer);
+    await this.waitForICEGathering();
 
-    return offer;
+    return this.connection.localDescription as RTCSessionDescriptionInit;
   }
 
   /**
-   * Accept WebRTC offer and create answer
+   * Accept WebRTC offer and create answer. Waits for ICE gathering to complete
+   * so the returned SDP contains all candidates.
    */
   async acceptOffer(offer: RTCSessionDescriptionInit): Promise<RTCSessionDescriptionInit> {
     this.connection = new RTCPeerConnection({ iceServers: this.config.iceServers });
@@ -74,8 +77,9 @@ export class WebRTCClient {
     await this.connection.setRemoteDescription(offer);
     const answer = await this.connection.createAnswer();
     await this.connection.setLocalDescription(answer);
+    await this.waitForICEGathering();
 
-    return answer;
+    return this.connection.localDescription as RTCSessionDescriptionInit;
   }
 
   /**
@@ -315,6 +319,23 @@ export class WebRTCClient {
     }
 
     return new TextEncoder().encode(response.body);
+  }
+
+  /**
+   * Wait for ICE gathering to complete (or timeout).
+   * Call before close() to avoid "ICE candidate on closed connection" errors.
+   */
+  async waitForICEGathering(timeoutMs = 5000): Promise<void> {
+    if (!this.connection || this.connection.iceGatheringState === 'complete') return;
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(resolve, timeoutMs);
+      this.connection!.onicegatheringstatechange = () => {
+        if (this.connection?.iceGatheringState === 'complete') {
+          clearTimeout(timeout);
+          resolve();
+        }
+      };
+    });
   }
 
   /**
