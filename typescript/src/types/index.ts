@@ -84,7 +84,6 @@ export interface ServerConfig {
   bootstrapNodes?: Peer[]; // Known peers for DHT bootstrapping
   resultsLimit?: number; // Max results per query (default: 20)
   port?: number; // Listen port
-  enableMDNS?: boolean; // Enable mDNS discovery
   enableDHT?: boolean; // Enable Kademlia DHT
 }
 

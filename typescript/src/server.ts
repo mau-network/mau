@@ -44,7 +44,6 @@ export class Server {
     this.config = {
       resultsLimit: SERVER_RESULT_LIMIT,
       bootstrapNodes: [],
-      enableMDNS: false,
       enableDHT: false,
       ...config,
     };
