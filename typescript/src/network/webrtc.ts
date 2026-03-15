@@ -4,6 +4,7 @@
  * Handles WebRTC connections with mTLS authentication over data channels.
  */
 
+import pRetry from 'p-retry';
 import type { Fingerprint, Storage } from '../types/index.js';
 import type { Account } from '../account.js';
 import {  } from '../crypto/index.js';
@@ -110,17 +111,11 @@ export class WebRTCClient {
     if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
       throw new Error('Data channel not ready');
     }
-    let lastError: Error | null = null;
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        return await this.doPerformMTLS();
-      } catch (err) {
-        lastError = err as Error;
-        if (attempt >= maxRetries) throw err;
-        await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
-      }
-    }
-    throw lastError!;
+    return pRetry(() => this.doPerformMTLS(), {
+      retries: maxRetries,
+      minTimeout: 500,
+      factor: 2,
+    });
   }
 
   private async doPerformMTLS(): Promise<boolean> {
@@ -183,17 +178,11 @@ export class WebRTCClient {
     headers: Record<string, string>;
     body: Uint8Array | string;
   }> {
-    let lastError: Error | null = null;
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        return await this.doSendRequest(request);
-      } catch (err) {
-        lastError = err as Error;
-        if (attempt >= maxRetries) throw err;
-        await new Promise(r => setTimeout(r, initialDelayMs * Math.pow(2, attempt)));
-      }
-    }
-    throw lastError!;
+    return pRetry(() => this.doSendRequest(request), {
+      retries: maxRetries,
+      minTimeout: initialDelayMs,
+      factor: 2,
+    });
   }
 
   private doSendRequest(request: {

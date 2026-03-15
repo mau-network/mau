@@ -4,6 +4,7 @@
  * Handles HTTP communication with peers for file synchronization.
  */
 
+import pRetry from 'p-retry';
 import type {
   Storage,
   Fingerprint,
@@ -211,35 +212,21 @@ export class Client {
     options: RequestInit,
     maxRetries = 2
   ): Promise<Response> {
-    let lastError: Error | null = null;
-    
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
+    return pRetry(
+      async () => {
         const response = await this.fetchImpl(url, options);
-        
-        // Retry on 5xx server errors (but not 4xx client errors)
-        if (response.status >= 500 && attempt < maxRetries) {
-          const delayMs = 100 * Math.pow(2, attempt); // 100ms, 200ms, 400ms
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-          continue;
-        }
-        
+        if (response.status >= 500) throw new HttpError(response.status, response.statusText);
         return response;
-      } catch (err) {
-        lastError = err as Error;
-        
-        // Don't retry on timeout (abort signal) or last attempt
-        if ((err as Error).name === 'AbortError' || attempt >= maxRetries) {
-          throw err;
-        }
-        
-        // Exponential backoff for network errors
-        const delayMs = 100 * Math.pow(2, attempt);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+      },
+      {
+        retries: maxRetries,
+        minTimeout: 100,
+        factor: 2,
+        onFailedAttempt: (error) => {
+          if (error.name === 'AbortError') throw error;
+        },
       }
-    }
-    
-    throw lastError || new Error('Fetch failed after retries');
+    );
   }
 
   /**
@@ -400,21 +387,16 @@ export class Client {
     maxRetries = 2,
     initialDelayMs = 200
   ): Promise<T> {
-    let lastError: Error | null = null;
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        return await fn();
-      } catch (err) {
-        lastError = err as Error;
-        const isAbort = (err as Error).name === 'AbortError';
-        const isClientError = err instanceof HttpError && (err as HttpError).statusCode < 500;
-        if (isAbort || isClientError || attempt >= maxRetries) {
-          throw err;
+    return pRetry(fn, {
+      retries: maxRetries,
+      minTimeout: initialDelayMs,
+      factor: 2,
+      onFailedAttempt: (error) => {
+        if (error.name === 'AbortError' || (error instanceof HttpError && error.statusCode < 500)) {
+          throw error;
         }
-        await new Promise(resolve => setTimeout(resolve, initialDelayMs * Math.pow(2, attempt)));
-      }
-    }
-    throw lastError!;
+      },
+    });
   }
 
   private async calculateChecksum(data: Uint8Array): Promise<string> {
