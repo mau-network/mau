@@ -3,6 +3,7 @@
  */
 
 import type { Fingerprint, FingerprintResolver } from '../types/index.js';
+import { DnsNotSupportedError } from '../types/index.js';
 import type { KademliaDHT } from './dht.js';
 
 /**
@@ -32,12 +33,17 @@ export function dnsResolver(
   let resolverAvailable: boolean | null = null;
   
   return async (fingerprint: Fingerprint, timeout = 5000) => {
+    // dns2 requires UDP sockets — not available in browsers
+    if (typeof process === 'undefined' || !process.versions?.node) {
+      throw new DnsNotSupportedError();
+    }
+
     try {
       // Check if resolver was already determined to be unavailable
       if (resolverAvailable === false) {
         return null;
       }
-      
+
       // Dynamic import for Node.js-only library
       const DNS2 = (await import('dns2')).default;
       const { Packet } = DNS2;
@@ -78,15 +84,6 @@ export function dnsResolver(
       return null;
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
-      
-      // Module not available (browser environment)
-      if ('code' in error && (error as NodeJS.ErrnoException).code === 'MODULE_NOT_FOUND' || error?.message?.includes('Cannot find module')) {
-        if (resolverAvailable === null) {
-          console.warn('DNS resolver not available in browser environment');
-          resolverAvailable = false;
-        }
-        return null;
-      }
       
       // Timeout (treat as peer not found, could retry)
       if (error?.message === 'DNS timeout') {

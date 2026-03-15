@@ -197,3 +197,9 @@ export class NetworkError extends MauError {
     super(message, 'NETWORK_ERROR');
   }
 }
+
+export class DnsNotSupportedError extends MauError {
+  constructor() {
+    super('DNS resolver is not supported in browser environments', 'DNS_NOT_SUPPORTED_IN_BROWSER');
+  }
+}

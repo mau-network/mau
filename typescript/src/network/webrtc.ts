@@ -99,48 +99,50 @@ export class WebRTCClient {
   }
 
   /**
-   * Perform mTLS handshake over data channel
+   * Perform mTLS handshake over data channel.
+   * Retries up to maxRetries times with exponential backoff on timeout.
    */
-  async performMTLS(): Promise<boolean> {
+  async performMTLS(maxRetries = 2): Promise<boolean> {
     if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
       throw new Error('Data channel not ready');
     }
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await this.doPerformMTLS();
+      } catch (err) {
+        lastError = err as Error;
+        if (attempt >= maxRetries) throw err;
+        await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
+      }
+    }
+    throw lastError!;
+  }
 
-    // Set up response handler BEFORE sending offer (avoid race condition)
+  private async doPerformMTLS(): Promise<boolean> {
+    const publicKey = this.account.getPublicKey();
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+
+    // Register response handler BEFORE sending offer to eliminate the race condition
     const responsePromise = new Promise<boolean>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('mTLS timeout')), 10000);
+      const timeout = setTimeout(() => reject(new Error('mTLS timeout')), 5000);
 
       const handler = async (event: MessageEvent) => {
         try {
           const response = JSON.parse(event.data);
+          if (response.type !== 'mtls_response') return;
 
-          if (response.type === 'mtls_response') {
-            // Import crypto functions at top of promise to avoid repeated dynamic imports
-            const { deserializePublicKey, getFingerprint, verify } = await import('../crypto/index.js');
-            
-            // Verify peer's public key matches expected fingerprint
-            const peerKey = await deserializePublicKey(response.publicKey);
-            const peerFingerprint = getFingerprint(peerKey);
+          const { deserializePublicKey, getFingerprint, verify } = await import('../crypto/index.js');
+          const peerKey = await deserializePublicKey(response.publicKey);
+          const peerFingerprint = getFingerprint(peerKey);
 
-            if (peerFingerprint !== this.peer) {
-              clearTimeout(timeout);
-              this.dataChannel!.removeEventListener('message', handler);
-              resolve(false);
-              return;
-            }
+          clearTimeout(timeout);
+          this.dataChannel!.removeEventListener('message', handler);
 
-            // Verify challenge signature
-            const challengeBytes = new Uint8Array(response.challenge);
-            const signatureValid = await verify(
-              challengeBytes,
-              response.signature,
-              peerKey
-            );
+          if (peerFingerprint !== this.peer) { resolve(false); return; }
 
-            clearTimeout(timeout);
-            this.dataChannel!.removeEventListener('message', handler);
-            resolve(signatureValid);
-          }
+          const challengeBytes = new Uint8Array(response.challenge);
+          resolve(await verify(challengeBytes, response.signature, peerKey));
         } catch (err) {
           clearTimeout(timeout);
           this.dataChannel!.removeEventListener('message', handler);
@@ -148,31 +150,49 @@ export class WebRTCClient {
         }
       };
 
-      if (this.dataChannel) {
-        this.dataChannel.addEventListener('message', handler);
-      }
+      this.dataChannel!.addEventListener('message', handler);
     });
-    
-    // Now send offer (handler is already registered)
-    const publicKey = this.account.getPublicKey();
-    const challenge = crypto.getRandomValues(new Uint8Array(32));
 
-    const handshakeOffer = JSON.stringify({
+    this.dataChannel!.send(JSON.stringify({
       type: 'mtls_offer',
       publicKey,
       challenge: Array.from(challenge),
-    });
+    }));
 
-    this.dataChannel.send(handshakeOffer);
-
-    // Wait for response
     return responsePromise;
   }
 
   /**
-   * Send HTTP-style request over data channel
+   * Send HTTP-style request over data channel with retry.
    */
-  async sendRequest(request: {
+  async sendRequest(
+    request: {
+      method: string;
+      path: string;
+      query?: Record<string, string>;
+      headers?: Record<string, string>;
+    },
+    maxRetries = 2,
+    initialDelayMs = 200,
+  ): Promise<{
+    status: number;
+    headers: Record<string, string>;
+    body: Uint8Array | string;
+  }> {
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await this.doSendRequest(request);
+      } catch (err) {
+        lastError = err as Error;
+        if (attempt >= maxRetries) throw err;
+        await new Promise(r => setTimeout(r, initialDelayMs * Math.pow(2, attempt)));
+      }
+    }
+    throw lastError!;
+  }
+
+  private doSendRequest(request: {
     method: string;
     path: string;
     query?: Record<string, string>;
@@ -183,7 +203,7 @@ export class WebRTCClient {
     body: Uint8Array | string;
   }> {
     if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
-      throw new Error('Data channel not ready');
+      return Promise.reject(new Error('Data channel not ready'));
     }
 
     const message = JSON.stringify({
@@ -194,44 +214,37 @@ export class WebRTCClient {
       headers: request.headers || {},
     });
 
-    this.dataChannel.send(message);
+    // Register response handler BEFORE sending to eliminate the race condition
+    const responsePromise = new Promise<{ status: number; headers: Record<string, string>; body: Uint8Array | string }>(
+      (resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Request timeout')), 30000);
 
-    // Wait for response
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Request timeout')), 30000);
+        const handler = (event: MessageEvent) => {
+          if (!this.dataChannel) return;
+          try {
+            const response = JSON.parse(event.data);
+            if (response.type !== 'response') return;
 
-      const handler = (event: MessageEvent) => {
-        if (!this.dataChannel) return;
-
-        try {
-          const response = JSON.parse(event.data);
-          if (response.type === 'response') {
             clearTimeout(timeout);
             this.dataChannel.removeEventListener('message', handler);
 
-            // Convert body back to Uint8Array if it's an array
             let body = response.body;
-            if (Array.isArray(body)) {
-              body = new Uint8Array(body);
-            }
+            if (Array.isArray(body)) body = new Uint8Array(body);
 
-            resolve({
-              status: response.status,
-              headers: response.headers || {},
-              body,
-            });
+            resolve({ status: response.status, headers: response.headers || {}, body });
+          } catch (err) {
+            clearTimeout(timeout);
+            this.dataChannel.removeEventListener('message', handler);
+            reject(err);
           }
-        } catch (err) {
-          clearTimeout(timeout);
-          this.dataChannel.removeEventListener('message', handler);
-          reject(err);
-        }
-      };
+        };
 
-      if (this.dataChannel) {
-        this.dataChannel.addEventListener('message', handler);
+        this.dataChannel!.addEventListener('message', handler);
       }
-    });
+    );
+
+    this.dataChannel.send(message);
+    return responsePromise;
   }
 
   /**
