@@ -5,69 +5,6 @@ identified during a code review of the `typescript/` directory.
 
 ---
 
-## Critical / High Priority
-
-### ~~1. Enforce signature verification in `file.ts`~~ ✓ Fixed
-`file.ts` now throws `MauError('SIGNATURE_VERIFICATION_FAILED')` instead of
-logging a warning when `decryptAndVerify()` returns `verified = false`.
-
-### ~~2. Add mTLS authentication to the HTTP client~~ ✓ Fixed
-`Client` now performs a PGP challenge-response handshake (`performHandshake`)
-before the first request to any peer, verifying the server's fingerprint and
-signature. `Server` exposes `GET /p2p/<fingerprint>/auth?challenge=<hex>` to
-respond to the handshake.
-
----
-
-## Medium Priority
-
-### ~~3. Implement `generateCertificate()` in `crypto/pgp.ts`~~ ✓ Fixed
-Implemented using Web Crypto API (`SubtleCrypto`) with a hand-rolled ASN.1 DER
-encoder. Generates an ephemeral ECDSA P-256 key pair, builds a self-signed
-X.509 v3 certificate with the PGP fingerprint in the Subject CN and a `pgp:`
-URI Subject Alternative Name, and returns DER-encoded cert + PKCS#8 key.
-
----
-
-### ~~4. Replace the DHT stub with a real Kademlia implementation~~ ✓ Fixed
-Implemented `KademliaDHT` in `network/dht.ts`: 160 k-buckets, k=20, alpha=3,
-XOR distance on PGP fingerprints — same algorithm as Go's `kademlia.go`.
-Transport is WebRTC data channels instead of HTTP. Bootstrap peers are reached
-via `POST /p2p/dht/offer` (HTTP, one round-trip with complete ICE). All
-subsequent peer connections use DHT-relay signaling: an existing DHT peer
-forwards offer/answer/ICE between the two endpoints for NAT hole-punching.
-`dhtResolver()` now wraps a `KademliaDHT` instance directly.
-
----
-
-### ~~5. Retry failed file downloads during sync~~ ✓ Fixed
-Added `withRetry()` helper to `Client` that wraps the per-file `downloadFile()`
-call in the sync loop with exponential backoff (200ms, 400ms). The helper skips
-retries for `AbortError` and 4xx HTTP errors. `sync()` now returns a
-`failedFiles` list alongside the existing counters so callers can inspect which
-files permanently failed.
-
----
-
-### ~~6. Fix type-unsafe patterns across the codebase~~ ✓ Fixed
-- `resolvers.ts:47` — replaced `any` with `{ nameServers?: string[] }`.
-- `client-edge.test.ts:106` — removed `null as any` casts (null is already
-  assignable to `string | null`).
-- `client.test.ts:110` — removed `@ts-expect-error` / private-field access by
-  adding `fetchImpl?: typeof fetch` to `ClientConfig`; tests now pass the mock
-  via config.
-- `client.ts` `create()` — replaced `resolvers: any[]` with
-  `FingerprintResolver[]`.
-
----
-
-### ~~7. Add a CI workflow to ensure tests are runnable~~ ✓ Fixed
-Added `.github/workflows/typescript-test.yml`: runs `npm ci --ignore-scripts`,
-`tsc --noEmit`, and `npm test` on every push/PR touching `typescript/**`.
-Coverage is uploaded to Codecov under the `typescript` flag.
-
----
-
 ## Low Priority / Future Work
 
 ### 8. Implement mDNS peer discovery
@@ -130,13 +67,6 @@ without full mTLS.
 
 | # | Area | Severity | File |
 |---|------|----------|------|
-| ~~1~~ | ~~Signature verification not enforced~~ | ~~High~~ | ~~`file.ts:109`~~ ✓ |
-| ~~2~~ | ~~HTTP client missing mTLS auth~~ | ~~High~~ | ~~`client.ts:147`~~ ✓ |
-| ~~3~~ | ~~`generateCertificate()` not implemented~~ | ~~Medium~~ | ~~`crypto/pgp.ts`~~ ✓ |
-| ~~4~~ | ~~DHT stub not Kademlia-compatible~~ | ~~Medium~~ | ~~`network/resolvers.ts`~~ ✓ |
-| ~~5~~ | ~~No retry for failed file downloads~~ | ~~Medium~~ | ~~`client.ts:262`~~ ✓ |
-| ~~6~~ | ~~Type-unsafe `any` / `@ts-expect-error`~~ | ~~Medium~~ | ~~multiple~~ ✓ |
-| ~~7~~ | ~~Tests not runnable without CI workflow~~ | ~~Medium~~ | ~~CI config missing~~ ✓ |
 | 8 | mDNS discovery unused | Low | `resolvers.ts` |
 | 9 | WebRTC mTLS handshake race condition | Low | `webrtc.ts:109` |
 | 10 | No retry on WebRTC request timeout | Low | `webrtc.ts` |
