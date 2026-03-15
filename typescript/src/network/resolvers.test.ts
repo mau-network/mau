@@ -72,31 +72,29 @@ describe('Network Resolvers', () => {
   });
 
   describe('dhtResolver', () => {
-    it('should return null when bootstrap nodes unreachable', async () => {
-      const resolver = dhtResolver(['unreachable-node-12345.example.com:8080']);
+    it('should return null when peer not found in DHT', async () => {
+      const mockDHT = { resolver: () => async () => null } as any;
+      const resolver = dhtResolver(mockDHT);
       const address = await resolver('fingerprint123', 1000);
 
       expect(address).toBeNull();
     });
 
-    it('should query multiple bootstrap nodes', async () => {
-      const resolver = dhtResolver([
-        'bootstrap1-unreachable.example.com:8080',
-        'bootstrap2-unreachable.example.com:8080',
-      ]);
+    it('should return address when peer found in DHT', async () => {
+      const mockDHT = { resolver: () => async () => 'peer.example.com:8080' } as any;
+      const resolver = dhtResolver(mockDHT);
       const address = await resolver('fingerprint123', 1000);
 
-      expect(address).toBeNull();
+      expect(address).toBe('peer.example.com:8080');
     });
 
-    it('should respect timeout', async () => {
-      const resolver = dhtResolver(['slow-bootstrap.example.com:8080']);
-      const start = Date.now();
-      await resolver('fingerprint123', 500);
-      const elapsed = Date.now() - start;
+    it('should delegate to the DHT resolver function', async () => {
+      const inner = jest.fn().mockResolvedValue('found.example.com:9000');
+      const mockDHT = { resolver: () => inner } as any;
+      const resolver = dhtResolver(mockDHT);
+      await resolver('abc123', 500);
 
-      // Should complete within timeout + some tolerance
-      expect(elapsed).toBeLessThan(1000);
+      expect(inner).toHaveBeenCalledWith('abc123', 500);
     });
   });
 

@@ -76,6 +76,7 @@ export interface ClientConfig {
   timeout?: number; // HTTP timeout in milliseconds (default: 30000)
   dnsNames?: string[]; // DNS names for certificate
   resolvers?: FingerprintResolver[]; // Peer discovery resolvers
+  fetchImpl?: typeof fetch; // Override fetch implementation (useful in tests)
 }
 
 /** Server configuration */
@@ -83,9 +84,7 @@ export interface ServerConfig {
   bootstrapNodes?: Peer[]; // Known peers for DHT bootstrapping
   resultsLimit?: number; // Max results per query (default: 20)
   port?: number; // Listen port
-  enableMDNS?: boolean; // Enable mDNS discovery
   enableDHT?: boolean; // Enable Kademlia DHT
-  enableUPnP?: boolean; // Enable UPnP port forwarding
 }
 
 /** Sync state tracking */
@@ -196,5 +195,11 @@ export class HttpError extends MauError {
 export class NetworkError extends MauError {
   constructor(message: string) {
     super(message, 'NETWORK_ERROR');
+  }
+}
+
+export class DnsNotSupportedError extends MauError {
+  constructor() {
+    super('DNS resolver is not supported in browser environments', 'DNS_NOT_SUPPORTED_IN_BROWSER');
   }
 }

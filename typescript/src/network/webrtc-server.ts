@@ -85,7 +85,20 @@ export class WebRTCServer {
     const answer = await peer.createAnswer();
     await peer.setLocalDescription(answer);
 
-    return answer;
+    // Wait for ICE gathering to complete so the answer SDP contains all
+    // candidates — no trickle-ICE signaling channel required.
+    await new Promise<void>((resolve) => {
+      if (peer.iceGatheringState === 'complete') { resolve(); return; }
+      const timeout = setTimeout(resolve, 5000);
+      peer.onicegatheringstatechange = () => {
+        if (peer.iceGatheringState === 'complete') {
+          clearTimeout(timeout);
+          resolve();
+        }
+      };
+    });
+
+    return peer.localDescription as RTCSessionDescriptionInit;
   }
 
   /**

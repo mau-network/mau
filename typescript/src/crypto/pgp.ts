@@ -5,6 +5,11 @@
  */
 
 import * as openpgp from 'openpgp';
+import {
+  X509CertificateGenerator,
+  BasicConstraintsExtension,
+  SubjectAlternativeNameExtension,
+} from '@peculiar/x509';
 import type {
   Fingerprint,
   AccountOptions,
@@ -279,18 +284,51 @@ export async function sha256(data: Uint8Array): Promise<string> {
 }
 
 /**
- * Generate self-signed TLS certificate with embedded PGP fingerprint
- * Note: This is a simplified version - full implementation requires X.509 library
+ * Generate a self-signed ECDSA P-256 TLS certificate with the PGP fingerprint
+ * embedded in the Subject CN and as a URI Subject Alternative Name.
+ *
+ * The returned `key` is a PKCS#8 DER-encoded private key suitable for use
+ * with Node.js `tls.createServer` or the Web Crypto API.
  */
 export async function generateCertificate(
   privateKey: openpgp.PrivateKey,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _dnsNames: string[] = []
+  dnsNames: string[] = []
 ): Promise<CertificateInfo> {
-  // This would require a full X.509 implementation
-  // For now, return a placeholder that should be implemented with a proper crypto library
-  throw new MauError(
-    'Certificate generation not yet implemented in TypeScript - use Node.js crypto or Web Crypto API with X.509 library',
-    'NOT_IMPLEMENTED'
+  const pgpFpr = privateKey.getFingerprint();
+
+  // Generate an ephemeral ECDSA P-256 key pair exclusively for TLS
+  const tlsKeys = await crypto.subtle.generateKey(
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    true,
+    ['sign', 'verify']
   );
+
+  const pkcs8Der = new Uint8Array(await crypto.subtle.exportKey('pkcs8', tlsKeys.privateKey));
+
+  const now = new Date();
+  const exp = new Date(now);
+  exp.setFullYear(exp.getFullYear() + 1);
+
+  // SubjectAltName: caller-supplied DNS names + pgp: URI for the fingerprint
+  const sanEntries = [
+    ...dnsNames.map(n => ({ type: 'dns' as const, value: n })),
+    { type: 'url' as const, value: `pgp:${pgpFpr}` },
+  ];
+
+  const cert = await X509CertificateGenerator.createSelfSigned({
+    name: `CN=${pgpFpr}`,
+    keys: tlsKeys,
+    notBefore: now,
+    notAfter: exp,
+    extensions: [
+      new BasicConstraintsExtension(false),
+      new SubjectAlternativeNameExtension(sanEntries),
+    ],
+  });
+
+  return {
+    cert: new Uint8Array(cert.rawData),
+    key: pkcs8Der,
+    fingerprint: pgpFpr,
+  };
 }

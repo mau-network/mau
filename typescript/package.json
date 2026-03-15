@@ -30,13 +30,13 @@
     "directory": "typescript"
   },
   "dependencies": {
+    "@peculiar/x509": "^1.14.3",
     "node-fetch": "^3.3.2",
     "openpgp": "^5.11.1"
   },
   "optionalDependencies": {
     "dns2": "^2.1.0",
-    "k-bucket": "^5.1.0",
-    "multicast-dns": "^7.2.5"
+    "k-bucket": "^5.1.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
@@ -44,8 +44,7 @@
     "@types/dns2": "^2.0.10",
     "@types/jest": "^29.5.12",
     "@types/k-bucket": "^5.0.4",
-    "@types/multicast-dns": "^7.2.4",
-    "@types/node": "^20.19.37",
+"@types/node": "^20.19.37",
     "@typescript-eslint/eslint-plugin": "^7.0.2",
     "@typescript-eslint/parser": "^7.0.2",
     "buffer": "^6.0.3",

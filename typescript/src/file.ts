@@ -5,7 +5,7 @@
  */
 
 import type { Storage, Fingerprint, MauFile } from './types/index.js';
-import { InvalidFileNameError } from './types/index.js';
+import { InvalidFileNameError, MauError } from './types/index.js';
 import type { Account } from './account.js';
 import {
   signAndEncrypt,
@@ -107,7 +107,10 @@ export class File {
     );
 
     if (!verified) {
-      console.warn(`Warning: File ${this.filePath} signature verification failed`);
+      throw new MauError(
+        `Signature verification failed for ${this.filePath}`,
+        'SIGNATURE_VERIFICATION_FAILED'
+      );
     }
 
     return data;

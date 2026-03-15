@@ -8,6 +8,8 @@ import type { Storage, ServerConfig, FileListItem } from './types/index.js';
 import { SERVER_RESULT_LIMIT } from './types/index.js';
 import type { Account } from './account.js';
 import { File } from './file.js';
+import { sign, serializePublicKey } from './crypto/index.js';
+import type { KademliaDHT } from './network/dht.js';
 
 export interface ServerRequest {
   method: string;
@@ -15,6 +17,7 @@ export interface ServerRequest {
   path: string;
   query: Record<string, string>;
   headers: Record<string, string>;
+  body?: string;
 }
 
 export interface ServerResponse {
@@ -33,24 +36,29 @@ export class Server {
   private account: Account;
   private storage: Storage;
   private config: ServerConfig;
+  private dht?: KademliaDHT;
 
-  constructor(account: Account, storage: Storage, config: ServerConfig = {}) {
+  constructor(account: Account, storage: Storage, config: ServerConfig = {}, dht?: KademliaDHT) {
     this.account = account;
     this.storage = storage;
     this.config = {
       resultsLimit: SERVER_RESULT_LIMIT,
       bootstrapNodes: [],
-      enableMDNS: false,
       enableDHT: false,
-      enableUPnP: false,
       ...config,
     };
+    this.dht = dht;
   }
 
   /**
    * Handle incoming HTTP request
    */
   async handleRequest(req: ServerRequest): Promise<ServerResponse> {
+    // DHT WebRTC offer endpoint — must be checked before the fingerprint routes
+    if (req.method === 'POST' && req.path === '/p2p/dht/offer') {
+      return this.handleDHTOffer(req);
+    }
+
     if (req.method !== 'GET') {
       return this.methodNotAllowed();
     }
@@ -73,6 +81,9 @@ export class Server {
     if (!resource) {
       // List files: /p2p/<fingerprint>
       return await this.handleFileList(req);
+    } else if (resource === 'auth') {
+      // mTLS challenge: /p2p/<fingerprint>/auth?challenge=<hex>
+      return await this.handleAuth(req);
     } else if (resource.includes('.versions/')) {
       // Get version: /p2p/<fingerprint>/<file>.versions/<hash>
       return await this.handleFileVersion(resource);
@@ -128,6 +139,65 @@ export class Server {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ files: fileList }),
+    };
+  }
+
+  /**
+   * Handle DHT WebRTC offer: POST /p2p/dht/offer
+   * Body: { from: Fingerprint, offer: RTCSessionDescriptionInit }
+   * Response: { answer: RTCSessionDescriptionInit }
+   */
+  private async handleDHTOffer(req: ServerRequest): Promise<ServerResponse> {
+    if (!this.dht) {
+      return { status: 404, headers: { 'Content-Type': 'text/plain' }, body: 'DHT not enabled' };
+    }
+    try {
+      const { from, offer } = JSON.parse(req.body ?? '{}') as {
+        from: string;
+        offer: RTCSessionDescriptionInit;
+      };
+      if (!from || !offer) {
+        return { status: 400, headers: { 'Content-Type': 'text/plain' }, body: 'Bad Request' };
+      }
+      const remoteAddr = req.headers['x-forwarded-for'] ?? req.headers['host'] ?? '';
+      const answer = await this.dht.handleHTTPOffer(from, offer, remoteAddr);
+      return {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answer }),
+      };
+    } catch {
+      return { status: 500, headers: { 'Content-Type': 'text/plain' }, body: 'Internal Server Error' };
+    }
+  }
+
+  /**
+   * Handle mTLS challenge-response: GET /p2p/<fingerprint>/auth?challenge=<hex>
+   *
+   * Signs the caller's challenge with the account private key so the client can
+   * verify this server controls the key for the advertised fingerprint.
+   */
+  private async handleAuth(req: ServerRequest): Promise<ServerResponse> {
+    const challengeHex = req.query['challenge'];
+    if (!challengeHex || !/^[0-9a-f]+$/i.test(challengeHex) || challengeHex.length % 2 !== 0) {
+      return {
+        status: 400,
+        headers: { 'Content-Type': 'text/plain' },
+        body: 'Bad Request: missing or invalid challenge',
+      };
+    }
+
+    const challenge = new Uint8Array(
+      (challengeHex.match(/.{2}/g) as string[]).map(b => parseInt(b, 16))
+    );
+
+    const signature = await sign(challenge, this.account.getPrivateKey());
+    const publicKey = serializePublicKey(this.account.getPublicKeyObject());
+
+    return {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publicKey, signature }),
     };
   }
 
@@ -254,9 +324,18 @@ export class Server {
       const url = new URL(req.url!, `http://${req.headers.host}`);
 
       const query: Record<string, string> = {};
-      url.searchParams.forEach((value, key) => {
-        query[key] = value;
-      });
+      url.searchParams.forEach((value, key) => { query[key] = value; });
+
+      // Read body for POST requests
+      let body: string | undefined;
+      if (req.method === 'POST') {
+        body = await new Promise<string>((resolve, reject) => {
+          const chunks: Buffer[] = [];
+          req.on('data', (chunk: Buffer) => chunks.push(chunk));
+          req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+          req.on('error', reject);
+        });
+      }
 
       const request: ServerRequest = {
         method: req.method!,
@@ -264,6 +343,7 @@ export class Server {
         path: url.pathname,
         query,
         headers: req.headers || {},
+        body,
       };
 
       const response = await this.handleRequest(request);

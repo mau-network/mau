@@ -92,7 +92,7 @@ describe('Real WebRTC E2E Tests', () => {
       };
 
       // Create data channel on peer1
-      peer1.createDataChannel('test');
+      const dc1 = peer1.createDataChannel('test');
 
       dc1.onopen = () => {
         dc1.send('Hello from Peer1');
@@ -160,7 +160,7 @@ describe('Real WebRTC E2E Tests', () => {
       };
 
       const testData = new Uint8Array([1, 2, 3, 4, 5]);
-      peer1.createDataChannel('test');
+      const dc1 = peer1.createDataChannel('test');
 
       dc1.onopen = () => {
         dc1.send(testData);
@@ -253,11 +253,12 @@ describe('Real WebRTC E2E Tests', () => {
   }, 15000);
 
   it('should use WebRTCClient and WebRTCServer', async () => {
-    const server = new WebRTCServer(serverAccount, storage);
+    const server = new WebRTCServer(serverAccount, storage, { iceServers: [] });
     const client = new WebRTCClient(
       clientAccount,
       storage,
-      serverAccount.getFingerprint()
+      serverAccount.getFingerprint(),
+      { iceServers: [] }
     );
 
     const offer = await client.createOffer();
@@ -273,20 +274,22 @@ describe('Real WebRTC E2E Tests', () => {
 
     await client.completeConnection(answer);
 
-    // Give time for connection to establish
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Wait for ICE gathering to finish before closing to avoid
+    // "ICE candidate on closed connection" errors when running in parallel.
+    await client.waitForICEGathering();
 
     client.close();
     server.closeConnection(clientAccount.getFingerprint());
   });
 
   it('should handle multiple concurrent connections', async () => {
-    const server = new WebRTCServer(serverAccount, storage);
-    
+    const server = new WebRTCServer(serverAccount, storage, { iceServers: [] });
+
     const client1 = new WebRTCClient(
       clientAccount,
       storage,
-      serverAccount.getFingerprint()
+      serverAccount.getFingerprint(),
+      { iceServers: [] }
     );
 
     const client2Account = await Account.create(storage, TEST_DIR + '/client2', {
@@ -299,7 +302,8 @@ describe('Real WebRTC E2E Tests', () => {
     const client2 = new WebRTCClient(
       client2Account,
       storage,
-      serverAccount.getFingerprint()
+      serverAccount.getFingerprint(),
+      { iceServers: [] }
     );
 
     const offer1 = await client1.createOffer();
@@ -316,6 +320,9 @@ describe('Real WebRTC E2E Tests', () => {
 
     await client1.completeConnection(answer1);
     await client2.completeConnection(answer2);
+
+    // Wait for ICE gathering on both clients before asserting/closing
+    await Promise.all([client1.waitForICEGathering(), client2.waitForICEGathering()]);
 
     const connections = server.getConnections();
     expect(connections).toContain(clientAccount.getFingerprint());
