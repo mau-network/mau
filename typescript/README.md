@@ -33,7 +33,7 @@ TypeScript/JavaScript implementation of the [Mau P2P social network protocol](ht
 - **DNS resolver** - Requires UDP sockets (not available in browsers)
 - **HTTP Server** - Use WebRTC or browser extensions for serving files
 
-**Browser Peer Discovery:** Use `staticResolver` or `dhtResolver` (HTTP-based). The DNS resolver will gracefully return `null` in browser environments.
+**Browser Peer Discovery:** Use `staticResolver` or `dhtResolver` (HTTP-based). DNS resolvers will gracefully fail in browser environments.
 
 ## Installation
 
@@ -232,17 +232,6 @@ Run a simple HTTP signaling server for WebRTC coordination:
 npx tsx examples/signaling-server.ts 8080
 ```
 
-Or deploy the `HTTPSignalingServer` to your infrastructure:
-
-```typescript
-import { HTTPSignalingServer } from '@mau-network/mau/examples/signaling-server';
-
-const server = new HTTPSignalingServer();
-await server.start(8080);
-
-console.log('Signaling server running on port 8080');
-```
-
 For full examples, see:
 - [`examples/browser-example.ts`](examples/browser-example.ts) - Complete browser P2P flow
 - [`examples/signaling-server.ts`](examples/signaling-server.ts) - HTTP signaling server
@@ -318,14 +307,14 @@ const client = new Client(account, storage, peerFingerprint, {
 });
 
 // Or use convenience method
-const client = Client.create(account, storage, {
+const client = Client.create(account, account.storage, {
   fingerprint: 'peer-fingerprint',
   address: '192.168.1.100:8080',
-});
+}, [staticResolver(knownPeers)]);
 
 // Sync files
 const stats = await client.sync();
-// => { downloaded: 5, updated: 2, errors: 0 }
+// => { downloaded: 5, updated: 2, errors: 0, failedFiles: [] }
 
 // Fetch file list
 const files = await client.fetchFileList();
@@ -413,8 +402,8 @@ await client.completeConnection(answer);
 // Add ICE candidate
 await client.addIceCandidate(candidate);
 
-// Perform mTLS authentication
-const authenticated = await client.performMTLS();
+// Perform mTLS authentication with retry attempts
+const authenticated = await client.performMTLS({ maxRetries: 3 });
 if (!authenticated) throw new Error('Authentication failed');
 
 // HTTP-style requests over data channel
@@ -583,15 +572,38 @@ This implementation follows the [Mau specification](https://github.com/mau-netwo
 - ✅ HTTP endpoints: `/p2p/<fpr>`, `/p2p/<fpr>/<file>`, `/p2p/<fpr>/<file>.versions/<hash>`
 - ✅ JSON-LD / Schema.org for content structure
 - ✅ SHA-256 checksums for content verification
+- ✅ Kademlia DHT peer discovery (HTTP-based)
 - ⚠️ mTLS authentication (requires additional setup)
-- ⚠️ Kademlia DHT (not yet implemented)
 - ⚠️ mDNS discovery (not yet implemented)
+
+### Peer Discovery Resolvers
+
+```typescript
+import { staticResolver, dhtResolver, combinedResolver } from '@mau-network/mau';
+
+// Static resolver - hardcoded peer addresses
+const resolver1 = staticResolver({
+  'alice-fingerprint': '192.168.1.100:8080',
+  'bob-fingerprint': 'bob.example.com:8080',
+});
+
+// DHT resolver - discover peers via Kademlia DHT
+const resolver2 = dhtResolver(['bootstrap.mau.social:443']);
+
+// Combined resolver - try multiple strategies
+const resolver3 = combinedResolver([
+  staticResolver(knownPeers),
+  dhtResolver(['bootstrap1:443', 'bootstrap2:443']),
+]);
+
+// Use with client
+const client = Client.create(account, storage, peer, [resolver3]);
+```
 
 ## Limitations
 
 - **Certificate Generation**: TLS certificate generation requires additional libraries (not included)
-- **DHT**: Kademlia DHT not yet implemented
-- **mDNS**: Local network discovery not yet implemented
+- **mDNS**: Local network discovery not yet implemented (Node.js only)
 - **UPnP**: Port forwarding not yet implemented
 
 These are planned for future releases.
