@@ -31,8 +31,10 @@
   },
   "dependencies": {
     "@peculiar/x509": "^1.14.3",
+    "idb": "^8.0.3",
     "node-fetch": "^3.3.2",
-    "openpgp": "^5.11.1"
+    "openpgp": "^5.11.1",
+    "p-retry": "^4.6.2"
   },
   "optionalDependencies": {
     "dns2": "^2.1.0",
@@ -44,7 +46,7 @@
     "@types/dns2": "^2.0.10",
     "@types/jest": "^29.5.12",
     "@types/k-bucket": "^5.0.4",
-"@types/node": "^20.19.37",
+    "@types/node": "^20.19.37",
     "@typescript-eslint/eslint-plugin": "^7.0.2",
     "@typescript-eslint/parser": "^7.0.2",
     "buffer": "^6.0.3",

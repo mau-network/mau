@@ -1,10 +1,8 @@
 /**
- * Browser Storage Implementation (localStorage + IndexedDB)
- * 
- * Provides browser-based storage using localStorage for metadata and
- * IndexedDB for binary file data.
+ * Browser Storage Implementation (IndexedDB via idb)
  */
 
+import { openDB, IDBPDatabase, DBSchema } from 'idb';
 import type { Storage } from '../types/index.js';
 
 const DB_NAME = 'mau-storage';
@@ -19,123 +17,43 @@ interface FileEntry {
   modifiedTime?: number;
 }
 
+interface MauDB extends DBSchema {
+  files: {
+    key: string;
+    value: FileEntry;
+  };
+}
+
 export class BrowserStorage implements Storage {
-  private db: IDBDatabase | null = null;
-  private initPromise: Promise<void>;
+  private db: IDBPDatabase<MauDB>;
 
-  private constructor() {
-    // Private constructor - use BrowserStorage.create() instead
-    this.initPromise = this.initDB();
+  private constructor(db: IDBPDatabase<MauDB>) {
+    this.db = db;
   }
 
-  /**
-   * Create a new BrowserStorage instance
-   * Use this instead of `new BrowserStorage()` to ensure DB is initialized
-   */
   static async create(): Promise<BrowserStorage> {
-    const storage = new BrowserStorage();
-    await storage.initPromise;
-    return storage;
-  }
-
-  private async initDB(): Promise<void> {
-    if (typeof indexedDB === 'undefined') {
-      throw new Error('IndexedDB not available in this environment');
-    }
-
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        this.db = request.result;
-        resolve();
-      };
-
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
+    const db = await openDB<MauDB>(DB_NAME, DB_VERSION, {
+      upgrade(db) {
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.createObjectStore(STORE_NAME, { keyPath: 'path' });
         }
-      };
+      },
     });
-  }
-
-  private async ensureDB(): Promise<IDBDatabase> {
-    // Wait for initialization to complete
-    await this.initPromise;
-    if (!this.db) {
-      throw new Error('Failed to initialize database');
-    }
-    return this.db;
-  }
-
-  private async getEntry(path: string): Promise<FileEntry | null> {
-    const db = await this.ensureDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.get(path);
-
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  private async putEntry(entry: FileEntry): Promise<void> {
-    const db = await this.ensureDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.put(entry);
-
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  private async deleteEntry(path: string): Promise<void> {
-    const db = await this.ensureDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.delete(path);
-
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  private async getAllKeys(): Promise<string[]> {
-    const db = await this.ensureDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.getAllKeys();
-
-      request.onsuccess = () => resolve(request.result as string[]);
-      request.onerror = () => reject(request.error);
-    });
+    return new BrowserStorage(db);
   }
 
   async exists(path: string): Promise<boolean> {
-    const entry = await this.getEntry(path);
-    return entry !== null;
+    return (await this.db.getKey(STORE_NAME, path)) !== undefined;
   }
 
   async readFile(path: string): Promise<Uint8Array> {
-    const entry = await this.getEntry(path);
-    if (!entry) {
-      throw new Error(`File not found: ${path}`);
-    }
-    if (entry.isDirectory) {
-      throw new Error(`Path is a directory: ${path}`);
-    }
+    const entry = await this.db.get(STORE_NAME, path);
+    if (!entry) throw new Error(`File not found: ${path}`);
+    if (entry.isDirectory) throw new Error(`Path is a directory: ${path}`);
     return entry.data;
   }
 
   async writeFile(path: string, data: Uint8Array): Promise<void> {
-    // Create parent directories if needed
     const parts = path.split('/');
     for (let i = 1; i < parts.length; i++) {
       const dirPath = parts.slice(0, i).join('/');
@@ -143,8 +61,7 @@ export class BrowserStorage implements Storage {
         await this.mkdir(dirPath);
       }
     }
-
-    await this.putEntry({
+    await this.db.put(STORE_NAME, {
       path,
       data,
       size: data.length,
@@ -154,80 +71,37 @@ export class BrowserStorage implements Storage {
   }
 
   async readText(path: string): Promise<string> {
-    const data = await this.readFile(path);
-    return new TextDecoder().decode(data);
+    return new TextDecoder().decode(await this.readFile(path));
   }
 
   async writeText(path: string, text: string): Promise<void> {
-    const data = new TextEncoder().encode(text);
-    await this.writeFile(path, data);
+    await this.writeFile(path, new TextEncoder().encode(text));
   }
 
   async readDir(dirPath: string): Promise<string[]> {
-    const db = await this.ensureDB();
-    
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
-      
-      // Handle root directory
-      if (!dirPath || dirPath === '/') {
-        const entries = new Set<string>();
-        const request = store.openCursor();
-        
-        request.onsuccess = () => {
-          const cursor = request.result;
-          if (cursor) {
-            const key = cursor.value.path;
-            const slashIndex = key.indexOf('/');
-            if (slashIndex === -1) {
-              entries.add(key);
-            } else {
-              entries.add(key.slice(0, slashIndex));
-            }
-            cursor.continue();
-          } else {
-            resolve(Array.from(entries));
-          }
-        };
-        
-        request.onerror = () => reject(request.error);
-        return;
+    const entries = new Set<string>();
+    if (!dirPath || dirPath === '/') {
+      const all = await this.db.getAllKeys(STORE_NAME);
+      for (const key of all) {
+        const slashIndex = key.indexOf('/');
+        entries.add(slashIndex === -1 ? key : key.slice(0, slashIndex));
       }
-      
-      // Handle subdirectories with cursor range query
+    } else {
       const prefix = dirPath.endsWith('/') ? dirPath : dirPath + '/';
       const range = IDBKeyRange.bound(prefix, prefix + '\uffff');
-      
-      const entries = new Set<string>();
-      const request = store.openCursor(range);
-      
-      request.onsuccess = () => {
-        const cursor = request.result;
-        if (cursor) {
-          const key = cursor.value.path;
-          if (key.startsWith(prefix)) {
-            const rest = key.slice(prefix.length);
-            const nextSlash = rest.indexOf('/');
-            if (nextSlash === -1) {
-              entries.add(rest);
-            } else {
-              entries.add(rest.slice(0, nextSlash));
-            }
-          }
-          cursor.continue();
-        } else {
-          resolve(Array.from(entries));
-        }
-      };
-      
-      request.onerror = () => reject(request.error);
-    });
+      const keys = await this.db.getAllKeys(STORE_NAME, range);
+      for (const key of keys) {
+        const rest = key.slice(prefix.length);
+        const nextSlash = rest.indexOf('/');
+        entries.add(nextSlash === -1 ? rest : rest.slice(0, nextSlash));
+      }
+    }
+    return Array.from(entries);
   }
 
   async mkdir(dirPath: string): Promise<void> {
     if (!(await this.exists(dirPath))) {
-      await this.putEntry({
+      await this.db.put(STORE_NAME, {
         path: dirPath,
         data: new Uint8Array(0),
         size: 0,
@@ -238,108 +112,58 @@ export class BrowserStorage implements Storage {
   }
 
   async remove(path: string): Promise<void> {
-    const db = await this.ensureDB();
-    
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const prefix = path.endsWith('/') ? path : path + '/';
-      
-      // Delete the path itself
-      store.delete(path);
-      
-      // Delete all children using cursor with range
-      const range = IDBKeyRange.bound(prefix, prefix + '\uffff');
-      const request = store.openCursor(range);
-      
-      request.onsuccess = () => {
-        const cursor = request.result;
-        if (cursor) {
-          cursor.delete();
-          cursor.continue();
-        }
-      };
-      
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
+    const tx = this.db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    await store.delete(path);
+    const prefix = path.endsWith('/') ? path : path + '/';
+    const range = IDBKeyRange.bound(prefix, prefix + '\uffff');
+    let cursor = await store.openCursor(range);
+    while (cursor) {
+      await cursor.delete();
+      cursor = await cursor.continue();
+    }
+    await tx.done;
   }
 
   async stat(path: string): Promise<{ size: number; isDirectory: boolean; modifiedTime?: number }> {
-    const entry = await this.getEntry(path);
-    if (!entry) {
-      throw new Error(`Path not found: ${path}`);
-    }
-    return {
-      size: entry.size,
-      isDirectory: entry.isDirectory,
-      modifiedTime: entry.modifiedTime,
-    };
+    const entry = await this.db.get(STORE_NAME, path);
+    if (!entry) throw new Error(`Path not found: ${path}`);
+    return { size: entry.size, isDirectory: entry.isDirectory, modifiedTime: entry.modifiedTime };
   }
 
   join(...parts: string[]): string {
-    return parts
-      .join('/')
-      .replace(/\/+/g, '/')
-      .replace(/^\//, '');
+    return parts.join('/').replace(/\/+/g, '/').replace(/^\//, '');
   }
 
-  /**
-   * Batch write multiple files in a single transaction
-   * Much faster than individual writeFile calls for bulk operations
-   */
   async writeBatch(files: Array<{ path: string; data: Uint8Array }>): Promise<void> {
-    const db = await this.ensureDB();
-    
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const timestamp = Date.now();
-      
-      for (const file of files) {
+    const tx = this.db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const timestamp = Date.now();
+    await Promise.all(
+      files.map((file) =>
         store.put({
           path: file.path,
           data: file.data,
           size: file.data.length,
           isDirectory: false,
           modifiedTime: timestamp,
-        });
-      }
-      
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
+        })
+      )
+    );
+    await tx.done;
   }
 
-  /**
-   * Batch read multiple files in a single transaction
-   * Returns Map of path -> data (null if file doesn't exist)
-   */
   async readBatch(paths: string[]): Promise<Map<string, Uint8Array | null>> {
-    const db = await this.ensureDB();
-    
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
-      const results = new Map<string, Uint8Array | null>();
-      
-      let completed = 0;
-      for (const path of paths) {
-        const request = store.get(path);
-        request.onsuccess = () => {
-          results.set(path, request.result?.data || null);
-          completed++;
-          if (completed === paths.length) {
-            resolve(results);
-          }
-        };
-        request.onerror = () => reject(request.error);
-      }
-      
-      // Handle empty array case
-      if (paths.length === 0) {
-        resolve(results);
-      }
-    });
+    const tx = this.db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const results = new Map<string, Uint8Array | null>();
+    await Promise.all(
+      paths.map(async (path) => {
+        const entry = await store.get(path);
+        results.set(path, entry?.data ?? null);
+      })
+    );
+    await tx.done;
+    return results;
   }
 }
