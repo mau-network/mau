@@ -55,6 +55,18 @@ jobs:
           rm *.md
           chmod -R 0777 .
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Generate TypeScript API documentation
+        working-directory: typescript
+        run: |
+          npm ci
+          npm install -g typedoc
+          npx typedoc --out ../docs/typescript src/index.ts
+
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3.0.1
         with:
