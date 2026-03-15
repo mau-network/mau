@@ -5,20 +5,18 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { Client } from './client';
 import { Account } from './account';
-import { FilesystemStorage } from './storage/filesystem';
+import { BrowserStorage } from './storage/browser';
 import { PeerNotFoundError } from './types';
-import * as fs from 'fs/promises';
 
-const TEST_DIR = './test-data-client-edge';
+const TEST_DIR = 'test-data-client-edge';
 
 describe('Client Error Handling and Edge Cases', () => {
-  let storage: FilesystemStorage;
+  let storage: BrowserStorage;
   let account: Account;
   let peerAccount: Account;
 
   beforeAll(async () => {
-    storage = new FilesystemStorage();
-    await fs.mkdir(TEST_DIR, { recursive: true });
+    storage = await BrowserStorage.create();
 
     account = await Account.create(storage, TEST_DIR + '/client', {
       name: 'Client',
@@ -37,8 +35,10 @@ describe('Client Error Handling and Edge Cases', () => {
 
   afterAll(async () => {
     try {
-      await fs.rm(TEST_DIR, { recursive: true, force: true });
-    } catch (error) { /* Ignore expected error */ }
+      await storage.remove(TEST_DIR);
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   describe('Constructor and Configuration', () => {

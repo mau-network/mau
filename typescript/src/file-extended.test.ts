@@ -5,19 +5,17 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { File } from './file';
 import { Account } from './account';
-import { FilesystemStorage } from './storage/filesystem';
-import * as fs from 'fs/promises';
+import { BrowserStorage } from './storage/browser';
 
-const TEST_DIR = './test-data-file-extended';
+const TEST_DIR = 'test-data-file-extended';
 
 describe('Extended File Operations', () => {
-  let storage: FilesystemStorage;
+  let storage: BrowserStorage;
   let account: Account;
   let contentDir: string;
 
   beforeAll(async () => {
-    storage = new FilesystemStorage();
-    await fs.mkdir(TEST_DIR, { recursive: true });
+    storage = await BrowserStorage.create();
 
     account = await Account.create(storage, TEST_DIR, {
       name: 'Test User',
@@ -31,8 +29,10 @@ describe('Extended File Operations', () => {
 
   afterAll(async () => {
     try {
-      await fs.rm(TEST_DIR, { recursive: true, force: true });
-    } catch (error) { /* Ignore expected error */ }
+      await storage.remove(TEST_DIR);
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
 

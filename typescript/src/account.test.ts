@@ -4,24 +4,23 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { Account } from './account';
-import { FilesystemStorage } from './storage/filesystem';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { BrowserStorage } from './storage/browser';
 
-const TEST_DIR = './test-data-account';
+const TEST_DIR = 'test-data-account';
 
 describe('Account', () => {
-  let storage: FilesystemStorage;
+  let storage: BrowserStorage;
 
   beforeEach(async () => {
-    storage = new FilesystemStorage();
-    await fs.mkdir(TEST_DIR, { recursive: true });
+    storage = await BrowserStorage.create();
   });
 
   afterEach(async () => {
     try {
-      await fs.rm(TEST_DIR, { recursive: true, force: true });
-    } catch (err) { /* cleanup error ignored */ }
+      await storage.remove(TEST_DIR);
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   it('should create a new account', async () => {
@@ -78,9 +77,8 @@ describe('Account', () => {
     });
 
     // Create a friend account
-    const friendStorage = new FilesystemStorage();
-    const friendDir = path.join(TEST_DIR, 'friend');
-    const friend = await Account.create(friendStorage, friendDir, {
+    const friendDir = TEST_DIR + '/friend';
+    const friend = await Account.create(storage, friendDir, {
       name: 'Bob',
       email: 'bob@example.com',
       passphrase: 'bob-pass',

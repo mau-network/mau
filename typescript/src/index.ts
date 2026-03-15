@@ -1,27 +1,60 @@
 /**
  * Mau TypeScript Implementation
  * 
- * A peer-to-peer social network protocol implementation for browser and Node.js.
+ * A peer-to-peer social network protocol implementation for browsers.
  * 
  * @packageDocumentation
  */
 
-// Core exports
+// ============================================================================
+// Core Classes
+// ============================================================================
+
 export { Account } from './account.js';
 export { Client } from './client.js';
 export { Server } from './server.js';
 export { File } from './file.js';
 
-// Storage exports
-export { createStorage, FilesystemStorage, BrowserStorage } from './storage/index.js';
+// ============================================================================
+// Storage Backends
+// ============================================================================
 
-// Crypto exports
-export * from './crypto/index.js';
+export { createStorage, BrowserStorage } from './storage/index.js';
 
-// Network exports
-export * from './network/index.js';
+// ============================================================================
+// Networking & P2P
+// ============================================================================
 
-// Type exports
+// Peer discovery resolvers
+export {
+  staticResolver,
+  dhtResolver,
+  combinedResolver,
+  retryResolver,
+} from './network/index.js';
+
+// WebRTC client and server
+export {
+  WebRTCClient,
+  WebRTCServer,
+} from './network/index.js';
+
+// Signaling for WebRTC coordination
+export {
+  LocalSignalingServer,
+  WebSocketSignaling,
+  HTTPSignaling,
+  SignaledConnection,
+} from './network/index.js';
+
+// Distributed Hash Table (DHT)
+export { KademliaDHT } from './network/index.js';
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
+// Core types
 export type {
   Storage,
   Fingerprint,
@@ -37,22 +70,22 @@ export type {
   FileListResponse,
 } from './types/index.js';
 
+// Server request/response types
 export type { ServerRequest, ServerResponse } from './server.js';
 
+// Network types
+export type {
+  WebRTCConfig,
+  WebRTCServerConfig,
+  WebRTCConnection,
+  SignalingMessage,
+} from './network/index.js';
+
+// ============================================================================
+// Error Classes
+// ============================================================================
+
 export {
-  MAU_DIR_NAME,
-  ACCOUNT_KEY_FILENAME,
-  SYNC_STATE_FILENAME,
-  FILE_PERM,
-  DIR_PERM,
-  HTTP_TIMEOUT_MS,
-  SERVER_RESULT_LIMIT,
-  URI_PROTOCOL_NAME,
-  DHT_B,
-  DHT_K,
-  DHT_ALPHA,
-  DHT_STALL_PERIOD_MS,
-  DHT_PING_MIN_BACKOFF_MS,
   MauError,
   PassphraseRequiredError,
   IncorrectPassphraseError,
@@ -63,6 +96,10 @@ export {
   PeerNotFoundError,
   IncorrectPeerCertificateError,
 } from './types/index.js';
+
+// ============================================================================
+// Convenience Functions
+// ============================================================================
 
 /**
  * Convenience function to create a new account

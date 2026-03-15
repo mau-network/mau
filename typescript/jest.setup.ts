@@ -1,9 +1,11 @@
 /**
- * WebRTC Polyfill for Node.js
- * Wraps node-datachannel to match browser RTCPeerConnection API
+ * Test Environment Setup
+ * - WebRTC Polyfill for Node.js using node-datachannel
+ * - IndexedDB Polyfill for Node.js using fake-indexeddb
  */
 
 import { PeerConnection as NodePeerConnection } from 'node-datachannel';
+import 'fake-indexeddb/auto';
 
 // Polyfill RTCPeerConnection for Node.js environment
 if (typeof global.RTCPeerConnection === 'undefined') {

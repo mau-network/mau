@@ -2,38 +2,33 @@
 
 TypeScript/JavaScript implementation of the [Mau P2P social network protocol](https://github.com/mau-network/mau).
 
-**Works in both Browser and Node.js environments** with pluggable storage backends.
+**Browser-first P2P social networking** with IndexedDB storage and WebRTC communication.
 
 ## Features
 
-- ✅ **Universal**: Works in browser (IndexedDB) and Node.js (filesystem)
+- ✅ **Browser-Native**: Built for modern browsers with IndexedDB storage
 - ✅ **WebRTC P2P**: Native browser-to-browser communication over data channels
 - ✅ **PGP Authentication**: Challenge-response authentication over WebRTC
 - ✅ **OpenPGP**: Ed25519 and RSA key generation, signing, and encryption
-- ✅ **P2P Sync**: HTTP-style protocol over WebRTC or traditional HTTP
+- ✅ **P2P Sync**: HTTP-style protocol over WebRTC data channels
 - ✅ **Versioning**: Automatic content versioning with SHA-256 checksums
 - ✅ **Type-safe**: Full TypeScript definitions
-- ✅ **Zero native dependencies**: Pure JavaScript, runs anywhere
+- ✅ **Zero native dependencies**: Pure JavaScript, runs in any modern browser
 
 ## Security Note
 
-⚠️ **HTTP Client**: The HTTP client does not yet implement mTLS authentication. For authenticated P2P connections, use the WebRTC client which implements PGP-based challenge-response authentication. Traditional mTLS over HTTPS requires X.509 certificates and is planned for a future release.
+⚠️ **HTTP Client**: The HTTP client does not yet implement mTLS authentication. For authenticated P2P connections, use the WebRTC client which implements PGP-based challenge-response authentication.
 
-## Browser vs Node.js
+## Architecture
 
-### ✅ Works Everywhere (Browser + Node.js)
-- Account management (PGP key generation)
-- File encryption/decryption
-- WebRTC P2P connections
-- HTTP client sync
-- Static peer resolver
-- DHT resolver (HTTP-based)
+This package is designed for **browser environments**:
 
-### ⚠️ Node.js Only
-- **DNS resolver** - Requires UDP sockets (not available in browsers)
-- **HTTP Server** - Use WebRTC or browser extensions for serving files
+- **Storage**: IndexedDB for encrypted file storage
+- **Communication**: WebRTC data channels for P2P file synchronization
+- **Peer Discovery**: Static resolver or DHT resolver (HTTP-based)
+- **Authentication**: PGP-based challenge-response over WebRTC
 
-**Browser Peer Discovery:** Use `staticResolver` or `dhtResolver` (HTTP-based). DNS resolvers will gracefully fail in browser environments.
+Tests run in Node.js using polyfills (`fake-indexeddb`, `@roamhq/wrtc`) but the production code is browser-only.
 
 ## Installation
 
@@ -43,52 +38,6 @@ npm install @mau-network/mau
 
 ## Quick Start
 
-### Node.js Example
-
-```typescript
-import { createAccount, loadAccount, File, Client } from '@mau-network/mau';
-
-// Create a new account
-const account = await createAccount(
-  './my-mau-data',    // Root directory
-  'Alice',            // Name
-  'alice@mau.network', // Email
-  'strong-passphrase'  // Passphrase
-);
-
-console.log('Account fingerprint:', account.getFingerprint());
-console.log('Public key:', account.getPublicKey());
-
-// Write a post
-const file = File.create(account, account.storage, 'hello.json');
-await file.writeJSON({
-  '@type': 'SocialMediaPosting',
-  headline: 'Hello, Mau!',
-  articleBody: 'My first post on Mau',
-  datePublished: new Date().toISOString(),
-});
-
-// List all files
-const files = await File.list(account, account.storage);
-for (const f of files) {
-  console.log('File:', f.getName());
-}
-
-// Add a friend
-const friendPublicKey = '-----BEGIN PGP PUBLIC KEY BLOCK-----\n...';
-const friendFingerprint = await account.addFriend(friendPublicKey);
-
-// Sync with a peer
-const client = Client.create(
-  account,
-  account.storage,
-  { fingerprint: friendFingerprint, address: '192.168.1.100:8080' }
-);
-
-const stats = await client.sync();
-console.log('Downloaded:', stats.downloaded, 'Updated:', stats.updated);
-```
-
 ### Browser Example
 
 ```typescript
@@ -97,57 +46,35 @@ import { createAccount, File } from '@mau-network/mau';
 // Create account (uses IndexedDB automatically)
 const account = await createAccount(
   'mau-data',         // Root path in IndexedDB
-  'Bob',
-  'bob@mau.network',
+  'Alice',
+  'alice@mau.network',
   'strong-passphrase'
 );
 
+console.log('Account fingerprint:', account.getFingerprint());
+console.log('Public key:', account.getPublicKey());
+
 // Write a post
-const file = File.create(account, account.storage, 'post-1.json');
+const file = await account.createFile('hello.json');
 await file.writeJSON({
   '@type': 'SocialMediaPosting',
-  headline: 'Posted from browser!',
+  headline: 'Hello, Mau!',
+  articleBody: 'My first post on Mau',
   datePublished: new Date().toISOString(),
 });
 
-// Read it back
-const content = await file.readJSON();
-console.log(content);
+// List all files
+const files = await account.listFiles();
+for (const f of files) {
+  console.log('File:', f.getName());
+}
+
+// Add a friend
+const friendPublicKey = '-----BEGIN PGP PUBLIC KEY BLOCK-----\n...';
+const friendFingerprint = await account.addFriend(friendPublicKey);
+
+console.log('Friend added:', friendFingerprint);
 ```
-
-### Server Example (Express)
-
-```typescript
-import express from 'express';
-import { loadAccount, Server } from '@mau-network/mau';
-
-const app = express();
-
-const account = await loadAccount('./my-mau-data', 'my-passphrase');
-const server = new Server(account, account.storage);
-
-// Mount Mau server
-app.use(server.expressMiddleware());
-
-app.listen(8080, () => {
-  console.log('Mau server listening on port 8080');
-  console.log('Fingerprint:', account.getFingerprint());
-});
-```
-
-### Server Example (Node.js http)
-
-```typescript
-import http from 'http';
-import { loadAccount, Server } from '@mau-network/mau';
-
-const account = await loadAccount('./my-mau-data', 'my-passphrase');
-const server = new Server(account, account.storage);
-
-const httpServer = http.createServer(server.nodeHandler());
-
-httpServer.listen(8080, () => {
-  console.log('Mau server listening on port 8080');
 });
 ```
 
@@ -327,20 +254,15 @@ const version = await client.downloadFileVersion('post.json', 'abc123...');
 
 ### Server
 
+The `Server` class provides a framework-agnostic HTTP request handler. It's primarily used internally by `WebRTCServer` for HTTP-over-datachannel communication.
+
 ```typescript
 // Create server
 const server = new Server(account, storage, {
   resultsLimit: 20,
-  port: 8080,
 });
 
-// Express middleware
-app.use(server.expressMiddleware());
-
-// Node.js http handler
-http.createServer(server.nodeHandler()).listen(8080);
-
-// Handle requests manually
+// Handle requests manually (used internally by WebRTCServer)
 const response = await server.handleRequest({
   method: 'GET',
   url: '/p2p/3a7b2c.../post.json',
@@ -349,6 +271,8 @@ const response = await server.handleRequest({
   headers: {},
 });
 ```
+
+For browser-to-browser communication, use `WebRTCServer` which wraps the `Server` class.
 
 ### WebRTCServer
 
@@ -473,14 +397,13 @@ await connection.sendICECandidate(candidate);
 ### Storage
 
 ```typescript
-// Auto-detect storage backend
+// Auto-detect storage backend (uses BrowserStorage with IndexedDB)
 const storage = await createStorage();
 
-// Or use specific backend
-import { FilesystemStorage, BrowserStorage } from '@mau-network/mau';
+// Or create BrowserStorage directly
+import { BrowserStorage } from '@mau-network/mau';
 
-const fsStorage = new FilesystemStorage();
-const browserStorage = new BrowserStorage();
+const browserStorage = await BrowserStorage.create();
 
 // Storage interface
 await storage.readFile(path);         // => Uint8Array
@@ -499,12 +422,7 @@ storage.join('a', 'b', 'c');          // => 'a/b/c'
 
 ### Storage Abstraction
 
-Mau uses a storage abstraction layer that works in both environments:
-
-- **Node.js**: Uses native `fs` module for filesystem operations
-- **Browser**: Uses IndexedDB for persistent storage
-
-Both implement the same `Storage` interface, making code portable.
+Mau uses IndexedDB for persistent storage in the browser. The storage abstraction layer provides a file-like interface over IndexedDB's key-value store.
 
 ### Browser P2P with WebRTC
 
@@ -573,8 +491,7 @@ This implementation follows the [Mau specification](https://github.com/mau-netwo
 - ✅ JSON-LD / Schema.org for content structure
 - ✅ SHA-256 checksums for content verification
 - ✅ Kademlia DHT peer discovery (HTTP-based)
-- ⚠️ mTLS authentication (requires additional setup)
-- ⚠️ mDNS discovery (not yet implemented)
+- ⚠️ mTLS authentication (PGP-based, implemented for WebRTC only)
 
 ### Peer Discovery Resolvers
 
@@ -602,11 +519,11 @@ const client = Client.create(account, storage, peer, [resolver3]);
 
 ## Limitations
 
-- **Certificate Generation**: TLS certificate generation requires additional libraries (not included)
-- **mDNS**: Local network discovery not yet implemented (Node.js only)
-- **UPnP**: Port forwarding not yet implemented
+- **Certificate Pinning**: TLS certificate pinning for HTTP clients is not implemented (use WebRTC for authenticated connections)
+- **Browser Environment**: This package is designed for browsers only; it will not work in Node.js or other JavaScript runtimes
+- **WebRTC Dependency**: Peer-to-peer file synchronization requires WebRTC support
 
-These are planned for future releases.
+These limitations are by design for this browser-focused implementation.
 
 ## Development
 

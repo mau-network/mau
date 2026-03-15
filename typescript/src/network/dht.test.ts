@@ -7,21 +7,19 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
-import * as fs from 'fs/promises';
 import { KademliaDHT } from './dht';
 import { Account } from '../account';
-import { FilesystemStorage } from '../storage/filesystem';
+import { BrowserStorage } from '../storage/browser';
 
-const TEST_DIR = './test-data-dht';
+const TEST_DIR = 'test-data-dht';
 
 describe('KademliaDHT', () => {
-  let storage: FilesystemStorage;
+  let storage: BrowserStorage;
   let account: Account;
   let peerAccount: Account;
 
   beforeAll(async () => {
-    storage = new FilesystemStorage();
-    await fs.mkdir(TEST_DIR, { recursive: true });
+    storage = await BrowserStorage.create();
 
     account = await Account.create(storage, TEST_DIR + '/account', {
       name: 'DHT User',
@@ -39,7 +37,11 @@ describe('KademliaDHT', () => {
   });
 
   afterAll(async () => {
-    await fs.rm(TEST_DIR, { recursive: true, force: true }).catch(() => {});
+    try {
+      await storage.remove(TEST_DIR);
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   it('constructs with default ICE servers', () => {

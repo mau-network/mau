@@ -5,18 +5,16 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { Account } from './account';
 import { File } from './file';
-import { FilesystemStorage } from './storage/filesystem';
-import * as fs from 'fs/promises';
+import { BrowserStorage } from './storage/browser';
 
-const TEST_DIR = './test-data-file';
+const TEST_DIR = 'test-data-file';
 
 describe('File', () => {
   let account: Account;
-  let storage: FilesystemStorage;
+  let storage: BrowserStorage;
 
   beforeEach(async () => {
-    storage = new FilesystemStorage();
-    await fs.mkdir(TEST_DIR, { recursive: true });
+    storage = await BrowserStorage.create();
 
     account = await Account.create(storage, TEST_DIR, {
       name: 'Test User',
@@ -27,12 +25,14 @@ describe('File', () => {
 
   afterEach(async () => {
     try {
-      await fs.rm(TEST_DIR, { recursive: true, force: true });
-    } catch (err) { /* cleanup error ignored */ }
+      await storage.remove(TEST_DIR);
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   it('should write and read text', async () => {
-    const file = File.create(account, storage, 'test.txt');
+    const file = await account.createFile('test.txt');
     await file.writeText('Hello, World!');
 
     const content = await file.readText();
@@ -40,7 +40,7 @@ describe('File', () => {
   });
 
   it('should write and read JSON', async () => {
-    const file = File.create(account, storage, 'test.json');
+    const file = await account.createFile('test.json');
     const data = { message: 'Hello', count: 42 };
     
     await file.writeJSON(data);
@@ -50,7 +50,7 @@ describe('File', () => {
   });
 
   it('should create versions on update', async () => {
-    const file = File.create(account, storage, 'versioned.txt');
+    const file = await account.createFile('versioned.txt');
     
     await file.writeText('Version 1');
     await file.writeText('Version 2');
@@ -61,24 +61,27 @@ describe('File', () => {
   });
 
   it('should list files', async () => {
-    await File.create(account, storage, 'file1.txt').writeText('Content 1');
-    await File.create(account, storage, 'file2.txt').writeText('Content 2');
-    await File.create(account, storage, 'file3.txt').writeText('Content 3');
+    const file1 = await account.createFile('file1.txt');
+    await file1.writeText('Content 1');
+    const file2 = await account.createFile('file2.txt');
+    await file2.writeText('Content 2');
+    const file3 = await account.createFile('file3.txt');
+    await file3.writeText('Content 3');
 
-    const files = await File.list(account, storage);
+    const files = await account.listFiles();
     expect(files.length).toBe(3);
   });
 
   it('should delete files', async () => {
-    const file = File.create(account, storage, 'delete-me.txt');
+    const file = await account.createFile('delete-me.txt');
     await file.writeText('This will be deleted');
 
-    let files = await File.list(account, storage);
+    let files = await account.listFiles();
     expect(files.length).toBe(1);
 
     await file.delete();
 
-    files = await File.list(account, storage);
+    files = await account.listFiles();
     expect(files.length).toBe(0);
   });
 });

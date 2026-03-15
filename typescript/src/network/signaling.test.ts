@@ -5,19 +5,17 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { LocalSignalingServer } from './signaling';
 import { Account } from '../account';
-import { FilesystemStorage } from '../storage/filesystem';
-import * as fs from 'fs/promises';
+import { BrowserStorage } from '../storage/browser';
 
-const TEST_DIR = './test-data-signaling';
+const TEST_DIR = 'test-data-signaling';
 
 describe('Signaling E2E Tests', () => {
-  let storage: FilesystemStorage;
+  let storage: BrowserStorage;
   let serverAccount: Account;
   let clientAccount: Account;
 
   beforeAll(async () => {
-    storage = new FilesystemStorage();
-    await fs.mkdir(TEST_DIR, { recursive: true });
+    storage = await BrowserStorage.create();
 
     serverAccount = await Account.create(storage, TEST_DIR + '/server', {
       name: 'Server User',
@@ -36,8 +34,10 @@ describe('Signaling E2E Tests', () => {
 
   afterAll(async () => {
     try {
-      await fs.rm(TEST_DIR, { recursive: true, force: true });
-    } catch (error) { /* Ignore expected error */ }
+      await storage.remove(TEST_DIR);
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   describe('LocalSignalingServer - Post/Poll', () => {

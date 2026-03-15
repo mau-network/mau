@@ -3,7 +3,7 @@
  */
 
 import express from 'express';
-import { loadAccount, createAccount, Server } from '../src/index.js';
+import { loadAccount, createAccount } from '../src/index.js';
 
 async function main() {
   const app = express();
@@ -27,7 +27,7 @@ async function main() {
   console.log('Fingerprint:', account.getFingerprint());
 
   // Create Mau server
-  const server = new Server(account, account.storage);
+  const server = account.createServer();
 
   // Mount Mau routes
   app.use(server.expressMiddleware());

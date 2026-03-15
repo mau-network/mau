@@ -4,7 +4,6 @@
 
 import pRetry, { AbortError } from 'p-retry';
 import type { Fingerprint, FingerprintResolver } from '../types/index.js';
-import { DnsNotSupportedError } from '../types/index.js';
 import type { KademliaDHT } from './dht.js';
 
 /**
@@ -18,87 +17,6 @@ export function staticResolver(
     return addressMap.get(fingerprint) || null;
   };
 }
-
-/**
- * DNS resolver - looks up TXT records for _mau.<fingerprint>.<domain>
- * 
- * ⚠️ **Node.js only** - Requires UDP sockets (not available in browsers)
- * 
- * @param domain Base domain for DNS lookups (e.g., "mau.network")
- * @param dnsServer Optional DNS server address (defaults to system resolver)
- */
-export function dnsResolver(
-  domain: string,
-  dnsServer?: string
-): FingerprintResolver {
-  let resolverAvailable: boolean | null = null;
-  
-  return async (fingerprint: Fingerprint, timeout = 5000) => {
-    // dns2 requires UDP sockets — not available in browsers
-    if (typeof process === 'undefined' || !process.versions?.node) {
-      throw new DnsNotSupportedError();
-    }
-
-    try {
-      // Check if resolver was already determined to be unavailable
-      if (resolverAvailable === false) {
-        return null;
-      }
-
-      // Dynamic import for Node.js-only library
-      const DNS2 = (await import('dns2')).default;
-      const { Packet } = DNS2;
-      
-      resolverAvailable = true;
-
-      const options: { nameServers?: string[] } = {};
-      if (dnsServer) {
-        options.nameServers = [dnsServer];
-      }
-
-      const resolver = new DNS2(options);
-
-      const hostname = `_mau.${fingerprint}.${domain}`;
-      
-      const response = await Promise.race([
-        resolver.resolve(hostname, 'TXT'),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('DNS timeout')), timeout)
-        ),
-      ]);
-
-      // Parse TXT records for address
-      if (response && 'answers' in response && response.answers.length > 0) {
-        for (const answer of response.answers) {
-          if (answer.type === Packet.TYPE.TXT && 'data' in answer) {
-            // TXT record format: "mau-address=hostname:port"
-            const txtData = String(answer.data || '');
-            const match = txtData.match(/mau-address=(.+)/);
-            if (match) {
-              return match[1];
-            }
-          }
-        }
-      }
-
-      // No matching TXT record found (peer not published)
-      return null;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      
-      // Timeout (treat as peer not found, could retry)
-      if (error?.message === 'DNS timeout') {
-        return null;
-      }
-      
-      // Network errors or invalid DNS server - log but return null
-      console.error(`DNS resolution failed for ${fingerprint}:`, error.message);
-      return null;
-    }
-  };
-}
-
-
 
 /**
  * DHT resolver — wraps a {@link KademliaDHT} instance as a {@link FingerprintResolver}.

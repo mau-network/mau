@@ -28,16 +28,16 @@ Test files: `*.test.ts` alongside source files
 
 ## Core Principles
 
-### 1. Universal Compatibility
-- **Must work in both Node.js and Browser**
-- Use feature detection, not environment detection
-- Storage abstraction (`FilesystemStorage` vs `BrowserStorage`)
-- Conditional imports for Node.js-only modules
+### 1. Browser-Only Architecture
+- **Designed exclusively for modern browsers**
+- Uses IndexedDB for storage (via `BrowserStorage`)
+- WebRTC for peer-to-peer communication
+- Tests run in Node.js with polyfills (`fake-indexeddb`, `@roamhq/wrtc`)
 
 ### 2. Zero Native Dependencies
 - Pure JavaScript/TypeScript only
 - No C/C++ bindings, no native addons
-- Use `wrtc` polyfill for Node.js WebRTC testing only (dev dependency)
+- Polyfills used only for testing (not in production builds)
 
 ### 3. Type Safety
 - All public APIs must have TypeScript definitions
@@ -45,14 +45,16 @@ Test files: `*.test.ts` alongside source files
 - Export types from `src/types/index.ts`
 
 ### 4. Test Coverage
-- Target: >50% branch coverage (current: ~44%)
+- Target: >50% branch coverage (current: ~41%)
 - Every public method should have at least one test
 - Integration tests for critical paths (sync, encryption)
+- Focus on high-impact areas: `account.ts` (40%), `client.ts` (47%), `server.ts` (48%)
+- Low-coverage areas need attention: `dht.ts` (13%), `signaling.ts` (20%), `webrtc-server.ts` (15%)
 
 ### 5. Security First
 - All files are PGP-encrypted before storage
 - Signatures verified on read
-- mTLS authentication for WebRTC connections
+- PGP-based authentication for WebRTC connections
 - No plaintext secrets in memory longer than necessary
 
 ## Development Workflow
@@ -77,20 +79,40 @@ npm run lint                  # ESLint check
 npm run format                # Prettier format
 ```
 
+### Documentation
+```bash
+npm run docs                  # Generate HTML docs → docs/
+npm run docs:serve            # Generate + serve at http://localhost:8000
+```
+
 ### Manual Testing
 ```bash
 # Browser testing
-npm run dev                   # Start dev server
-# Open http://localhost:5173/test-standalone.html
+npm run dev                   # Start dev server at http://localhost:5173
+npm run preview               # Preview production build
 
 # Node.js testing
 node test-integration.mjs
 
-# Automated browser testing
-node test-browser.cjs
+# Automated browser testing (Playwright)
+npx playwright test
 ```
 
+**Test Files:**
+- `*.test.ts` - Jest unit/integration tests (run in Node.js with polyfills)
+- Test environment uses `fake-indexeddb` and `@roamhq/wrtc` to simulate browser APIs
+
 ## Key Implementation Details
+
+### Project Architecture
+
+The codebase is organized into these key modules:
+
+- **Core**: `account.ts`, `file.ts`, `client.ts`, `server.ts`, `index.ts`
+- **Cryptography**: `crypto/pgp.ts`, `crypto/index.ts` - OpenPGP operations
+- **Networking**: `network/webrtc.ts`, `network/webrtc-server.ts`, `network/resolvers.ts`, `network/dht.ts`, `network/signaling.ts`
+- **Storage**: `storage/browser.ts`, `storage/index.ts` (filesystem storage removed)
+- **Types**: `types/index.ts` - TypeScript type definitions
 
 ### Storage Abstraction
 ```typescript
@@ -108,9 +130,8 @@ interface Storage {
 }
 ```
 
-Implementations:
-- **FilesystemStorage** (Node.js): Uses `fs/promises`
-- **BrowserStorage** (Browser): Uses IndexedDB
+Implementation:
+- **BrowserStorage**: Uses IndexedDB for persistent storage in browsers
 
 ### Peer Discovery Resolvers
 ```typescript
@@ -121,11 +142,11 @@ type FingerprintResolver = (
 ```
 
 Available resolvers:
-- **staticResolver** ✅ Universal: Hardcoded address map
-- **dhtResolver** ✅ Universal: Kademlia DHT via `/kad/find_peer` endpoint (HTTP-based)
-- **dnsResolver** ⚠️ Node.js only: DNS TXT record lookup (`_mau.<fingerprint>.<domain>`)
-- **mdnsResolver** ⚠️ Node.js only: Local network discovery (`_mau._tcp.local`)
-- **combinedResolver** ✅ Universal: Try multiple resolvers in parallel
+- **staticResolver**: Hardcoded address map
+- **dhtResolver**: Kademlia DHT via `/kad/find_peer` endpoint (HTTP-based)
+- **combinedResolver**: Try multiple resolvers in parallel
+
+**Note:** DNS and mDNS resolvers were removed as they require Node.js-specific UDP socket access.
 
 ### File Encryption Flow
 ```
@@ -137,10 +158,13 @@ Read:
 ```
 
 ### WebRTC Architecture
-- **WebRTCClient**: Initiates connections, creates offers
-- **WebRTCServer**: Accepts connections, handles answers
-- **mTLS**: Certificate verification after WebRTC data channel opens
-- **HTTP-over-datachannel**: Text-based HTTP/1.1 protocol
+- **WebRTCClient** (`network/webrtc.ts`): Initiates connections, creates offers
+- **WebRTCServer** (`network/webrtc-server.ts`): Accepts connections, handles answers
+- **Signaling** (`network/signaling.ts`): Coordinates peer connection establishment
+- **mTLS**: PGP-based challenge-response authentication after data channel opens
+- **HTTP-over-datachannel**: Text-based HTTP/1.1 protocol for file synchronization
+
+**Note:** WebRTC implementation uses native browser APIs. In Node.js tests, `@roamhq/wrtc` provides polyfill.
 
 ## Common Patterns
 
@@ -178,17 +202,20 @@ try {
 ### Unit Tests
 ```typescript
 describe('FeatureName', () => {
-  let storage: FilesystemStorage;
+  let storage: BrowserStorage;
   let account: Account;
 
   beforeEach(async () => {
-    storage = new FilesystemStorage();
-    await fs.mkdir(TEST_DIR, { recursive: true });
+    storage = await BrowserStorage.create();
     account = await Account.create(storage, TEST_DIR, options);
   });
 
   afterEach(async () => {
-    await fs.rm(TEST_DIR, { recursive: true, force: true });
+    try {
+      await storage.remove(TEST_DIR);
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   it('should do something', async () => {
@@ -198,14 +225,93 @@ describe('FeatureName', () => {
 ```
 
 ### Integration Tests
-- Use real filesystem (create temp directories)
-- Clean up in `afterEach`
+- Use BrowserStorage (backed by fake-indexeddb in tests)
+- Clean up in `afterEach` using `storage.remove()`
 - Test full workflows (create account → write file → sync → verify)
 
 ### Mocking
 ```typescript
 // Use Jest mocks sparingly
 const mockResolver = jest.fn().mockResolvedValue('peer:8080');
+```
+
+## TypeScript Configuration
+
+- **Target**: ES2022 (modern JavaScript features)
+- **Module System**: ES2022 modules (`.js` extensions in imports)
+- **Strict Mode**: Enabled (all strict type checks)
+- **Output**: `dist/` directory with declaration files (`.d.ts`)
+- **Source Maps**: Enabled for debugging
+
+**Important:** All imports must use `.js` extensions even for `.ts` files:
+```typescript
+// ✅ Correct
+import { Account } from './account.js';
+
+// ❌ Wrong
+import { Account } from './account';
+```
+
+## API Export Policy
+
+### Public API (Exported from `src/index.ts`)
+
+**Core Classes:**
+- `Account`, `Client`, `Server`, `File` - Main user-facing classes
+- `BrowserStorage`, `createStorage` - Storage backend
+
+**Networking:**
+- `WebRTCClient`, `WebRTCServer` - WebRTC P2P communication
+- `LocalSignalingServer`, `WebSocketSignaling`, `HTTPSignaling`, `SignaledConnection` - Signaling mechanisms
+- `staticResolver`, `dhtResolver`, `combinedResolver`, `retryResolver` - Peer discovery
+- `KademliaDHT` - Distributed hash table for peer discovery
+
+**Utilities:**
+- `validateFileName`, `normalizeFingerprint`, `formatFingerprint` - Crypto utilities
+- `createAccount`, `loadAccount` - Convenience functions
+
+**Types & Errors:**
+- All type definitions (interfaces, type aliases)
+- All error classes (`MauError`, `PeerNotFoundError`, etc.)
+
+**NOT Exported (Internal Constants):**
+- `MAU_DIR_NAME`, `ACCOUNT_KEY_FILENAME`, `SYNC_STATE_FILENAME` - Internal file structure
+- `FILE_PERM`, `DIR_PERM` - Internal permissions
+- `HTTP_TIMEOUT_MS`, `SERVER_RESULT_LIMIT` - Configure via `ClientConfig`/`ServerConfig` instead
+- `DHT_B`, `DHT_K`, `DHT_ALPHA`, etc. - Internal DHT implementation details
+
+### Internal API (Not Exported)
+
+**Implementation Details:**
+- PGP operations (`generateKeyPair`, `signAndEncrypt`, `decryptAndVerify`) - wrapped by Account class
+- Internal helper functions in `crypto/pgp.ts`
+- Low-level HTTP protocol handlers
+- Storage implementation internals
+
+### When Adding New Features
+
+1. **Default to internal** - Only export what users need
+2. **Use explicit exports** - Avoid `export *` wildcards in `src/index.ts`
+3. **Document public APIs** - Use JSDoc for exported symbols
+4. **Mark internal symbols** - Use JSDoc `@internal` tag or leading underscore for private methods
+
+Example:
+```typescript
+// src/my-feature.ts
+
+/**
+ * @internal
+ * Internal helper function - not exported from index.ts
+ */
+export function _internalHelper() { }
+
+/**
+ * Public API function - exported from index.ts
+ * @param data Input data to process
+ */
+export function publicFeature(data: string) {
+  return _internalHelper();
+}
 ```
 
 ## Code Quality Guidelines
@@ -270,23 +376,21 @@ await Promise.race([
 
 ## Dependencies
 
-### Production (Universal)
-- **openpgp**: PGP encryption/signing (RFC 4880) - works everywhere
-- **node-fetch**: HTTP client for Node.js (polyfill) - not needed in browser
-
-### Optional (Node.js only)
-- **dns2**: DNS client for TXT record lookups (requires UDP sockets)
-- **multicast-dns**: mDNS/DNS-SD for local network discovery (requires UDP multicast)
-- **k-bucket**: Kademlia routing table
-
-**Note:** Optional dependencies use dynamic imports and fail gracefully in browser environments.
+### Production (Browser)
+- **openpgp**: PGP encryption/signing (RFC 4880)
+- **@peculiar/x509**: X.509 certificate handling for WebRTC authentication
+- **idb**: IndexedDB wrapper for browser storage
+- **p-retry**: Robust retry mechanism for network operations
+- **k-bucket**: Kademlia routing table for DHT
 
 ### Development
-- **typescript**: TypeScript compiler
-- **jest**: Test framework
+- **typescript**: TypeScript compiler (v5.3.3)
+- **jest**: Test framework with ts-jest for TypeScript support
 - **@roamhq/wrtc**: WebRTC polyfill for Node.js testing
-- **playwright**: Browser automation
-- **vite**: Browser bundler
+- **fake-indexeddb**: IndexedDB mock for Node.js tests
+- **vite**: Browser bundler and dev server
+- **typedoc**: API documentation generator
+- **eslint** + **prettier**: Code quality and formatting
 
 ## When Making Changes
 
@@ -316,49 +420,76 @@ await Promise.race([
 3. Avoid premature optimization
 4. Test that behavior hasn't changed
 
-## Common Gotchas
+## Performance Considerations
 
-### Browser vs Node.js
+### Parallel Operations
+Always parallelize independent async operations:
+
 ```typescript
-// ❌ Wrong: Environment detection
-if (typeof window !== 'undefined') {
-  // Browser code
-}
+// ✅ Fast: Parallel execution
+const [account, config] = await Promise.all([
+  loadAccount(dir, passphrase),
+  loadConfig(configPath),
+]);
 
-// ✅ Right: Feature detection + storage abstraction
-const storage = await createStorage();  // Auto-detects environment
+// ❌ Slow: Sequential execution
+const account = await loadAccount(dir, passphrase);
+const config = await loadConfig(configPath);  // Waits unnecessarily
 ```
 
-**Node.js-Only Features:**
-
-Some resolvers require Node.js-only capabilities (UDP sockets):
+### Retry Strategies
+Network operations use `p-retry` for resilience:
 
 ```typescript
-// ⚠️ Node.js only - Will return null in browser
-const dnsRes = dnsResolver('mau.network');
-const mdnsRes = mdnsResolver();
+import pRetry from 'p-retry';
 
-// ✅ Works everywhere (browser + Node.js)
+await pRetry(
+  async () => {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('HTTP error');
+    return response;
+  },
+  { retries: 3, minTimeout: 1000 }
+);
+```
+
+### Memory Management
+- Dispose of large buffers (`Uint8Array`) after processing
+- Close WebRTC connections explicitly to free resources
+- Clear PGP keys from memory after use when possible
+
+## Common Gotchas
+
+### Storage Usage
+```typescript
+// ✅ Correct: Always use BrowserStorage
+const storage = await createStorage();  // Creates BrowserStorage with IndexedDB
+
+// ✅ Or create directly
+const storage = await BrowserStorage.create();
+```
+
+**Browser-Only Architecture:**
+
+This package is designed exclusively for browsers:
+
+```typescript
+// ✅ Available: Browser-compatible peer discovery
 const staticRes = staticResolver(knownPeers);
 const dhtRes = dhtResolver(['bootstrap1:443']);  // Uses fetch()
 
-// ✅ Browser-safe combined resolver
+// ✅ Combined resolver works in browsers
 const resolver = combinedResolver([
   staticResolver(knownPeers),
   dhtResolver(['bootstrap1:443']),
-  // dnsResolver/mdnsResolver gracefully fail in browser
 ]);
 ```
 
-**Why DNS/mDNS don't work in browsers:**
-- Require UDP socket access (not available in browsers for security)
-- Browsers can only use fetch/WebSocket/WebRTC
-- Use DHT resolver (HTTP-based) or static resolver instead
-
-**Dependencies:**
-- `dns2` and `multicast-dns` are marked as `optionalDependencies`
-- Dynamic imports with try/catch handle missing modules gracefully
-- Browser bundles won't include these Node.js-only modules
+**Why this is browser-only:**
+- Uses IndexedDB for storage (not filesystem)
+- WebRTC for P2P communication
+- No Node.js-specific APIs (fs, http, net, dgram)
+- Tests use polyfills to simulate browser environment
 
 ### Async Constructor
 ```typescript
@@ -462,16 +593,72 @@ console.log('Data channel state:', client.dataChannelState);
 console.log(await storage.readDir(rootDir));
 ```
 
+## Troubleshooting
+
+### Common Issues
+
+**"Cannot find module" errors:**
+- Ensure all imports use `.js` extensions (ES modules requirement)
+- Check that `type: "module"` is set in package.json
+
+**WebRTC connection failures:**
+- Verify signaling server is reachable
+- Check firewall/NAT configuration for peer-to-peer connectivity
+- Enable debug logging: `DEBUG=mau:* npm test`
+
+**Test timeouts:**
+- Increase Jest timeout: `jest.setTimeout(30000)`
+- Check for unclosed connections (WebRTC, HTTP servers)
+- Use `--detectOpenHandles` to find leaks
+
+**Browser IndexedDB errors:**
+- Clear browser storage: DevTools → Application → Clear Storage
+- Check browser compatibility (IndexedDB API required)
+- Verify HTTPS context (required for some browser features)
+
 ## Release Checklist
 
 Before submitting PR:
 - [ ] All tests pass (`npm test`)
 - [ ] No linting errors (`npm run lint`)
-- [ ] Coverage threshold met (>50% branches)
+- [ ] Code formatted (`npm run format`)
+- [ ] Coverage maintained or improved (target: >50% branches)
 - [ ] README.md updated with new features
 - [ ] Examples work in both Node.js and browser
 - [ ] TypeScript compiles without errors (`npm run build`)
 - [ ] Bundle size is reasonable (`npm run build:browser`)
+- [ ] API documentation updated (`npm run docs`)
+- [ ] No console warnings in browser tests
+
+## Security Considerations
+
+### PGP Key Management
+- Private keys are **always** encrypted at rest with a passphrase
+- Never log or transmit unencrypted private keys
+- Use secure random sources for key generation (`crypto.getRandomValues`)
+
+### Network Security
+- WebRTC uses PGP-based challenge-response authentication (not traditional X.509 mTLS)
+- HTTP client does **not** yet implement certificate verification (use WebRTC for authenticated connections)
+- All file contents are encrypted with OpenPGP before storage
+
+### Input Validation
+- Filename sanitization prevents directory traversal attacks
+- PGP signature verification prevents tampered content
+- Fingerprint validation ensures peer identity
+
+## CI/CD Integration
+
+GitHub Actions workflows handle:
+- **Tests**: Automated test suite with coverage reporting
+- **Linting**: ESLint checks on every push
+- **Browser Tests**: Playwright-based browser automation
+- **Documentation**: Auto-generated API docs with TypeDoc
+
+**Local CI simulation:**
+```bash
+npm run lint && npm test && npm run build && npm run build:browser
+```
 
 ## Resources
 
@@ -480,6 +667,9 @@ Before submitting PR:
 - **OpenPGP Spec**: RFC 4880
 - **WebRTC Spec**: W3C WebRTC 1.0
 - **Kademlia Paper**: Original DHT paper by Maymounkov & Mazières
+- **TypeDoc**: [https://typedoc.org](https://typedoc.org)
+- **Jest**: [https://jestjs.io](https://jestjs.io)
+- **Vite**: [https://vitejs.dev](https://vitejs.dev)
 
 ## Getting Help
 
@@ -487,7 +677,24 @@ Before submitting PR:
 - **Discussions**: Use GitHub Discussions for questions
 - **Code Review**: Tag @emad-elsaid for review
 - **Testing**: Run `npm test -- --verbose` for detailed output
+- **Debug Mode**: Set `DEBUG=mau:*` environment variable
 
 ---
 
 **Remember:** This implementation must work in both browser and Node.js. Test both environments before submitting changes.
+
+## Quick Reference
+
+| Task | Command |
+|------|---------|
+| Install dependencies | `npm install` |
+| Run tests | `npm test` |
+| Run tests (watch) | `npm test -- --watch` |
+| Check coverage | `npm test -- --coverage` |
+| Build for Node.js | `npm run build` |
+| Build for browser | `npm run build:browser` |
+| Start dev server | `npm run dev` |
+| Lint code | `npm run lint` |
+| Format code | `npm run format` |
+| Generate docs | `npm run docs` |
+| Serve docs | `npm run docs:serve` |

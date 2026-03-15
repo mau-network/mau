@@ -7,10 +7,9 @@ import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } from '@roam
 import { WebRTCClient } from './webrtc';
 import { WebRTCServer } from './webrtc-server';
 import { Account } from '../account';
-import { FilesystemStorage } from '../storage/filesystem';
-import * as fs from 'fs/promises';
+import { BrowserStorage } from '../storage/browser';
 
-const TEST_DIR = './test-data-webrtc-real';
+const TEST_DIR = 'test-data-webrtc-real';
 
 // Make wrtc available globally
 (global as any).RTCPeerConnection = RTCPeerConnection;
@@ -18,13 +17,12 @@ const TEST_DIR = './test-data-webrtc-real';
 (global as any).RTCIceCandidate = RTCIceCandidate;
 
 describe('Real WebRTC E2E Tests', () => {
-  let storage: FilesystemStorage;
+  let storage: BrowserStorage;
   let clientAccount: Account;
   let serverAccount: Account;
 
   beforeAll(async () => {
-    storage = new FilesystemStorage();
-    await fs.mkdir(TEST_DIR, { recursive: true });
+    storage = await BrowserStorage.create();
 
     clientAccount = await Account.create(storage, TEST_DIR + '/client', {
       name: 'Client User',
@@ -43,8 +41,10 @@ describe('Real WebRTC E2E Tests', () => {
 
   afterAll(async () => {
     try {
-      await fs.rm(TEST_DIR, { recursive: true, force: true });
-    } catch (error) { /* Ignore cleanup errors */ }
+      await storage.remove(TEST_DIR);
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   it('should create peer connection', () => {
@@ -334,8 +334,10 @@ describe('Real WebRTC E2E Tests', () => {
     server.closeConnection(client2Account.getFingerprint());
 
     try {
-      await fs.rm(TEST_DIR + '/client2', { recursive: true });
-    } catch (error) { /* Ignore cleanup errors */ }
+      await storage.remove(TEST_DIR + '/client2');
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   it('should close connections gracefully', () => {

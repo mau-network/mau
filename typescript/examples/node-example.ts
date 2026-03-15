@@ -2,7 +2,7 @@
  * Example: Node.js Usage
  */
 
-import { createAccount, loadAccount, File, Client } from '../src/index.js';
+import { createAccount, loadAccount } from '../src/index.js';
 
 async function main() {
   console.log('=== Creating Account ===');
@@ -24,7 +24,7 @@ async function main() {
   console.log('\n=== Writing Files ===');
 
   // Create and write a post
-  const post1 = File.create(account, account.storage, 'hello.json');
+  const post1 = await account.createFile('hello.json');
   await post1.writeJSON({
     '@type': 'SocialMediaPosting',
     headline: 'Hello, Mau!',
@@ -34,7 +34,7 @@ async function main() {
   console.log('Created: hello.json');
 
   // Create another post
-  const post2 = File.create(account, account.storage, 'second-post.json');
+  const post2 = await account.createFile('second-post.json');
   await post2.writeJSON({
     '@type': 'SocialMediaPosting',
     headline: 'Second Post',
@@ -46,7 +46,7 @@ async function main() {
   console.log('\n=== Reading Files ===');
 
   // List all files
-  const files = await File.list(account, account.storage);
+  const files = await account.listFiles();
   console.log(`Found ${files.length} files:`);
   
   for (const file of files) {

@@ -8,22 +8,19 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
-import * as fs from 'fs/promises';
 import { WebRTCClient } from './webrtc';
 import { Account } from '../account';
-import { FilesystemStorage } from '../storage/filesystem';
+import { BrowserStorage } from '../storage/browser';
 
-const TEST_DIR = './test-data-webrtc-unit';
+const TEST_DIR = 'test-data-webrtc-unit';
 
 describe('WebRTCClient', () => {
-  let storage: FilesystemStorage;
+  let storage: BrowserStorage;
   let account: Account;
   let peerAccount: Account;
 
   beforeAll(async () => {
-    storage = new FilesystemStorage();
-    await fs.rm(TEST_DIR, { recursive: true, force: true }).catch(() => {});
-    await fs.mkdir(TEST_DIR, { recursive: true });
+    storage = await BrowserStorage.create();
 
     account = await Account.create(storage, TEST_DIR + '/account', {
       name: 'WRTCUser',
@@ -41,7 +38,11 @@ describe('WebRTCClient', () => {
   });
 
   afterAll(async () => {
-    await fs.rm(TEST_DIR, { recursive: true, force: true }).catch(() => {});
+    try {
+      await storage.remove(TEST_DIR);
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   it('constructs with defaults', () => {

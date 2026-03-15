@@ -5,7 +5,6 @@
 import { describe, it, expect } from '@jest/globals';
 import {
   staticResolver,
-  dnsResolver,
   dhtResolver,
   combinedResolver,
 } from './resolvers';
@@ -43,30 +42,6 @@ describe('Network Resolvers', () => {
 
       const address = await resolver('any-fingerprint');
 
-      expect(address).toBeNull();
-    });
-  });
-
-  describe('dnsResolver', () => {
-    it('should return null for non-existent domain', async () => {
-      const resolver = dnsResolver('nonexistent-test-domain-12345.com');
-      const address = await resolver('fingerprint123', 1000);
-
-      expect(address).toBeNull();
-    });
-
-    it('should handle DNS timeout', async () => {
-      const resolver = dnsResolver('slow-dns-test.example.com');
-      const address = await resolver('fingerprint123', 100); // Very short timeout
-
-      expect(address).toBeNull();
-    });
-
-    it('should accept custom DNS server', async () => {
-      const resolver = dnsResolver('example.com', '8.8.8.8');
-      const address = await resolver('fingerprint123', 1000);
-
-      // Will return null since we're not actually setting up TXT records
       expect(address).toBeNull();
     });
   });

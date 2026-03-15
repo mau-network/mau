@@ -107,7 +107,7 @@ export class Server {
       }
     }
 
-    const files = await File.list(this.account, this.storage);
+    const files = await this.account.listFiles();
     const fileList: FileListItem[] = [];
 
     for (const file of files) {
@@ -206,8 +206,16 @@ export class Server {
    */
   private async handleFile(fileName: string): Promise<ServerResponse> {
     try {
-      const file = File.create(this.account, this.storage, fileName);
-      const data = await this.storage.readFile(file.getPath());
+      const { validateFileName } = await import('./crypto/index.js');
+      const { InvalidFileNameError } = await import('./types/index.js');
+      
+      if (!validateFileName(fileName)) {
+        throw new InvalidFileNameError('contains invalid characters or path separators');
+      }
+
+      const contentDir = this.account.getContentDir();
+      const filePath = this.storage.join(contentDir, fileName);
+      const data = await this.storage.readFile(filePath);
 
       return {
         status: 200,
@@ -234,8 +242,16 @@ export class Server {
     const [, fileName, versionHash] = match;
 
     try {
-      const file = File.create(this.account, this.storage, fileName);
-      const versionDir = `${file.getPath()}.versions`;
+      const { validateFileName } = await import('./crypto/index.js');
+      const { InvalidFileNameError } = await import('./types/index.js');
+      
+      if (!validateFileName(fileName)) {
+        throw new InvalidFileNameError('contains invalid characters or path separators');
+      }
+
+      const contentDir = this.account.getContentDir();
+      const filePath = this.storage.join(contentDir, fileName);
+      const versionDir = `${filePath}.versions`;
       const versionPath = this.storage.join(versionDir, versionHash);
 
       if (!(await this.storage.exists(versionPath))) {
@@ -270,91 +286,6 @@ export class Server {
       status: 404,
       headers: { 'Content-Type': 'text/plain' },
       body: 'Not Found',
-    };
-  }
-
-  /**
-   * Create Express.js middleware
-   * 
-   * Example:
-   * ```
-   * const app = express();
-   * app.use(server.expressMiddleware());
-   * ```
-   */
-  expressMiddleware() {
-    return async (req: any, res: any, next: any) => {
-      if (!req.path.startsWith('/p2p/')) {
-        return next();
-      }
-
-      const request: ServerRequest = {
-        method: req.method,
-        url: req.url,
-        path: req.path,
-        query: req.query || {},
-        headers: req.headers || {},
-      };
-
-      const response = await this.handleRequest(request);
-
-      res.status(response.status);
-      Object.entries(response.headers).forEach(([key, value]) => {
-        res.setHeader(key, value);
-      });
-
-      if (response.body instanceof Uint8Array) {
-        res.send(Buffer.from(response.body));
-      } else {
-        res.send(response.body);
-      }
-    };
-  }
-
-  /**
-   * Create Node.js http.Server request handler
-   * 
-   * Example:
-   * ```
-   * const httpServer = http.createServer(server.nodeHandler());
-   * ```
-   */
-  nodeHandler() {
-    return async (req: any, res: any) => {
-      const url = new URL(req.url!, `http://${req.headers.host}`);
-
-      const query: Record<string, string> = {};
-      url.searchParams.forEach((value, key) => { query[key] = value; });
-
-      // Read body for POST requests
-      let body: string | undefined;
-      if (req.method === 'POST') {
-        body = await new Promise<string>((resolve, reject) => {
-          const chunks: Buffer[] = [];
-          req.on('data', (chunk: Buffer) => chunks.push(chunk));
-          req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-          req.on('error', reject);
-        });
-      }
-
-      const request: ServerRequest = {
-        method: req.method!,
-        url: req.url!,
-        path: url.pathname,
-        query,
-        headers: req.headers || {},
-        body,
-      };
-
-      const response = await this.handleRequest(request);
-
-      res.writeHead(response.status, response.headers);
-
-      if (response.body instanceof Uint8Array) {
-        res.end(Buffer.from(response.body));
-      } else {
-        res.end(response.body);
-      }
     };
   }
 

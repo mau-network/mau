@@ -5,9 +5,8 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { Client } from './client';
 import { Account } from './account';
-import { FilesystemStorage } from './storage/filesystem';
+import { BrowserStorage } from './storage/browser';
 import { sign, serializePublicKey } from './crypto/index';
-import * as fs from 'fs/promises';
 
 /**
  * Creates a mock fetch that handles the mTLS auth handshake transparently.
@@ -34,18 +33,16 @@ async function createHandshakeFetch(
   });
 }
 
-const TEST_DIR = './test-data-client';
-const PEER_DIR = './test-data-client-peer';
+const TEST_DIR = 'test-data-client';
+const PEER_DIR = 'test-data-client-peer';
 
 describe('Client', () => {
-  let storage: FilesystemStorage;
+  let storage: BrowserStorage;
   let account: Account;
   let peerAccount: Account;
 
   beforeEach(async () => {
-    storage = new FilesystemStorage();
-    await fs.mkdir(TEST_DIR, { recursive: true });
-    await fs.mkdir(PEER_DIR, { recursive: true });
+    storage = await BrowserStorage.create();
 
     account = await Account.create(storage, TEST_DIR, {
       name: 'Client User',
@@ -67,15 +64,15 @@ describe('Client', () => {
 
   afterEach(async () => {
     try {
-      await fs.rm(TEST_DIR, { recursive: true, force: true });
-      await fs.rm(PEER_DIR, { recursive: true, force: true });
-    } catch (err) { /* cleanup error ignored */ }
+      await storage.remove(TEST_DIR);
+      await storage.remove(PEER_DIR);
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   it('should create client with static resolver', () => {
-    const client = Client.create(
-      account,
-      storage,
+    const client = account.createClient(
       {
         fingerprint: peerAccount.getFingerprint(),
         address: 'localhost:8080',

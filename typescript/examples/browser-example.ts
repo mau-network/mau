@@ -6,7 +6,6 @@
  */
 
 import { createAccount } from '../src/account.js';
-import { File } from '../src/file.js';
 import { WebRTCServer } from '../src/network/webrtc-server.js';
 import { WebRTCClient } from '../src/network/webrtc.js';
 import { LocalSignalingServer, SignaledConnection } from '../src/network/signaling.js';
@@ -37,10 +36,10 @@ async function exampleTwoPeers() {
   console.log(`Alice fingerprint: ${aliceFpr.slice(0, 16)}...`);
 
   // Start Alice's WebRTC server
-  const aliceServer = new WebRTCServer(alice, aliceStorage);
+  const aliceServer = new WebRTCServer(alice, alice.getStorage());
 
   // Alice creates some content
-  const alicePost = File.create(alice, aliceStorage, 'hello.json');
+  const alicePost = await alice.createFile('hello.json');
   await alicePost.writeJSON({
     '@type': 'SocialMediaPosting',
     headline: 'Hello from Alice!',
@@ -68,7 +67,7 @@ async function exampleTwoPeers() {
   console.log('Establishing WebRTC connection...');
 
   // Bob creates WebRTC client to connect to Alice
-  const bobClient = new WebRTCClient(bob, bobStorage, aliceFpr);
+  const bobClient = new WebRTCClient(bob, bob.getStorage(), aliceFpr);
 
   // Step 1: Bob creates offer
   const offer = await bobClient.createOffer();
@@ -142,12 +141,16 @@ async function exampleTwoPeers() {
   console.log(`Downloaded ${fileData.length} bytes`);
 
   // Bob saves Alice's file
-  const aliceDir = bob.getFriendContentDir(aliceFpr);
-  await bobStorage.writeFile(bobStorage.join(aliceDir, 'hello.json'), fileData);
+  const bobStorage = bob.getStorage();
+  await bobStorage.writeFile(bobStorage.join(bob.getFriendContentDir(aliceFpr), 'hello.json'), fileData);
   console.log('Saved to Bob\'s content directory');
 
   // Bob reads the content (decrypts automatically)
-  const aliceFile = File.create(bob, bobStorage, aliceFpr, 'hello.json');
+  const savedAliceFiles = await bob.listFriendFiles(aliceFpr);
+  const aliceFile = savedAliceFiles.find(f => f.getName() === 'hello.json');
+  if (!aliceFile) {
+    throw new Error('File not found after save');
+  }
   const content = await aliceFile.readJSON();
   console.log('\nDecrypted content:');
   console.log(JSON.stringify(content, null, 2));
@@ -182,7 +185,7 @@ async function exampleSignaledNetwork() {
   const fingerprint = account.getFingerprint();
 
   // Create WebRTC server
-  const server = new WebRTCServer(account, storage);
+  const server = new WebRTCServer(account, account.getStorage());
 
   // Connect to signaling server
   const { WebSocketSignaling } = await import('../src/network/signaling.js');
@@ -243,7 +246,7 @@ async function exampleConnectToPeer(peerFingerprint: string) {
   const connection = new SignaledConnection(signaling, fingerprint, peerFingerprint);
 
   // Create WebRTC client
-  const client = new WebRTCClient(account, storage, peerFingerprint);
+  const client = new WebRTCClient(account, account.getStorage(), peerFingerprint);
 
   // Handle answer from peer
   connection.onAnswer(async (answer) => {

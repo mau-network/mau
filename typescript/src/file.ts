@@ -23,7 +23,7 @@ import {
  * 
  * @example
  * ```typescript
- * const file = File.create(account, storage, 'posts/hello.json');
+ * const file = await account.createFile('posts/hello.json');
  * await file.writeJSON({ '@type': 'SocialMediaPosting', headline: 'Hello!' });
  * const data = await file.readJSON();
  * ```
@@ -232,77 +232,5 @@ export class File {
       name: this.getName(),
       isVersion: this.isVersion,
     };
-  }
-
-  /**
-   * Create a File instance from a path
-   */
-  static create(
-    account: Account,
-    storage: Storage,
-    fileName: string,
-    isVersion = false
-  ): File {
-    if (!validateFileName(fileName)) {
-      throw new InvalidFileNameError('contains invalid characters or path separators');
-    }
-
-    const contentDir = account.getContentDir();
-    const filePath = storage.join(contentDir, fileName);
-
-    return new File(account, storage, filePath, isVersion);
-  }
-
-  /**
-   * List all files in account's content directory
-   */
-  static async list(account: Account, storage: Storage): Promise<File[]> {
-    const contentDir = account.getContentDir();
-    if (!(await storage.exists(contentDir))) {
-      return [];
-    }
-
-    const entries = await storage.readDir(contentDir);
-    const files: File[] = [];
-
-    for (const entry of entries) {
-      const filePath = storage.join(contentDir, entry);
-      const stats = await storage.stat(filePath);
-      
-      // Skip directories and version directories
-      if (!stats.isDirectory && !entry.endsWith('.versions')) {
-        files.push(new File(account, storage, filePath, false));
-      }
-    }
-
-    return files;
-  }
-
-  /**
-   * List files for a specific friend
-   */
-  static async listFriend(
-    account: Account,
-    storage: Storage,
-    fingerprint: Fingerprint
-  ): Promise<File[]> {
-    const contentDir = account.getFriendContentDir(fingerprint);
-    if (!(await storage.exists(contentDir))) {
-      return [];
-    }
-
-    const entries = await storage.readDir(contentDir);
-    const files: File[] = [];
-
-    for (const entry of entries) {
-      const filePath = storage.join(contentDir, entry);
-      const stats = await storage.stat(filePath);
-      
-      if (!stats.isDirectory && !entry.endsWith('.versions')) {
-        files.push(new File(account, storage, filePath, false));
-      }
-    }
-
-    return files;
   }
 }

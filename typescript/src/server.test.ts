@@ -6,19 +6,17 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { Server } from './server';
 import { Account } from './account';
 import { File } from './file';
-import { FilesystemStorage } from './storage/filesystem';
-import * as fs from 'fs/promises';
+import { BrowserStorage } from './storage/browser';
 
-const TEST_DIR = './test-data-server';
+const TEST_DIR = 'test-data-server';
 
 describe('Server', () => {
-  let storage: FilesystemStorage;
+  let storage: BrowserStorage;
   let account: Account;
   let server: Server;
 
   beforeEach(async () => {
-    storage = new FilesystemStorage();
-    await fs.mkdir(TEST_DIR, { recursive: true });
+    storage = await BrowserStorage.create();
 
     account = await Account.create(storage, TEST_DIR, {
       name: 'Server User',
@@ -30,17 +28,19 @@ describe('Server', () => {
     server = new Server(account, storage);
 
     // Create some test files
-    const file1 = File.create(account, storage, 'test1.json');
+    const file1 = await account.createFile('test1.json');
     await file1.writeJSON({ message: 'test 1' });
 
-    const file2 = File.create(account, storage, 'test2.json');
+    const file2 = await account.createFile('test2.json');
     await file2.writeJSON({ message: 'test 2' });
   });
 
   afterEach(async () => {
     try {
-      await fs.rm(TEST_DIR, { recursive: true, force: true });
-    } catch (err) { /* cleanup error ignored */ }
+      await storage.remove(TEST_DIR);
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   it('should create server instance', () => {
@@ -129,7 +129,7 @@ describe('Server', () => {
 
   it('should handle version download request', async () => {
     // Create a file and modify it to create a version
-    const file = File.create(account, storage, 'versioned.json');
+    const file = await account.createFile('versioned.json');
     await file.writeJSON({ version: 1 });
     const version1 = await file.getChecksum();
     
@@ -162,7 +162,7 @@ describe('Server', () => {
   it('should limit file list results', async () => {
     // Create many files
     for (let i = 0; i < 25; i++) {
-      const file = File.create(account, storage, `file${i}.json`);
+      const file = await account.createFile(`file${i}.json`);
       await file.writeJSON({ index: i });
     }
 
@@ -185,68 +185,6 @@ describe('Server', () => {
     const config = server.getConfig();
     expect(config).toBeDefined();
     expect(config.resultsLimit).toBe(20); // default
-  });
-
-  it('should create Express middleware', () => {
-    const middleware = server.expressMiddleware();
-    expect(middleware).toBeDefined();
-    expect(typeof middleware).toBe('function');
-  });
-
-  it('should create Node.js handler', () => {
-    const handler = server.nodeHandler();
-    expect(handler).toBeDefined();
-    expect(typeof handler).toBe('function');
-  });
-
-  it('should handle Express middleware request', async () => {
-    const middleware = server.expressMiddleware();
-
-    const mockReq = {
-      method: 'GET',
-      url: `/p2p/${account.getFingerprint()}`,
-      path: `/p2p/${account.getFingerprint()}`,
-      query: {},
-      headers: {},
-    };
-
-    const mockRes = {
-      status: jest.fn().mockReturnThis(),
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
-
-    const mockNext = jest.fn();
-
-    await middleware(mockReq, mockRes, mockNext);
-
-    expect(mockRes.status).toHaveBeenCalledWith(200);
-    expect(mockRes.send).toHaveBeenCalled();
-  });
-
-  it('should pass non-p2p requests to next in Express middleware', async () => {
-    const middleware = server.expressMiddleware();
-
-    const mockReq = {
-      method: 'GET',
-      url: '/other/path',
-      path: '/other/path',
-      query: {},
-      headers: {},
-    };
-
-    const mockRes = {
-      status: jest.fn(),
-      setHeader: jest.fn(),
-      send: jest.fn(),
-    };
-
-    const mockNext = jest.fn();
-
-    await middleware(mockReq, mockRes, mockNext);
-
-    expect(mockNext).toHaveBeenCalled();
-    expect(mockRes.status).not.toHaveBeenCalled();
   });
 
   it('should filter files by If-Modified-Since header', async () => {

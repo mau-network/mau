@@ -13,6 +13,8 @@
     "test": "jest",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write 'src/**/*.ts'",
+    "docs": "typedoc",
+    "docs:serve": "typedoc --watch --preserveWatchOutput",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -32,18 +34,14 @@
   "dependencies": {
     "@peculiar/x509": "^1.14.3",
     "idb": "^8.0.3",
+    "k-bucket": "^5.1.0",
     "node-fetch": "^3.3.2",
     "openpgp": "^5.11.1",
     "p-retry": "^4.6.2"
   },
-  "optionalDependencies": {
-    "dns2": "^2.1.0",
-    "k-bucket": "^5.1.0"
-  },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@roamhq/wrtc": "^0.9.1",
-    "@types/dns2": "^2.0.10",
     "@types/jest": "^29.5.12",
     "@types/k-bucket": "^5.0.4",
     "@types/node": "^20.19.37",
@@ -62,6 +60,7 @@
     "stream-browserify": "^3.0.0",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
+    "typedoc": "^0.28.17",
     "typescript": "^5.3.3",
     "vite": "^5.1.4"
   },

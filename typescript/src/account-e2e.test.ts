@@ -4,23 +4,23 @@
 
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { Account } from './account';
-import { FilesystemStorage } from './storage/filesystem';
-import * as fs from 'fs/promises';
+import { BrowserStorage } from './storage/browser';
 
-const TEST_DIR = './test-data-account-e2e';
+const TEST_DIR = 'test-data-account-e2e';
 
 describe('Account E2E Tests', () => {
-  let storage: FilesystemStorage;
+  let storage: BrowserStorage;
 
   beforeAll(async () => {
-    storage = new FilesystemStorage();
-    await fs.mkdir(TEST_DIR, { recursive: true });
+    storage = await BrowserStorage.create();
   });
 
   afterAll(async () => {
     try {
-      await fs.rm(TEST_DIR, { recursive: true, force: true });
-    } catch (error) { /* Ignore expected error */ }
+      await storage.remove(TEST_DIR);
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   describe('Account Creation', () => {
