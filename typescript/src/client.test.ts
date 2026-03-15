@@ -107,7 +107,7 @@ describe('Client', () => {
 
     global.fetch = mockFetch as any;
 
-    // @ts-expect-error - Set fetchImpl to use our mock
+    // @ts-ignore - Intentionally accessing private property for testing
     client['fetchImpl'] = mockFetch as any;
 
     await client.fetchFileList();
@@ -133,7 +133,7 @@ describe('Client', () => {
       json: async () => ({ files: [] }),
     });
 
-    // @ts-expect-error - Testing error handling
+    // @ts-ignore - Intentionally accessing private property for testing
     client['fetchImpl'] = mockFetch as any;
 
     await client.fetchFileList(afterDate);
@@ -159,7 +159,7 @@ describe('Client', () => {
       arrayBuffer: async () => mockData.buffer,
     });
 
-    // @ts-expect-error - Testing error handling
+    // @ts-ignore - Intentionally accessing private property for testing
     client['fetchImpl'] = mockFetch as any;
 
     const data = await client.downloadFile('test.txt');
@@ -183,7 +183,7 @@ describe('Client', () => {
       arrayBuffer: async () => mockData.buffer,
     });
 
-    // @ts-expect-error - Testing error handling
+    // @ts-ignore - Intentionally accessing private property for testing
     client['fetchImpl'] = mockFetch as any;
 
     const data = await client.downloadFileVersion('test.txt', 'abc123');
@@ -207,7 +207,7 @@ describe('Client', () => {
       statusText: 'Not Found',
     });
 
-    // @ts-expect-error - Testing error handling
+    // @ts-ignore - Intentionally accessing private property for testing
     client['fetchImpl'] = mockFetch as any;
 
     await expect(client.fetchFileList()).rejects.toThrow('HTTP 404');
@@ -228,7 +228,7 @@ describe('Client', () => {
       () => new Promise((resolve) => setTimeout(resolve, 200))
     );
 
-    // @ts-expect-error - Testing error handling
+    // @ts-ignore - Intentionally accessing private property for testing
     client['fetchImpl'] = mockFetch as any;
 
     await expect(client.fetchFileList()).rejects.toThrow();
@@ -253,7 +253,7 @@ describe('Client', () => {
       json: async () => ({ files: [] }),
     });
 
-    // @ts-expect-error - Testing error handling
+    // @ts-ignore - Intentionally accessing private property for testing
     client['fetchImpl'] = mockFetch as any;
 
     await client.fetchFileList();
