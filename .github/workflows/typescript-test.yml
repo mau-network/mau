@@ -30,6 +30,10 @@ jobs:
         working-directory: typescript
         run: npm ci --ignore-scripts
 
+      - name: Build native modules
+        working-directory: typescript
+        run: npm rebuild node-datachannel
+
       - name: Type check
         working-directory: typescript
         run: npx tsc --noEmit
