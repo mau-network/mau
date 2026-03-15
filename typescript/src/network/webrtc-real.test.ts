@@ -92,7 +92,7 @@ describe('Real WebRTC E2E Tests', () => {
       };
 
       // Create data channel on peer1
-      peer1.createDataChannel('test');
+      const dc1 = peer1.createDataChannel('test');
 
       dc1.onopen = () => {
         dc1.send('Hello from Peer1');
@@ -160,7 +160,7 @@ describe('Real WebRTC E2E Tests', () => {
       };
 
       const testData = new Uint8Array([1, 2, 3, 4, 5]);
-      peer1.createDataChannel('test');
+      const dc1 = peer1.createDataChannel('test');
 
       dc1.onopen = () => {
         dc1.send(testData);

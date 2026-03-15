@@ -6,7 +6,33 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { Client } from './client';
 import { Account } from './account';
 import { FilesystemStorage } from './storage/filesystem';
+import { sign, serializePublicKey } from './crypto/index';
 import * as fs from 'fs/promises';
+
+/**
+ * Creates a mock fetch that handles the mTLS auth handshake transparently.
+ * Auth requests (URLs containing `/auth?challenge=`) are answered by signing
+ * the challenge with `peerAccount`'s private key. All other requests return
+ * `apiResponse`.
+ */
+async function createHandshakeFetch(
+  peerAccount: Account,
+  apiResponse: object,
+): Promise<jest.Mock> {
+  return jest.fn().mockImplementation(async (url: string) => {
+    if (typeof url === 'string' && url.includes('/auth?challenge=')) {
+      const challengeHex = new URL('http://x/' + url.split('/auth?challenge=')[1]).searchParams.get('challenge')
+        ?? url.split('/auth?challenge=')[1];
+      const challenge = new Uint8Array(
+        (challengeHex.match(/.{2}/g) as string[]).map(b => parseInt(b, 16))
+      );
+      const signature = await sign(challenge, peerAccount.getPrivateKey());
+      const publicKey = serializePublicKey(peerAccount.getPublicKeyObject());
+      return { ok: true, json: async () => ({ publicKey, signature }) };
+    }
+    return { ok: true, ...apiResponse };
+  });
+}
 
 const TEST_DIR = './test-data-client';
 const PEER_DIR = './test-data-client-peer';
@@ -84,10 +110,7 @@ describe('Client', () => {
   it('should resolve peer address using resolver', async () => {
     let resolverCalled = false;
 
-    const mockFetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ files: [] }),
-    });
+    const mockFetch = await createHandshakeFetch(peerAccount, { json: async () => ({ files: [] }) });
 
     const client = new Client(
       account,
@@ -114,48 +137,39 @@ describe('Client', () => {
   it('should fetch file list with after parameter', async () => {
     const afterDate = new Date('2024-01-01');
 
+    const mockFetch = await createHandshakeFetch(peerAccount, { json: async () => ({ files: [] }) });
+
     const client = new Client(
       account,
       storage,
       peerAccount.getFingerprint(),
       {
         resolvers: [async () => 'localhost:8080'],
+        fetchImpl: mockFetch as unknown as typeof fetch,
       }
     );
-
-    const mockFetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ files: [] }),
-    });
-
-    // @ts-expect-error - Testing error handling
-    client['fetchImpl'] = mockFetch as any;
 
     await client.fetchFileList(afterDate);
 
     expect(mockFetch).toHaveBeenCalled();
-    const callUrl = mockFetch.mock.calls[0][0];
+    // calls[0] is the auth handshake; calls[1] is the actual file list request
+    const callUrl = mockFetch.mock.calls[1][0];
     expect(callUrl).toContain('after=2024-01-01');
   });
 
   it('should download file from peer', async () => {
+    const mockData = new Uint8Array([1, 2, 3, 4]);
+    const mockFetch = await createHandshakeFetch(peerAccount, { arrayBuffer: async () => mockData.buffer });
+
     const client = new Client(
       account,
       storage,
       peerAccount.getFingerprint(),
       {
         resolvers: [async () => 'localhost:8080'],
+        fetchImpl: mockFetch as unknown as typeof fetch,
       }
     );
-
-    const mockData = new Uint8Array([1, 2, 3, 4]);
-    const mockFetch = jest.fn().mockResolvedValue({
-      ok: true,
-      arrayBuffer: async () => mockData.buffer,
-    });
-
-    // @ts-expect-error - Testing error handling
-    client['fetchImpl'] = mockFetch as any;
 
     const data = await client.downloadFile('test.txt');
 
@@ -163,23 +177,18 @@ describe('Client', () => {
   });
 
   it('should download file version', async () => {
+    const mockData = new Uint8Array([5, 6, 7, 8]);
+    const mockFetch = await createHandshakeFetch(peerAccount, { arrayBuffer: async () => mockData.buffer });
+
     const client = new Client(
       account,
       storage,
       peerAccount.getFingerprint(),
       {
         resolvers: [async () => 'localhost:8080'],
+        fetchImpl: mockFetch as unknown as typeof fetch,
       }
     );
-
-    const mockData = new Uint8Array([5, 6, 7, 8]);
-    const mockFetch = jest.fn().mockResolvedValue({
-      ok: true,
-      arrayBuffer: async () => mockData.buffer,
-    });
-
-    // @ts-expect-error - Testing error handling
-    client['fetchImpl'] = mockFetch as any;
 
     const data = await client.downloadFileVersion('test.txt', 'abc123');
 
@@ -187,28 +196,30 @@ describe('Client', () => {
   });
 
   it('should throw on HTTP error', async () => {
-    const client = new Client(
-      account,
-      storage,
-      peerAccount.getFingerprint(),
-      {
-        resolvers: [async () => 'localhost:8080'],
-      }
-    );
-
     const mockFetch = jest.fn().mockResolvedValue({
       ok: false,
       status: 404,
       statusText: 'Not Found',
     });
 
-    // @ts-expect-error - Testing error handling
-    client['fetchImpl'] = mockFetch as any;
+    const client = new Client(
+      account,
+      storage,
+      peerAccount.getFingerprint(),
+      {
+        resolvers: [async () => 'localhost:8080'],
+        fetchImpl: mockFetch as unknown as typeof fetch,
+      }
+    );
 
     await expect(client.fetchFileList()).rejects.toThrow('HTTP 404');
   });
 
   it('should handle fetch timeout', async () => {
+    const mockFetch = jest.fn().mockImplementation(
+      () => new Promise((resolve) => setTimeout(resolve, 200))
+    );
+
     const client = new Client(
       account,
       storage,
@@ -216,20 +227,16 @@ describe('Client', () => {
       {
         timeout: 100,
         resolvers: [async () => 'localhost:8080'],
+        fetchImpl: mockFetch as unknown as typeof fetch,
       }
     );
-
-    const mockFetch = jest.fn().mockImplementation(
-      () => new Promise((resolve) => setTimeout(resolve, 200))
-    );
-
-    // @ts-expect-error - Testing error handling
-    client['fetchImpl'] = mockFetch as any;
 
     await expect(client.fetchFileList()).rejects.toThrow();
   }, 10000);
 
   it('should try all resolvers until one succeeds', async () => {
+    const mockFetch = await createHandshakeFetch(peerAccount, { json: async () => ({ files: [] }) });
+
     const client = new Client(
       account,
       storage,
@@ -240,16 +247,9 @@ describe('Client', () => {
           async () => null, // Second fails
           async () => 'localhost:8080', // Third succeeds
         ],
+        fetchImpl: mockFetch as unknown as typeof fetch,
       }
     );
-
-    const mockFetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ files: [] }),
-    });
-
-    // @ts-expect-error - Testing error handling
-    client['fetchImpl'] = mockFetch as any;
 
     await client.fetchFileList();
 
