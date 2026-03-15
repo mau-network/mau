@@ -1,0 +1,56 @@
+# Build source
+src/
+*.test.ts
+*.test.js
+
+# Testing
+jest.config.ts
+jest.setup.ts
+test-*.mjs
+test-*.cjs
+test-*.html
+e2e/
+coverage/
+.nyc_output/
+
+# Development tools
+.eslintrc.json
+.prettierrc.json
+tsconfig.json
+tsconfig.*.json
+vite.config.ts
+playwright.config.ts
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Documentation
+docs/
+docs-site/
+*.md
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+.editorconfig
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# npm & node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.npm
+.eslintcache
+
+# Git
+.git/
+.gitignore
