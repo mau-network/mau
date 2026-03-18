@@ -12,9 +12,15 @@ import { BrowserStorage } from '../storage/browser';
 const TEST_DIR = 'test-data-webrtc-real';
 
 // Make wrtc available globally
-(global as any).RTCPeerConnection = RTCPeerConnection;
-(global as any).RTCSessionDescription = RTCSessionDescription;
-(global as any).RTCIceCandidate = RTCIceCandidate;
+interface GlobalWithWebRTC {
+  RTCPeerConnection: typeof RTCPeerConnection;
+  RTCSessionDescription: typeof RTCSessionDescription;
+  RTCIceCandidate: typeof RTCIceCandidate;
+}
+
+(global as unknown as GlobalWithWebRTC).RTCPeerConnection = RTCPeerConnection;
+(global as unknown as GlobalWithWebRTC).RTCSessionDescription = RTCSessionDescription;
+(global as unknown as GlobalWithWebRTC).RTCIceCandidate = RTCIceCandidate;
 
 describe('Real WebRTC E2E Tests', () => {
   let storage: BrowserStorage;

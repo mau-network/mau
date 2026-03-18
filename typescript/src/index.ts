@@ -110,7 +110,7 @@ export async function createAccount(
   email: string,
   passphrase: string,
   options: { algorithm?: 'ed25519' | 'rsa'; rsaBits?: 2048 | 4096 } = {}
-) {
+): Promise<import('./account.js').Account> {
   const { createStorage } = await import('./storage/index.js');
   const { Account } = await import('./account.js');
   const storage = await createStorage();
@@ -125,7 +125,7 @@ export async function createAccount(
 /**
  * Convenience function to load an existing account
  */
-export async function loadAccount(rootPath: string, passphrase: string) {
+export async function loadAccount(rootPath: string, passphrase: string): Promise<import('./account.js').Account> {
   const { createStorage } = await import('./storage/index.js');
   const { Account } = await import('./account.js');
   const storage = await createStorage();

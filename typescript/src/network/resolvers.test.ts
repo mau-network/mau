@@ -48,7 +48,7 @@ describe('Network Resolvers', () => {
 
   describe('dhtResolver', () => {
     it('should return null when peer not found in DHT', async () => {
-      const mockDHT = { resolver: () => async () => null } as any;
+      const mockDHT = { resolver: () => async () => null } as { resolver: () => (fpr: string, timeout?: number) => Promise<string | null> };
       const resolver = dhtResolver(mockDHT);
       const address = await resolver('fingerprint123', 1000);
 
@@ -56,7 +56,7 @@ describe('Network Resolvers', () => {
     });
 
     it('should return address when peer found in DHT', async () => {
-      const mockDHT = { resolver: () => async () => 'peer.example.com:8080' } as any;
+      const mockDHT = { resolver: () => async () => 'peer.example.com:8080' } as { resolver: () => (fpr: string, timeout?: number) => Promise<string | null> };
       const resolver = dhtResolver(mockDHT);
       const address = await resolver('fingerprint123', 1000);
 
@@ -65,7 +65,7 @@ describe('Network Resolvers', () => {
 
     it('should delegate to the DHT resolver function', async () => {
       const inner = jest.fn().mockResolvedValue('found.example.com:9000');
-      const mockDHT = { resolver: () => inner } as any;
+      const mockDHT = { resolver: () => inner } as { resolver: () => (fpr: string, timeout?: number) => Promise<string | null> };
       const resolver = dhtResolver(mockDHT);
       await resolver('abc123', 500);
 
