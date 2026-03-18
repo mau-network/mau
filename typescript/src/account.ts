@@ -454,7 +454,7 @@ export class Account {
     return new Client(this, this.storage, peer.fingerprint, {
       resolvers: [
         // Add static address resolver
-        async (fingerprint: string) => {
+        async (fingerprint: string): Promise<string | null> => {
           if (fingerprint === peer.fingerprint) {
             return peer.address;
           }

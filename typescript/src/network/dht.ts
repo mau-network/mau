@@ -69,9 +69,9 @@ function cmp(a: Uint8Array, b: Uint8Array): number {
 function rid(): string { return Math.random().toString(36).slice(2); }
 
 function waitICE(pc: RTCPeerConnection): Promise<void> {
-  return new Promise(res => {
+  return new Promise((res): void => {
     if (pc.iceGatheringState === 'complete') { res(); return; }
-    pc.onicegatheringstatechange = () => { if (pc.iceGatheringState === 'complete') {res();} };
+    pc.onicegatheringstatechange = (): void => { if (pc.iceGatheringState === 'complete') {res();} };
     setTimeout(res, 10_000);
   });
 }
@@ -269,8 +269,8 @@ export class KademliaDHT {
     const pc = new RTCPeerConnection({ iceServers: this.ice });
     this.rin.set(from, { pc, queued: [] });
 
-    pc.ondatachannel = ev => { this.register(pc, ev.channel, from).catch(() => {}); };
-    pc.onicecandidate = ev => {
+    pc.ondatachannel = (ev): void => { this.register(pc, ev.channel, from).catch((): void => {}); };
+    pc.onicecandidate = (ev): void => {
       if (ev.candidate) {this.send(sender, { type: 'relay_ice', from: this.account.getFingerprint(), to: msg.from, candidate: ev.candidate });}
     };
 
@@ -341,7 +341,7 @@ export class KademliaDHT {
     const pc = new RTCPeerConnection({ iceServers: this.ice });
     const ch = pc.createDataChannel('dht', { ordered: true });
 
-    pc.onicecandidate = ev => {
+    pc.onicecandidate = (ev): void => {
       if (ev.candidate) {this.send(rfpr, { type: 'relay_ice', from: this.account.getFingerprint(), to: target.fingerprint, candidate: ev.candidate });}
     };
 
@@ -364,8 +364,8 @@ export class KademliaDHT {
     const fpr = normalizeFingerprint(fromFpr);
     const pc = new RTCPeerConnection({ iceServers: this.ice });
     this.rin.set(fpr, { pc, queued: [] });
-    pc.ondatachannel = ev => {
-      this.register(pc, ev.channel, fpr).then(() => this.addPeer({ fingerprint: fromFpr, address: peerAddress })).catch(() => {});
+    pc.ondatachannel = (ev): void => {
+      this.register(pc, ev.channel, fpr).then((): void => this.addPeer({ fingerprint: fromFpr, address: peerAddress })).catch((): void => {});
     };
     await pc.setRemoteDescription(offer);
     await pc.setLocalDescription(await pc.createAnswer());
@@ -377,20 +377,20 @@ export class KademliaDHT {
   // ── Register open connection ──────────────────────────────────────────────────
 
   private register(pc: RTCPeerConnection, ch: RTCDataChannel, fpr: Fingerprint): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error(`channel open timeout ${fpr}`)), 30_000);
-      const onOpen = async () => {
+    return new Promise((resolve, reject): void => {
+      const t = setTimeout((): void => reject(new Error(`channel open timeout ${fpr}`)), 30_000);
+      const onOpen = async (): Promise<void> => {
         clearTimeout(t);
         const conn: Conn = { pc, ch, lastSeen: Date.now() };
         this.conns.set(fpr, conn);
-        ch.onmessage = (ev: MessageEvent<string>) => this.onMsg(fpr, ev.data);
-        ch.onclose = () => { this.conns.delete(fpr); };
+        ch.onmessage = (ev: MessageEvent<string>): void => this.onMsg(fpr, ev.data);
+        ch.onclose = (): void => { this.conns.delete(fpr); };
         const inbound = this.rin.get(fpr);
-        if (inbound) { for (const c of inbound.queued) {await pc.addIceCandidate(c).catch(() => {});} this.rin.delete(fpr); }
+        if (inbound) { for (const c of inbound.queued) {await pc.addIceCandidate(c).catch((): void => {});} this.rin.delete(fpr); }
         resolve();
       };
       if (ch.readyState === 'open') { onOpen().catch(reject); }
-      else { ch.onopen = () => onOpen().catch(reject); ch.onerror = () => { clearTimeout(t); reject(new Error('channel error')); }; }
+      else { ch.onopen = (): void => onOpen().catch(reject); ch.onerror = (): void => { clearTimeout(t); reject(new Error('channel error')); }; }
     });
   }
 

@@ -67,10 +67,10 @@ export class WebSocketSignaling {
    * Connect to signaling server
    */
   private connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject): void => {
       this.ws = new WebSocket(this.url);
 
-      this.ws.onopen = () => {
+      this.ws.onopen = (): void => {
         // Register with server
         this.ws!.send(
           JSON.stringify({
@@ -81,20 +81,20 @@ export class WebSocketSignaling {
         resolve();
       };
 
-      this.ws.onerror = (error) => {
+      this.ws.onerror = (error): void => {
         reject(error);
       };
 
-      this.ws.onmessage = (event) => {
+      this.ws.onmessage = (event): void => {
         try {
           const message: SignalingMessage = JSON.parse(event.data);
-          this.messageHandlers.forEach((handler) => handler(message));
+          this.messageHandlers.forEach((handler): void => handler(message));
         } catch (err) {
           console.error('[Signaling] Error parsing message:', err);
         }
       };
 
-      this.ws.onclose = () => {
+      this.ws.onclose = (): void => {
       };
     });
   }

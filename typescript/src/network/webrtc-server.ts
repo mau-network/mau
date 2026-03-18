@@ -64,20 +64,20 @@ export class WebRTCServer {
     this.connections.set(connectionId, connection);
 
     // Wait for data channel from remote peer
-    peer.ondatachannel = (event) => {
+    peer.ondatachannel = (event): void => {
       connection.channel = event.channel;
       this.setupDataChannel(connectionId, connection.channel);
     };
 
     // Handle ICE candidates
-    peer.onicecandidate = (event) => {
+    peer.onicecandidate = (event): void => {
       if (event.candidate) {
         const callback = this.signalingCallbacks.get(connectionId);
         if (callback) {
           callback({
             type: 'ice-candidate',
             candidate: event.candidate,
-          });
+          } as RTCIceCandidate);
         }
       }
     };
@@ -88,10 +88,10 @@ export class WebRTCServer {
 
     // Wait for ICE gathering to complete so the answer SDP contains all
     // candidates — no trickle-ICE signaling channel required.
-    await new Promise<void>((resolve) => {
+    await new Promise<void>((resolve): void => {
       if (peer.iceGatheringState === 'complete') { resolve(); return; }
       const timeout = setTimeout(resolve, 5000);
-      peer.onicegatheringstatechange = () => {
+      peer.onicegatheringstatechange = (): void => {
         if (peer.iceGatheringState === 'complete') {
           clearTimeout(timeout);
           resolve();
@@ -146,18 +146,18 @@ export class WebRTCServer {
    * Setup data channel event handlers
    */
   private setupDataChannel(connectionId: string, channel: RTCDataChannel): void {
-    channel.onopen = () => {
+    channel.onopen = (): void => {
     };
 
-    channel.onclose = () => {
+    channel.onclose = (): void => {
       this.closeConnection(connectionId);
     };
 
-    channel.onerror = (error) => {
+    channel.onerror = (error): void => {
       console.error(`[WebRTCServer] Data channel error: ${connectionId}`, error);
     };
 
-    channel.onmessage = async (event) => {
+    channel.onmessage = async (event): Promise<void> => {
       await this.handleMessage(connectionId, event.data);
     };
   }

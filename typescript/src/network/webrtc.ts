@@ -70,7 +70,7 @@ export class WebRTCClient {
     this.connection = new RTCPeerConnection({ iceServers: this.config.iceServers });
 
     // Wait for data channel from remote
-    this.connection.ondatachannel = (event) => {
+    this.connection.ondatachannel = (event): void => {
       this.dataChannel = event.channel;
       this.setupDataChannel(this.dataChannel);
     };
@@ -123,10 +123,10 @@ export class WebRTCClient {
     const challenge = crypto.getRandomValues(new Uint8Array(32));
 
     // Register response handler BEFORE sending offer to eliminate the race condition
-    const responsePromise = new Promise<boolean>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('mTLS timeout')), 5000);
+    const responsePromise = new Promise<boolean>((resolve, reject): void => {
+      const timeout = setTimeout((): void => reject(new Error('mTLS timeout')), 5000);
 
-      const handler = async (event: MessageEvent) => {
+      const handler = async (event: MessageEvent): Promise<void> => {
         try {
           const response = JSON.parse(event.data);
           if (response.type !== 'mtls_response') {return;}
@@ -209,10 +209,10 @@ export class WebRTCClient {
 
     // Register response handler BEFORE sending to eliminate the race condition
     const responsePromise = new Promise<{ status: number; headers: Record<string, string>; body: Uint8Array | string }>(
-      (resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Request timeout')), 30000);
+      (resolve, reject): void => {
+        const timeout = setTimeout((): void => reject(new Error('Request timeout')), 30000);
 
-        const handler = (event: MessageEvent) => {
+        const handler = (event: MessageEvent): void => {
           if (!this.dataChannel) {return;}
           try {
             const response = JSON.parse(event.data);
@@ -316,9 +316,9 @@ export class WebRTCClient {
    */
   async waitForICEGathering(timeoutMs = 5000): Promise<void> {
     if (!this.connection || this.connection.iceGatheringState === 'complete') {return;}
-    await new Promise<void>((resolve) => {
+    await new Promise<void>((resolve): void => {
       const timeout = setTimeout(resolve, timeoutMs);
-      this.connection!.onicegatheringstatechange = () => {
+      this.connection!.onicegatheringstatechange = (): void => {
         if (this.connection?.iceGatheringState === 'complete') {
           clearTimeout(timeout);
           resolve();
@@ -342,13 +342,13 @@ export class WebRTCClient {
   }
 
   private setupDataChannel(channel: RTCDataChannel): void {
-    channel.onopen = () => {
+    channel.onopen = (): void => {
     };
 
-    channel.onclose = () => {
+    channel.onclose = (): void => {
     };
 
-    channel.onerror = (error) => {
+    channel.onerror = (error): void => {
       console.error('Data channel error:', error);
     };
   }
