@@ -32,7 +32,8 @@ export class WebRTCServer {
   private config: WebRTCServerConfig;
   private server: Server;
   private connections: Map<string, WebRTCConnection> = new Map();
-  private signalingCallbacks: Map<string, (signal: any) => void> = new Map();
+  private signalingCallbacks: Map<string, (signal: RTCIceCandidate) => void> = new Map();
+
 
   constructor(account: Account, storage: Storage, config: WebRTCServerConfig = {}) {
     this.account = account;
@@ -115,7 +116,7 @@ export class WebRTCServer {
   /**
    * Set callback for signaling messages (ICE candidates, etc.)
    */
-  onSignaling(connectionId: string, callback: (signal: any) => void): void {
+  onSignaling(connectionId: string, callback: (signal: RTCIceCandidate) => void): void {
     this.signalingCallbacks.set(connectionId, callback);
   }
 
@@ -203,7 +204,7 @@ export class WebRTCServer {
   /**
    * Handle mTLS handshake offer
    */
-  private async handleMTLSOffer(connectionId: string, message: any): Promise<void> {
+  private async handleMTLSOffer(connectionId: string, message: { challenge: string }): Promise<void> {
     const connection = this.connections.get(connectionId);
     if (!connection || !connection.channel) {
       return;
@@ -250,7 +251,7 @@ export class WebRTCServer {
   /**
    * Handle HTTP-style request
    */
-  private async handleRequest(connectionId: string, message: any): Promise<void> {
+  private async handleRequest(connectionId: string, message: { id: number; request: unknown }): Promise<void> {
     const connection = this.connections.get(connectionId);
     if (!connection || !connection.channel) {
       return;

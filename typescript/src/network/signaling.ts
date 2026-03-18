@@ -11,7 +11,7 @@ export interface SignalingMessage {
   from: Fingerprint;
   to: Fingerprint;
   type: 'offer' | 'answer' | 'ice-candidate';
-  data: any;
+  data: RTCSessionDescriptionInit | RTCIceCandidate | unknown;
 }
 
 /**
@@ -162,7 +162,7 @@ export class HTTPSignaling {
    * Start polling for messages
    */
   startPolling(): void {
-    if (this.polling) return;
+    if (this.polling) {return;}
     this.polling = true;
     this.poll();
   }

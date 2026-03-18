@@ -7,7 +7,6 @@
 import type { Storage, ServerConfig, FileListItem } from './types/index.js';
 import { SERVER_RESULT_LIMIT } from './types/index.js';
 import type { Account } from './account.js';
-import { File } from './file.js';
 import { sign, serializePublicKey } from './crypto/index.js';
 import type { KademliaDHT } from './network/dht.js';
 

@@ -129,7 +129,7 @@ export class WebRTCClient {
       const handler = async (event: MessageEvent) => {
         try {
           const response = JSON.parse(event.data);
-          if (response.type !== 'mtls_response') return;
+          if (response.type !== 'mtls_response') {return;}
 
           const { deserializePublicKey, getFingerprint, verify } = await import('../crypto/index.js');
           const peerKey = await deserializePublicKey(response.publicKey);
@@ -213,16 +213,16 @@ export class WebRTCClient {
         const timeout = setTimeout(() => reject(new Error('Request timeout')), 30000);
 
         const handler = (event: MessageEvent) => {
-          if (!this.dataChannel) return;
+          if (!this.dataChannel) {return;}
           try {
             const response = JSON.parse(event.data);
-            if (response.type !== 'response') return;
+            if (response.type !== 'response') {return;}
 
             clearTimeout(timeout);
             this.dataChannel.removeEventListener('message', handler);
 
             let body = response.body;
-            if (Array.isArray(body)) body = new Uint8Array(body);
+            if (Array.isArray(body)) {body = new Uint8Array(body);}
 
             resolve({ status: response.status, headers: response.headers || {}, body });
           } catch (err) {
@@ -243,7 +243,7 @@ export class WebRTCClient {
   /**
    * Fetch file list from peer over WebRTC
    */
-  async fetchFileList(after?: Date): Promise<any> {
+  async fetchFileList(after?: Date): Promise<import('../types/index.js').FileListResponse> {
     const query: Record<string, string> = {};
     if (after) {
       query.after = after.toISOString();
@@ -315,7 +315,7 @@ export class WebRTCClient {
    * Call before close() to avoid "ICE candidate on closed connection" errors.
    */
   async waitForICEGathering(timeoutMs = 5000): Promise<void> {
-    if (!this.connection || this.connection.iceGatheringState === 'complete') return;
+    if (!this.connection || this.connection.iceGatheringState === 'complete') {return;}
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(resolve, timeoutMs);
       this.connection!.onicegatheringstatechange = () => {
