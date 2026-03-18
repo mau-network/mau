@@ -68,7 +68,7 @@ export function retryResolver(
       return await pRetry(
         async () => {
           const result = await resolver(fingerprint, timeout);
-          if (result === null) throw new AbortError('not found');
+          if (result === null) {throw new AbortError('not found');}
           return result;
         },
         { retries: maxRetries, minTimeout: initialDelayMs, factor: 2 }

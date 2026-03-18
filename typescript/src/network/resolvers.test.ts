@@ -8,6 +8,7 @@ import {
   dhtResolver,
   combinedResolver,
 } from './resolvers';
+import type { KademliaDHT } from './dht';
 
 describe('Network Resolvers', () => {
   describe('staticResolver', () => {
@@ -48,7 +49,7 @@ describe('Network Resolvers', () => {
 
   describe('dhtResolver', () => {
     it('should return null when peer not found in DHT', async () => {
-      const mockDHT = { resolver: () => async () => null } as any;
+      const mockDHT = { resolver: (): ((fpr: string, timeout?: number) => Promise<string | null>) => async (): Promise<string | null> => null } as unknown as KademliaDHT;
       const resolver = dhtResolver(mockDHT);
       const address = await resolver('fingerprint123', 1000);
 
@@ -56,7 +57,7 @@ describe('Network Resolvers', () => {
     });
 
     it('should return address when peer found in DHT', async () => {
-      const mockDHT = { resolver: () => async () => 'peer.example.com:8080' } as any;
+      const mockDHT = { resolver: (): ((fpr: string, timeout?: number) => Promise<string | null>) => async (): Promise<string | null> => 'peer.example.com:8080' } as unknown as KademliaDHT;
       const resolver = dhtResolver(mockDHT);
       const address = await resolver('fingerprint123', 1000);
 
@@ -65,7 +66,7 @@ describe('Network Resolvers', () => {
 
     it('should delegate to the DHT resolver function', async () => {
       const inner = jest.fn().mockResolvedValue('found.example.com:9000');
-      const mockDHT = { resolver: () => inner } as any;
+      const mockDHT = { resolver: (): ((fpr: string, timeout?: number) => Promise<string | null>) => inner } as unknown as KademliaDHT;
       const resolver = dhtResolver(mockDHT);
       await resolver('abc123', 500);
 

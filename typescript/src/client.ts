@@ -11,10 +11,8 @@ import type {
   ClientConfig,
   FileListItem,
   FileListResponse,
-  Peer,
-  FingerprintResolver,
 } from './types/index.js';
-import { HttpError, NetworkError, MauError, IncorrectPeerCertificateError } from './types/index.js';
+import { HttpError, NetworkError, MauError } from './types/index.js';
 import { HTTP_TIMEOUT_MS, URI_PROTOCOL_NAME, PeerNotFoundError } from './types/index.js';
 import type { Account } from './account.js';
 import { deserializePublicKey, getFingerprint, verify, normalizeFingerprint } from './crypto/index.js';
@@ -163,15 +161,15 @@ export class Client {
     return pRetry(
       async () => {
         const response = await this.fetchImpl(url, options);
-        if (response.status >= 500) throw new HttpError(response.status, response.statusText);
+        if (response.status >= 500) {throw new HttpError(response.status, response.statusText);}
         return response;
       },
       {
         retries: maxRetries,
         minTimeout: 100,
         factor: 2,
-        onFailedAttempt: (error) => {
-          if (error.name === 'AbortError') throw error;
+        onFailedAttempt: (error: Error): void => {
+          if (error.name === 'AbortError') {throw error;}
         },
       }
     );
@@ -339,7 +337,7 @@ export class Client {
       retries: maxRetries,
       minTimeout: initialDelayMs,
       factor: 2,
-      onFailedAttempt: (error) => {
+      onFailedAttempt: (error: Error): void => {
         if (error.name === 'AbortError' || (error instanceof HttpError && error.statusCode < 500)) {
           throw error;
         }

@@ -32,7 +32,8 @@ export class WebRTCServer {
   private config: WebRTCServerConfig;
   private server: Server;
   private connections: Map<string, WebRTCConnection> = new Map();
-  private signalingCallbacks: Map<string, (signal: any) => void> = new Map();
+  private signalingCallbacks: Map<string, (signal: RTCIceCandidate) => void> = new Map();
+
 
   constructor(account: Account, storage: Storage, config: WebRTCServerConfig = {}) {
     this.account = account;
@@ -63,20 +64,17 @@ export class WebRTCServer {
     this.connections.set(connectionId, connection);
 
     // Wait for data channel from remote peer
-    peer.ondatachannel = (event) => {
+    peer.ondatachannel = (event): void => {
       connection.channel = event.channel;
       this.setupDataChannel(connectionId, connection.channel);
     };
 
     // Handle ICE candidates
-    peer.onicecandidate = (event) => {
+    peer.onicecandidate = (event): void => {
       if (event.candidate) {
         const callback = this.signalingCallbacks.get(connectionId);
         if (callback) {
-          callback({
-            type: 'ice-candidate',
-            candidate: event.candidate,
-          });
+          callback(event.candidate);
         }
       }
     };
@@ -87,10 +85,10 @@ export class WebRTCServer {
 
     // Wait for ICE gathering to complete so the answer SDP contains all
     // candidates — no trickle-ICE signaling channel required.
-    await new Promise<void>((resolve) => {
+    await new Promise<void>((resolve): void => {
       if (peer.iceGatheringState === 'complete') { resolve(); return; }
       const timeout = setTimeout(resolve, 5000);
-      peer.onicegatheringstatechange = () => {
+      peer.onicegatheringstatechange = (): void => {
         if (peer.iceGatheringState === 'complete') {
           clearTimeout(timeout);
           resolve();
@@ -115,7 +113,7 @@ export class WebRTCServer {
   /**
    * Set callback for signaling messages (ICE candidates, etc.)
    */
-  onSignaling(connectionId: string, callback: (signal: any) => void): void {
+  onSignaling(connectionId: string, callback: (signal: RTCIceCandidate) => void): void {
     this.signalingCallbacks.set(connectionId, callback);
   }
 
@@ -145,18 +143,18 @@ export class WebRTCServer {
    * Setup data channel event handlers
    */
   private setupDataChannel(connectionId: string, channel: RTCDataChannel): void {
-    channel.onopen = () => {
+    channel.onopen = (): void => {
     };
 
-    channel.onclose = () => {
+    channel.onclose = (): void => {
       this.closeConnection(connectionId);
     };
 
-    channel.onerror = (error) => {
+    channel.onerror = (error): void => {
       console.error(`[WebRTCServer] Data channel error: ${connectionId}`, error);
     };
 
-    channel.onmessage = async (event) => {
+    channel.onmessage = async (event): Promise<void> => {
       await this.handleMessage(connectionId, event.data);
     };
   }
@@ -171,11 +169,11 @@ export class WebRTCServer {
     }
 
     try {
-      const message = JSON.parse(data);
+      const message = JSON.parse(data) as { type: string; [key: string]: unknown };
 
       // Handle mTLS handshake
       if (message.type === 'mtls_offer') {
-        await this.handleMTLSOffer(connectionId, message);
+        await this.handleMTLSOffer(connectionId, message as { type: 'mtls_offer'; publicKey: string; challenge: number[] });
         return;
       }
 
@@ -187,7 +185,7 @@ export class WebRTCServer {
 
       // Handle HTTP-style request
       if (message.type === 'request') {
-        await this.handleRequest(connectionId, message);
+        await this.handleRequest(connectionId, message as { type: 'request'; id: number; method?: string; url?: string; path?: string; query?: Record<string, string>; headers?: Record<string, string>; body?: Uint8Array });
         return;
       }
 
@@ -203,7 +201,7 @@ export class WebRTCServer {
   /**
    * Handle mTLS handshake offer
    */
-  private async handleMTLSOffer(connectionId: string, message: any): Promise<void> {
+  private async handleMTLSOffer(connectionId: string, message: { type: 'mtls_offer'; publicKey: string; challenge: number[] }): Promise<void> {
     const connection = this.connections.get(connectionId);
     if (!connection || !connection.channel) {
       return;
@@ -250,7 +248,7 @@ export class WebRTCServer {
   /**
    * Handle HTTP-style request
    */
-  private async handleRequest(connectionId: string, message: any): Promise<void> {
+  private async handleRequest(connectionId: string, message: { type: 'request'; id: number; method?: string; url?: string; path?: string; query?: Record<string, string>; headers?: Record<string, string>; body?: Uint8Array }): Promise<void> {
     const connection = this.connections.get(connectionId);
     if (!connection || !connection.channel) {
       return;

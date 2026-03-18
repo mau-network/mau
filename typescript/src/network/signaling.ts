@@ -11,7 +11,7 @@ export interface SignalingMessage {
   from: Fingerprint;
   to: Fingerprint;
   type: 'offer' | 'answer' | 'ice-candidate';
-  data: any;
+  data: RTCSessionDescriptionInit | RTCIceCandidate | unknown;
 }
 
 /**
@@ -67,10 +67,10 @@ export class WebSocketSignaling {
    * Connect to signaling server
    */
   private connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject): void => {
       this.ws = new WebSocket(this.url);
 
-      this.ws.onopen = () => {
+      this.ws.onopen = (): void => {
         // Register with server
         this.ws!.send(
           JSON.stringify({
@@ -81,20 +81,20 @@ export class WebSocketSignaling {
         resolve();
       };
 
-      this.ws.onerror = (error) => {
+      this.ws.onerror = (error): void => {
         reject(error);
       };
 
-      this.ws.onmessage = (event) => {
+      this.ws.onmessage = (event): void => {
         try {
           const message: SignalingMessage = JSON.parse(event.data);
-          this.messageHandlers.forEach((handler) => handler(message));
+          this.messageHandlers.forEach((handler): void => handler(message));
         } catch (err) {
           console.error('[Signaling] Error parsing message:', err);
         }
       };
 
-      this.ws.onclose = () => {
+      this.ws.onclose = (): void => {
       };
     });
   }
@@ -162,7 +162,7 @@ export class HTTPSignaling {
    * Start polling for messages
    */
   startPolling(): void {
-    if (this.polling) return;
+    if (this.polling) {return;}
     this.polling = true;
     this.poll();
   }
@@ -293,19 +293,19 @@ export class SignaledConnection {
     switch (message.type) {
       case 'offer':
         if (this.onOfferCallback) {
-          this.onOfferCallback(message.data);
+          this.onOfferCallback(message.data as RTCSessionDescriptionInit);
         }
         break;
 
       case 'answer':
         if (this.onAnswerCallback) {
-          this.onAnswerCallback(message.data);
+          this.onAnswerCallback(message.data as RTCSessionDescriptionInit);
         }
         break;
 
       case 'ice-candidate':
         if (this.onICECallback) {
-          this.onICECallback(message.data);
+          this.onICECallback(message.data as RTCIceCandidateInit);
         }
         break;
     }

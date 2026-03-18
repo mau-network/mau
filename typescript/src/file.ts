@@ -4,14 +4,13 @@
  * Handles reading, writing, signing, encrypting, and versioning content files.
  */
 
-import type { Storage, Fingerprint, MauFile } from './types/index.js';
-import { InvalidFileNameError, MauError } from './types/index.js';
+import type { Storage, MauFile } from './types/index.js';
+import { MauError } from './types/index.js';
 import type { Account } from './account.js';
 import {
   signAndEncrypt,
   decryptAndVerify,
   sha256,
-  validateFileName,
 } from './crypto/index.js';
 
 /**

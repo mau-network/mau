@@ -4,7 +4,6 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { Account } from './account';
-import { File } from './file';
 import { BrowserStorage } from './storage/browser';
 
 const TEST_DIR = 'test-data-file';

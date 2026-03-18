@@ -44,17 +44,17 @@ interface RelayIn  { pc: RTCPeerConnection; queued: RTCIceCandidateInit[] }
 function hex20(hex: string): Uint8Array {
   const h = hex.padEnd(40, '0').slice(0, 40);
   const b = new Uint8Array(20);
-  for (let i = 0; i < 20; i++) b[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);
+  for (let i = 0; i < 20; i++) {b[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);}
   return b;
 }
 function xor(a: string, b: string): Uint8Array {
   const ab = hex20(a), bb = hex20(b), out = new Uint8Array(20);
-  for (let i = 0; i < 20; i++) out[i] = ab[i] ^ bb[i];
+  for (let i = 0; i < 20; i++) {out[i] = ab[i] ^ bb[i];}
   return out;
 }
 function leadingZeros(d: Uint8Array): number {
   for (let i = 0; i < d.length; i++) {
-    if (d[i] === 0) continue;
+    if (d[i] === 0) {continue;}
     let b = d[i], n = 0;
     while ((b & 0x80) === 0) { n++; b <<= 1; }
     return i * 8 + n;
@@ -62,16 +62,16 @@ function leadingZeros(d: Uint8Array): number {
   return d.length * 8;
 }
 function cmp(a: Uint8Array, b: Uint8Array): number {
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i];
+  for (let i = 0; i < a.length; i++) {if (a[i] !== b[i]) {return a[i] - b[i];}}
   return 0;
 }
 
 function rid(): string { return Math.random().toString(36).slice(2); }
 
 function waitICE(pc: RTCPeerConnection): Promise<void> {
-  return new Promise(res => {
+  return new Promise((res): void => {
     if (pc.iceGatheringState === 'complete') { res(); return; }
-    pc.onicegatheringstatechange = () => { if (pc.iceGatheringState === 'complete') res(); };
+    pc.onicegatheringstatechange = (): void => { if (pc.iceGatheringState === 'complete') {res();} };
     setTimeout(res, 10_000);
   });
 }
@@ -116,7 +116,7 @@ export class KademliaDHT {
   async findAddress(target: Fingerprint): Promise<string | null> {
     const fpr = normalizeFingerprint(target);
     const local = this.fromTable(fpr);
-    if (local?.address) return local.address;
+    if (local?.address) {return local.address;}
     const found = await this.lookup(fpr);
     return found?.address ?? null;
   }
@@ -131,12 +131,12 @@ export class KademliaDHT {
 
   private addPeer(peer: Peer): void {
     const fpr = normalizeFingerprint(peer.fingerprint);
-    if (fpr === this.me()) return;
+    if (fpr === this.me()) {return;}
     const bucket = this.buckets[this.idx(fpr)];
     bucket.lastLookup = Date.now();
     const pos = bucket.peers.findIndex(p => normalizeFingerprint(p.fingerprint) === fpr);
     if (pos >= 0) {
-      if (peer.address) bucket.peers[pos].address = peer.address;
+      if (peer.address) {bucket.peers[pos].address = peer.address;}
       bucket.peers.push(bucket.peers.splice(pos, 1)[0]);
       return;
     }
@@ -150,7 +150,7 @@ export class KademliaDHT {
 
   private nearest(target: Fingerprint, n: number): Peer[] {
     const all: Peer[] = [];
-    for (const b of this.buckets) all.push(...b.peers);
+    for (const b of this.buckets) {all.push(...b.peers);}
     const t = normalizeFingerprint(target);
     return all.sort((a, b) => cmp(xor(normalizeFingerprint(a.fingerprint), t), xor(normalizeFingerprint(b.fingerprint), t))).slice(0, n);
   }
@@ -158,7 +158,7 @@ export class KademliaDHT {
   private fromTable(fpr: Fingerprint): Peer | undefined {
     for (const b of this.buckets) {
       const p = b.peers.find(p => normalizeFingerprint(p.fingerprint) === fpr);
-      if (p) return p;
+      if (p) {return p;}
     }
   }
 
@@ -168,17 +168,17 @@ export class KademliaDHT {
     const t = normalizeFingerprint(target);
     const seen = new Set<Fingerprint>([this.me()]);
     let cands = this.nearest(t, DHT_K);
-    if (!cands.length) return undefined;
+    if (!cands.length) {return undefined;}
     let best = xor(normalizeFingerprint(cands[0].fingerprint), t);
     let improved = true;
     while (improved) {
       improved = false;
       const unseen = cands.filter(p => !seen.has(normalizeFingerprint(p.fingerprint))).slice(0, DHT_ALPHA);
-      if (!unseen.length) break;
+      if (!unseen.length) {break;}
       const results = await Promise.allSettled(unseen.map(p => this.doFindPeer(p, t)));
       for (let i = 0; i < unseen.length; i++) {
         seen.add(normalizeFingerprint(unseen[i].fingerprint));
-        if (results[i].status !== 'fulfilled') continue;
+        if (results[i].status !== 'fulfilled') {continue;}
         for (const p of (results[i] as PromiseFulfilledResult<Peer[]>).value) {
           const pf = normalizeFingerprint(p.fingerprint);
           if (!seen.has(pf)) {
@@ -200,14 +200,14 @@ export class KademliaDHT {
 
   private async ping(peer: Peer): Promise<boolean> {
     const c = this.conns.get(normalizeFingerprint(peer.fingerprint));
-    if (!c || c.ch.readyState !== 'open') return false;
+    if (!c || c.ch.readyState !== 'open') {return false;}
     try { await this.rpc(c, { type: 'ping', id: rid() }, 3_000); c.lastSeen = Date.now(); return true; }
     catch { return false; }
   }
 
   private async doFindPeer(via: Peer, target: Fingerprint): Promise<Peer[]> {
     const c = this.conns.get(normalizeFingerprint(via.fingerprint));
-    if (!c || c.ch.readyState !== 'open') return [];
+    if (!c || c.ch.readyState !== 'open') {return [];}
     try {
       const id = rid();
       const res = await this.rpc(c, { type: 'find_peer', id, target }, 5_000) as { peers: Peer[] };
@@ -231,7 +231,7 @@ export class KademliaDHT {
     let msg: DHTMsg;
     try { msg = JSON.parse(raw) as DHTMsg; } catch { return; }
     const c = this.conns.get(senderFpr);
-    if (c) c.lastSeen = Date.now();
+    if (c) {c.lastSeen = Date.now();}
 
     switch (msg.type) {
       case 'ping':
@@ -254,7 +254,7 @@ export class KademliaDHT {
 
   private send(fpr: Fingerprint, msg: DHTMsg): void {
     const c = this.conns.get(fpr);
-    if (c?.ch.readyState === 'open') c.ch.send(JSON.stringify(msg));
+    if (c?.ch.readyState === 'open') {c.ch.send(JSON.stringify(msg));}
   }
 
   // ── Relay: offer ──────────────────────────────────────────────────────────────
@@ -264,14 +264,14 @@ export class KademliaDHT {
     if (to !== this.me()) { this.send(to, msg); return; } // forward
 
     const from = normalizeFingerprint(msg.from);
-    if (this.conns.has(from)) return;
+    if (this.conns.has(from)) {return;}
 
     const pc = new RTCPeerConnection({ iceServers: this.ice });
     this.rin.set(from, { pc, queued: [] });
 
-    pc.ondatachannel = ev => { this.register(pc, ev.channel, from).catch(() => {}); };
-    pc.onicecandidate = ev => {
-      if (ev.candidate) this.send(sender, { type: 'relay_ice', from: this.account.getFingerprint(), to: msg.from, candidate: ev.candidate });
+    pc.ondatachannel = (ev): void => { this.register(pc, ev.channel, from).catch((): void => {}); };
+    pc.onicecandidate = (ev): void => {
+      if (ev.candidate) {this.send(sender, { type: 'relay_ice', from: this.account.getFingerprint(), to: msg.from, candidate: ev.candidate });}
     };
 
     await pc.setRemoteDescription(msg.offer);
@@ -288,7 +288,7 @@ export class KademliaDHT {
 
     const from = normalizeFingerprint(msg.from);
     const out = this.rout.get(from);
-    if (!out) return;
+    if (!out) {return;}
     try { await out.pc.setRemoteDescription(msg.answer); out.resolve(); }
     catch (e) { out.reject(e instanceof Error ? e : new Error(String(e))); }
   }
@@ -305,14 +305,14 @@ export class KademliaDHT {
     const inbound = this.rin.get(from);
     if (inbound) { inbound.queued.push(msg.candidate); return; }
     const out = this.rout.get(from);
-    if (out) await out.pc.addIceCandidate(msg.candidate).catch(() => {});
+    if (out) {await out.pc.addIceCandidate(msg.candidate).catch(() => {});}
   }
 
   // ── Connect: HTTP (bootstrap) ─────────────────────────────────────────────────
 
   private async connectHTTP(peer: Peer): Promise<void> {
     const fpr = normalizeFingerprint(peer.fingerprint);
-    if (this.conns.has(fpr)) return;
+    if (this.conns.has(fpr)) {return;}
     const pc = new RTCPeerConnection({ iceServers: this.ice });
     const ch = pc.createDataChannel('dht', { ordered: true });
     await pc.setLocalDescription(await pc.createOffer());
@@ -322,7 +322,7 @@ export class KademliaDHT {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ from: this.account.getFingerprint(), offer: pc.localDescription }),
     });
-    if (!resp.ok) throw new Error(`DHT offer HTTP ${resp.status}`);
+    if (!resp.ok) {throw new Error(`DHT offer HTTP ${resp.status}`);}
     const { answer } = await resp.json() as { answer: RTCSessionDescriptionInit };
     await pc.setRemoteDescription(answer);
     await this.register(pc, ch, fpr);
@@ -333,16 +333,16 @@ export class KademliaDHT {
 
   async connectRelay(target: Peer, relay: Peer): Promise<void> {
     const tfpr = normalizeFingerprint(target.fingerprint);
-    if (this.conns.has(tfpr) || this.rout.has(tfpr)) return;
+    if (this.conns.has(tfpr) || this.rout.has(tfpr)) {return;}
     const rfpr = normalizeFingerprint(relay.fingerprint);
     const rc = this.conns.get(rfpr);
-    if (!rc || rc.ch.readyState !== 'open') throw new Error(`Relay ${relay.fingerprint} not connected`);
+    if (!rc || rc.ch.readyState !== 'open') {throw new Error(`Relay ${relay.fingerprint} not connected`);}
 
     const pc = new RTCPeerConnection({ iceServers: this.ice });
     const ch = pc.createDataChannel('dht', { ordered: true });
 
-    pc.onicecandidate = ev => {
-      if (ev.candidate) this.send(rfpr, { type: 'relay_ice', from: this.account.getFingerprint(), to: target.fingerprint, candidate: ev.candidate });
+    pc.onicecandidate = (ev): void => {
+      if (ev.candidate) {this.send(rfpr, { type: 'relay_ice', from: this.account.getFingerprint(), to: target.fingerprint, candidate: ev.candidate });}
     };
 
     await pc.setLocalDescription(await pc.createOffer());
@@ -364,8 +364,8 @@ export class KademliaDHT {
     const fpr = normalizeFingerprint(fromFpr);
     const pc = new RTCPeerConnection({ iceServers: this.ice });
     this.rin.set(fpr, { pc, queued: [] });
-    pc.ondatachannel = ev => {
-      this.register(pc, ev.channel, fpr).then(() => this.addPeer({ fingerprint: fromFpr, address: peerAddress })).catch(() => {});
+    pc.ondatachannel = (ev): void => {
+      this.register(pc, ev.channel, fpr).then((): void => this.addPeer({ fingerprint: fromFpr, address: peerAddress })).catch((): void => {});
     };
     await pc.setRemoteDescription(offer);
     await pc.setLocalDescription(await pc.createAnswer());
@@ -377,20 +377,20 @@ export class KademliaDHT {
   // ── Register open connection ──────────────────────────────────────────────────
 
   private register(pc: RTCPeerConnection, ch: RTCDataChannel, fpr: Fingerprint): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error(`channel open timeout ${fpr}`)), 30_000);
-      const onOpen = async () => {
+    return new Promise((resolve, reject): void => {
+      const t = setTimeout((): void => reject(new Error(`channel open timeout ${fpr}`)), 30_000);
+      const onOpen = async (): Promise<void> => {
         clearTimeout(t);
         const conn: Conn = { pc, ch, lastSeen: Date.now() };
         this.conns.set(fpr, conn);
-        ch.onmessage = (ev: MessageEvent<string>) => this.onMsg(fpr, ev.data);
-        ch.onclose = () => { this.conns.delete(fpr); };
+        ch.onmessage = (ev: MessageEvent<string>): void => this.onMsg(fpr, ev.data);
+        ch.onclose = (): void => { this.conns.delete(fpr); };
         const inbound = this.rin.get(fpr);
-        if (inbound) { for (const c of inbound.queued) await pc.addIceCandidate(c).catch(() => {}); this.rin.delete(fpr); }
+        if (inbound) { for (const c of inbound.queued) {await pc.addIceCandidate(c).catch((): void => {});} this.rin.delete(fpr); }
         resolve();
       };
       if (ch.readyState === 'open') { onOpen().catch(reject); }
-      else { ch.onopen = () => onOpen().catch(reject); ch.onerror = () => { clearTimeout(t); reject(new Error('channel error')); }; }
+      else { ch.onopen = (): void => { onOpen().catch(reject); }; ch.onerror = (): void => { clearTimeout(t); reject(new Error('channel error')); }; }
     });
   }
 
@@ -405,7 +405,7 @@ export class KademliaDHT {
     const now = Date.now();
     for (let i = 0; i < DHT_B; i++) {
       const b = this.buckets[i];
-      if (!b.peers.length || now - b.lastLookup < DHT_STALL_PERIOD_MS) continue;
+      if (!b.peers.length || now - b.lastLookup < DHT_STALL_PERIOD_MS) {continue;}
       await this.lookup(b.peers[Math.floor(Math.random() * b.peers.length)].fingerprint).catch(() => {});
       b.lastLookup = Date.now();
     }

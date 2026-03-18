@@ -34,6 +34,10 @@ jobs:
         working-directory: typescript
         run: npm rebuild node-datachannel
 
+      - name: Lint
+        working-directory: typescript
+        run: npm run lint
+
       - name: Type check
         working-directory: typescript
         run: npx tsc --noEmit

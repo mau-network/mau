@@ -449,11 +449,12 @@ export class Account {
     resolvers: Array<import('./types/index.js').FingerprintResolver> = []
   ): import('./client.js').Client {
     // Dynamic import to avoid circular dependency
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Client } = require('./client.js');
     return new Client(this, this.storage, peer.fingerprint, {
       resolvers: [
         // Add static address resolver
-        async (fingerprint: string) => {
+        async (fingerprint: string): Promise<string | null> => {
           if (fingerprint === peer.fingerprint) {
             return peer.address;
           }
@@ -481,6 +482,7 @@ export class Account {
     dht?: import('./network/dht.js').KademliaDHT
   ): import('./server.js').Server {
     // Dynamic import to avoid circular dependency
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Server } = require('./server.js');
     return new Server(this, this.storage, config, dht);
   }

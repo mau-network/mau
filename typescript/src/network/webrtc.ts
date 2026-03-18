@@ -70,7 +70,7 @@ export class WebRTCClient {
     this.connection = new RTCPeerConnection({ iceServers: this.config.iceServers });
 
     // Wait for data channel from remote
-    this.connection.ondatachannel = (event) => {
+    this.connection.ondatachannel = (event): void => {
       this.dataChannel = event.channel;
       this.setupDataChannel(this.dataChannel);
     };
@@ -123,13 +123,13 @@ export class WebRTCClient {
     const challenge = crypto.getRandomValues(new Uint8Array(32));
 
     // Register response handler BEFORE sending offer to eliminate the race condition
-    const responsePromise = new Promise<boolean>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('mTLS timeout')), 5000);
+    const responsePromise = new Promise<boolean>((resolve, reject): void => {
+      const timeout = setTimeout((): void => reject(new Error('mTLS timeout')), 5000);
 
-      const handler = async (event: MessageEvent) => {
+      const handler = async (event: MessageEvent): Promise<void> => {
         try {
           const response = JSON.parse(event.data);
-          if (response.type !== 'mtls_response') return;
+          if (response.type !== 'mtls_response') {return;}
 
           const { deserializePublicKey, getFingerprint, verify } = await import('../crypto/index.js');
           const peerKey = await deserializePublicKey(response.publicKey);
@@ -209,20 +209,20 @@ export class WebRTCClient {
 
     // Register response handler BEFORE sending to eliminate the race condition
     const responsePromise = new Promise<{ status: number; headers: Record<string, string>; body: Uint8Array | string }>(
-      (resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Request timeout')), 30000);
+      (resolve, reject): void => {
+        const timeout = setTimeout((): void => reject(new Error('Request timeout')), 30000);
 
-        const handler = (event: MessageEvent) => {
-          if (!this.dataChannel) return;
+        const handler = (event: MessageEvent): void => {
+          if (!this.dataChannel) {return;}
           try {
             const response = JSON.parse(event.data);
-            if (response.type !== 'response') return;
+            if (response.type !== 'response') {return;}
 
             clearTimeout(timeout);
             this.dataChannel.removeEventListener('message', handler);
 
             let body = response.body;
-            if (Array.isArray(body)) body = new Uint8Array(body);
+            if (Array.isArray(body)) {body = new Uint8Array(body);}
 
             resolve({ status: response.status, headers: response.headers || {}, body });
           } catch (err) {
@@ -243,7 +243,7 @@ export class WebRTCClient {
   /**
    * Fetch file list from peer over WebRTC
    */
-  async fetchFileList(after?: Date): Promise<any> {
+  async fetchFileList(after?: Date): Promise<import('../types/index.js').FileListResponse> {
     const query: Record<string, string> = {};
     if (after) {
       query.after = after.toISOString();
@@ -315,10 +315,10 @@ export class WebRTCClient {
    * Call before close() to avoid "ICE candidate on closed connection" errors.
    */
   async waitForICEGathering(timeoutMs = 5000): Promise<void> {
-    if (!this.connection || this.connection.iceGatheringState === 'complete') return;
-    await new Promise<void>((resolve) => {
+    if (!this.connection || this.connection.iceGatheringState === 'complete') {return;}
+    await new Promise<void>((resolve): void => {
       const timeout = setTimeout(resolve, timeoutMs);
-      this.connection!.onicegatheringstatechange = () => {
+      this.connection!.onicegatheringstatechange = (): void => {
         if (this.connection?.iceGatheringState === 'complete') {
           clearTimeout(timeout);
           resolve();
@@ -342,13 +342,13 @@ export class WebRTCClient {
   }
 
   private setupDataChannel(channel: RTCDataChannel): void {
-    channel.onopen = () => {
+    channel.onopen = (): void => {
     };
 
-    channel.onclose = () => {
+    channel.onclose = (): void => {
     };
 
-    channel.onerror = (error) => {
+    channel.onerror = (error): void => {
       console.error('Data channel error:', error);
     };
   }

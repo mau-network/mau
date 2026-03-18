@@ -33,7 +33,7 @@ export class BrowserStorage implements Storage {
 
   static async create(): Promise<BrowserStorage> {
     const db = await openDB<MauDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
+      upgrade(db: IDBPDatabase<MauDB>): void {
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.createObjectStore(STORE_NAME, { keyPath: 'path' });
         }
@@ -48,8 +48,8 @@ export class BrowserStorage implements Storage {
 
   async readFile(path: string): Promise<Uint8Array> {
     const entry = await this.db.get(STORE_NAME, path);
-    if (!entry) throw new Error(`File not found: ${path}`);
-    if (entry.isDirectory) throw new Error(`Path is a directory: ${path}`);
+    if (!entry) {throw new Error(`File not found: ${path}`);}
+    if (entry.isDirectory) {throw new Error(`Path is a directory: ${path}`);}
     return entry.data;
   }
 
@@ -127,7 +127,7 @@ export class BrowserStorage implements Storage {
 
   async stat(path: string): Promise<{ size: number; isDirectory: boolean; modifiedTime?: number }> {
     const entry = await this.db.get(STORE_NAME, path);
-    if (!entry) throw new Error(`Path not found: ${path}`);
+    if (!entry) {throw new Error(`Path not found: ${path}`);}
     return { size: entry.size, isDirectory: entry.isDirectory, modifiedTime: entry.modifiedTime };
   }
 
