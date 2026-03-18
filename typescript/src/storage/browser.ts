@@ -33,7 +33,7 @@ export class BrowserStorage implements Storage {
 
   static async create(): Promise<BrowserStorage> {
     const db = await openDB<MauDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
+      upgrade(db: IDBPDatabase<MauDB>): void {
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.createObjectStore(STORE_NAME, { keyPath: 'path' });
         }

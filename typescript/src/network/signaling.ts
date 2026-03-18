@@ -293,19 +293,19 @@ export class SignaledConnection {
     switch (message.type) {
       case 'offer':
         if (this.onOfferCallback) {
-          this.onOfferCallback(message.data);
+          this.onOfferCallback(message.data as RTCSessionDescriptionInit);
         }
         break;
 
       case 'answer':
         if (this.onAnswerCallback) {
-          this.onAnswerCallback(message.data);
+          this.onAnswerCallback(message.data as RTCSessionDescriptionInit);
         }
         break;
 
       case 'ice-candidate':
         if (this.onICECallback) {
-          this.onICECallback(message.data);
+          this.onICECallback(message.data as RTCIceCandidateInit);
         }
         break;
     }

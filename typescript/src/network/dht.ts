@@ -390,7 +390,7 @@ export class KademliaDHT {
         resolve();
       };
       if (ch.readyState === 'open') { onOpen().catch(reject); }
-      else { ch.onopen = (): void => onOpen().catch(reject); ch.onerror = (): void => { clearTimeout(t); reject(new Error('channel error')); }; }
+      else { ch.onopen = (): void => { onOpen().catch(reject); }; ch.onerror = (): void => { clearTimeout(t); reject(new Error('channel error')); }; }
     });
   }
 

@@ -168,7 +168,7 @@ export class Client {
         retries: maxRetries,
         minTimeout: 100,
         factor: 2,
-        onFailedAttempt: (error) => {
+        onFailedAttempt: (error: Error): void => {
           if (error.name === 'AbortError') {throw error;}
         },
       }
@@ -337,7 +337,7 @@ export class Client {
       retries: maxRetries,
       minTimeout: initialDelayMs,
       factor: 2,
-      onFailedAttempt: (error) => {
+      onFailedAttempt: (error: Error): void => {
         if (error.name === 'AbortError' || (error instanceof HttpError && error.statusCode < 500)) {
           throw error;
         }

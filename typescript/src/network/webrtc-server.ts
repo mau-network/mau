@@ -74,10 +74,7 @@ export class WebRTCServer {
       if (event.candidate) {
         const callback = this.signalingCallbacks.get(connectionId);
         if (callback) {
-          callback({
-            type: 'ice-candidate',
-            candidate: event.candidate,
-          } as RTCIceCandidate);
+          callback(event.candidate);
         }
       }
     };
@@ -172,11 +169,11 @@ export class WebRTCServer {
     }
 
     try {
-      const message = JSON.parse(data);
+      const message = JSON.parse(data) as { type: string; [key: string]: unknown };
 
       // Handle mTLS handshake
       if (message.type === 'mtls_offer') {
-        await this.handleMTLSOffer(connectionId, message);
+        await this.handleMTLSOffer(connectionId, message as { type: 'mtls_offer'; publicKey: string; challenge: number[] });
         return;
       }
 
@@ -188,7 +185,7 @@ export class WebRTCServer {
 
       // Handle HTTP-style request
       if (message.type === 'request') {
-        await this.handleRequest(connectionId, message);
+        await this.handleRequest(connectionId, message as { type: 'request'; id: number; method?: string; url?: string; path?: string; query?: Record<string, string>; headers?: Record<string, string>; body?: Uint8Array });
         return;
       }
 
@@ -204,7 +201,7 @@ export class WebRTCServer {
   /**
    * Handle mTLS handshake offer
    */
-  private async handleMTLSOffer(connectionId: string, message: { challenge: string }): Promise<void> {
+  private async handleMTLSOffer(connectionId: string, message: { type: 'mtls_offer'; publicKey: string; challenge: number[] }): Promise<void> {
     const connection = this.connections.get(connectionId);
     if (!connection || !connection.channel) {
       return;
@@ -251,7 +248,7 @@ export class WebRTCServer {
   /**
    * Handle HTTP-style request
    */
-  private async handleRequest(connectionId: string, message: { id: number; request: unknown }): Promise<void> {
+  private async handleRequest(connectionId: string, message: { type: 'request'; id: number; method?: string; url?: string; path?: string; query?: Record<string, string>; headers?: Record<string, string>; body?: Uint8Array }): Promise<void> {
     const connection = this.connections.get(connectionId);
     if (!connection || !connection.channel) {
       return;
