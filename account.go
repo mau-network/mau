@@ -17,6 +17,7 @@ import (
 	"os"
 	"path"
 	"slices"
+	"strings"
 	"time"
 
 	_ "crypto/sha256"
@@ -422,17 +423,24 @@ func (a *Account) prepareEncryptionEntities(recipients []*Friend) []*openpgp.Ent
 }
 
 func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File, error) {
+	// Enforce flat file structure per spec - reject paths with directory separators
+	if strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		return nil, errors.New("file name cannot contain path separators - only flat file structure is supported")
+	}
+
 	if path.Ext(name) != ".pgp" {
 		name += ".pgp"
 	}
 
 	fpr := a.Fingerprint().String()
-	p := path.Join(a.path, fpr, name)
-
-	// Create all parent directories for the file path
-	if err := os.MkdirAll(path.Dir(p), DirPerm); err != nil {
+	fprDir := path.Join(a.path, fpr)
+	
+	// Ensure fingerprint directory exists
+	if err := os.MkdirAll(fprDir, DirPerm); err != nil {
 		return nil, err
 	}
+
+	p := path.Join(fprDir, name)
 	if err := a.handleExistingFile(p); err != nil {
 		return nil, err
 	}
