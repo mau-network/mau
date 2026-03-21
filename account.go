@@ -422,33 +422,51 @@ func (a *Account) prepareEncryptionEntities(recipients []*Friend) []*openpgp.Ent
 }
 
 func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File, error) {
-	// Enforce flat file structure per spec - reject paths with directory separators
+	if err := validateFlatFileName(name); err != nil {
+		return nil, err
+	}
+
+	name = ensurePGPExtension(name)
+	filePath, err := a.prepareFilePath(name)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := a.writeEncryptedFile(filePath, r, recipients); err != nil {
+		return nil, err
+	}
+
+	return &File{Path: filePath}, nil
+}
+
+func validateFlatFileName(name string) error {
 	if strings.Contains(name, "/") || strings.Contains(name, "\\") {
-		return nil, errors.New("file name cannot contain path separators - only flat file structure is supported")
+		return errors.New("file name cannot contain path separators - only flat file structure is supported")
 	}
+	return nil
+}
 
+func ensurePGPExtension(name string) string {
 	if path.Ext(name) != ".pgp" {
-		name += ".pgp"
+		return name + ".pgp"
 	}
+	return name
+}
 
+func (a *Account) prepareFilePath(name string) (string, error) {
 	fpr := a.Fingerprint().String()
 	fprDir := path.Join(a.path, fpr)
 
-	// Ensure fingerprint directory exists
 	if err := os.MkdirAll(fprDir, DirPerm); err != nil {
-		return nil, err
+		return "", err
 	}
 
-	p := path.Join(fprDir, name)
-	if err := a.handleExistingFile(p); err != nil {
-		return nil, err
+	filePath := path.Join(fprDir, name)
+	if err := a.handleExistingFile(filePath); err != nil {
+		return "", err
 	}
 
-	if err := a.writeEncryptedFile(p, r, recipients); err != nil {
-		return nil, err
-	}
-
-	return &File{Path: p}, nil
+	return filePath, nil
 }
 
 func (a *Account) handleExistingFile(p string) error {
