@@ -32,7 +32,7 @@ func (hv *HomeView) saveDraft() {
 	}
 
 	draftPath := filepath.Join(hv.app.dataDir, draftFile)
-	
+
 	// Atomic write: write to temp file, then rename
 	tmpPath := draftPath + ".tmp"
 	if err := os.WriteFile(tmpPath, []byte(text), 0600); err != nil {

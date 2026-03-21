@@ -29,10 +29,10 @@ func TestFingerprintFromCert(t *testing.T) {
 		fpr, err := FingerprintFromCert([]*x509.Certificate{x509Cert})
 		assert.NoError(t, err)
 		assert.NotNil(t, fpr)
-		
+
 		// Fingerprint should match account fingerprint
 		assert.Equal(t, account.Fingerprint(), fpr)
-		
+
 		// Ed25519 keys use v4 PGP format (20 bytes / 40 hex chars)
 		assert.Len(t, fpr, 20, "Ed25519 fingerprint should be 20 bytes")
 	})
@@ -116,7 +116,7 @@ func TestFingerprintFromEd25519(t *testing.T) {
 
 		// Verify fingerprint is in DNSNames (as 40 hex chars)
 		require.NotEmpty(t, x509Cert.DNSNames)
-		
+
 		foundFingerprint := false
 		for _, name := range x509Cert.DNSNames {
 			if len(name) == 40 { // SHA-1 fingerprint hex length
@@ -147,7 +147,7 @@ func TestCertToAddress(t *testing.T) {
 		addr, err := certToAddress([]*x509.Certificate{x509Cert})
 		assert.NoError(t, err)
 		assert.NotEmpty(t, addr)
-		
+
 		// Address should be the fingerprint (embedded in DNSNames)
 		assert.Equal(t, account.Fingerprint().String(), addr)
 	})
@@ -173,7 +173,7 @@ func TestCertToAddress(t *testing.T) {
 
 		addr, err := certToAddress([]*x509.Certificate{x509Cert1, x509Cert2})
 		assert.NoError(t, err)
-		
+
 		// Should return first certificate's address
 		assert.Equal(t, account1.Fingerprint().String(), addr)
 	})
@@ -256,11 +256,11 @@ func TestFingerprintFromPublicKey(t *testing.T) {
 	t.Run("ECDSA returns nil (not yet supported)", func(t T) {
 		// Mau doesn't generate ECDSA keys, but the code handles it
 		// This documents the current behavior
-		
+
 		// Note: Creating a real ECDSA cert would require significant setup.
 		// For now, we document that ECDSA returns (nil, nil) per the code.
 		// If ECDSA support is added later, this test should be updated.
-		
+
 		// This is a documentation test - the actual ECDSA path returns (nil, nil)
 		// and is skipped by FingerprintFromCert's loop
 	})

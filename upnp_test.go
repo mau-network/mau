@@ -84,7 +84,7 @@ func TestUPNPFactory(t *testing.T) {
 		clients := factory()
 
 		assert.Len(t, clients, 2)
-		
+
 		// Verify first client
 		ip1, err := clients[0].GetExternalIPAddress()
 		assert.NoError(t, err)
@@ -109,7 +109,7 @@ func TestUPNPFactory(t *testing.T) {
 
 	t.Run("Factory ignores errors from underlying function", func(t *testing.T) {
 		mock := &mockUPNPClient{}
-		
+
 		factoryFunc := func() ([]*mockUPNPClient, []error, error) {
 			return []*mockUPNPClient{mock}, []error{errors.New("some error")}, errors.New("another error")
 		}
@@ -128,7 +128,7 @@ func TestNewUPNPClient(t *testing.T) {
 
 		// This will fail in test environment without real UPnP devices
 		client, err := newUPNPClient(ctx)
-		
+
 		// Either it finds a real device or returns the expected error
 		if err != nil {
 			assert.Error(t, err)
@@ -146,7 +146,7 @@ func TestNewUPNPClient(t *testing.T) {
 
 		// Function should still complete (context is passed but not currently used in newUPNPClient)
 		client, err := newUPNPClient(ctx)
-		
+
 		// Expected behavior: no clients found
 		if err != nil {
 			assert.Error(t, err)

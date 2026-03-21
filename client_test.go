@@ -302,11 +302,11 @@ func TestFetchFileList(t *testing.T) {
 	friend_dir := t.TempDir()
 	friend, err := NewAccount(friend_dir, "Mohamed Mahmoud", "mohamed@example.com", "strong password")
 	assert.NoError(t, err)
-	
+
 	// Friend adds account as a friend so it can share files
 	aFriend, err := friend.AddFriend(bytes.NewReader(account_key.Bytes()))
 	assert.NoError(t, err)
-	
+
 	server, err := friend.Server(nil)
 	assert.NoError(t, err)
 
@@ -343,7 +343,7 @@ func TestFetchFileList(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, list)
 		assert.Len(t, list, 2)
-		
+
 		// Verify file list contains expected items
 		var filenames []string
 		for _, item := range list {
@@ -373,7 +373,7 @@ func TestFetchFileList(t *testing.T) {
 		assert.NotNil(t, list)
 		// Should only see the new file
 		assert.GreaterOrEqual(t, len(list), 1)
-		
+
 		// Verify new file is in the list
 		found := false
 		for _, item := range list {
@@ -402,7 +402,7 @@ func TestFetchFileList(t *testing.T) {
 		_, err := client.fetchFileList(ctx, friend.Fingerprint(), address, time.Now())
 		assert.Error(t, err)
 	})
-	
+
 	t.Run("fetchFileList excludes private files", func(t T) {
 		// Add a private file (no recipients)
 		_, err := friend.AddFile(strings.NewReader("Private content"), "private.txt", []*Friend{})
@@ -413,7 +413,7 @@ func TestFetchFileList(t *testing.T) {
 
 		list, err := client.fetchFileList(ctx, friend.Fingerprint(), address, time.Now().Add(-time.Hour))
 		assert.NoError(t, err)
-		
+
 		// Verify private file is NOT in the list
 		for _, item := range list {
 			assert.NotEqual(t, "private.txt.pgp", path.Base(item.Path), "Private file should not be in list")

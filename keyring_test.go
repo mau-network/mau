@@ -113,7 +113,7 @@ func TestKeyring_FriendsSet(t *testing.T) {
 		// Copy friend1 file to sub-keyring as well
 		friend1SrcFile := path.Join(dir, ".mau", friend1.Fingerprint().String()+".pgp")
 		friend1DstFile := path.Join(subKeyringPath, friend1.Fingerprint().String()+".pgp")
-		
+
 		data, err := os.ReadFile(friend1SrcFile)
 		require.NoError(t, err)
 		err = os.WriteFile(friend1DstFile, data, FilePerm)
@@ -158,7 +158,7 @@ func TestKeyring_FindByFingerprint(t *testing.T) {
 	subKeyringPath := path.Join(dir, ".mau", "work")
 	err = os.MkdirAll(subKeyringPath, DirPerm)
 	require.NoError(t, err)
-	
+
 	oldPath := path.Join(dir, ".mau", friend2.Fingerprint().String()+".pgp")
 	newPath := path.Join(subKeyringPath, friend2.Fingerprint().String()+".pgp")
 	err = os.Rename(oldPath, newPath)
@@ -255,7 +255,7 @@ func TestKeyring_FriendById_SubKeyrings(t *testing.T) {
 	subKeyringPath := path.Join(dir, ".mau", "work")
 	err = os.MkdirAll(subKeyringPath, DirPerm)
 	require.NoError(t, err)
-	
+
 	oldPath := path.Join(dir, ".mau", friend.Fingerprint().String()+".pgp")
 	newPath := path.Join(subKeyringPath, friend.Fingerprint().String()+".pgp")
 	err = os.Rename(oldPath, newPath)

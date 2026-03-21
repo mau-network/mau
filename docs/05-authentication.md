@@ -63,11 +63,14 @@ mau init myaccount
 ```
 ~/.mau/myaccount/
 ├── account.pgp           # Your encrypted private key
-├── <fingerprint>/        # Your content directory
-│   └── posts/
-│       └── *.json        # Your encrypted posts
+├── <fingerprint>/        # Your content directory (flat - no subdirectories)
+│   ├── post-1.json.pgp
+│   ├── post-2.json.pgp
+│   └── profile.json.pgp
 ├── <friend-fpr1>.pgp     # Friend's public key
-├── <friend-fpr1>/        # Friend's synced content
+├── <friend-fpr1>/        # Friend's synced content (flat)
+│   ├── their-post-1.json.pgp
+│   └── their-post-2.json.pgp
 └── sync_state.json       # Last sync timestamps
 ```
 

@@ -43,7 +43,7 @@ func (k *Keyring) FindByFingerprint(fingerprint Fingerprint) *Friend {
 	if k == nil {
 		return nil
 	}
-	
+
 	for _, friend := range k.Friends {
 		if friend.Fingerprint().Equal(fingerprint) {
 			return friend

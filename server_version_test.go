@@ -227,7 +227,7 @@ func TestServerVersionEndpoint(t *testing.T) {
 		privateFile, err := account.AddFile(strings.NewReader("private v1"), "private.txt", []*Friend{})
 		assert.NoError(t, err)
 		defer os.Remove(privateFile.Path)
-		
+
 		privateFile, err = account.AddFile(strings.NewReader("private v2"), "private.txt", []*Friend{})
 		assert.NoError(t, err)
 
@@ -302,7 +302,7 @@ func TestServerVersionEndpointWithDeletedFile(t *testing.T) {
 	var file *File
 	_, err = account.AddFile(strings.NewReader("version 1"), "deleted.txt", []*Friend{friend})
 	assert.NoError(t, err)
-	
+
 	file, err = account.AddFile(strings.NewReader("version 2"), "deleted.txt", []*Friend{friend})
 	assert.NoError(t, err)
 
@@ -352,4 +352,3 @@ func TestServerVersionEndpointWithDeletedFile(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	resp.Body.Close()
 }
-

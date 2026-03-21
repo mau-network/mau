@@ -11,9 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	
 	"github.com/ProtonMail/go-crypto/openpgp"
-	
+
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 )
 

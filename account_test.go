@@ -94,7 +94,7 @@ func TestGetFile(t *testing.T) {
 
 	assert.NotNil(t, file)
 	assert.NotNil(t, opened)
-	
+
 	assert.Equal(t, file.Path, opened.Path)
 	assert.Equal(t, file.Name(), opened.Name())
 	assert.Equal(t, file.Deleted(), opened.Deleted())
@@ -118,26 +118,11 @@ func TestAddFileWithSubdirectories(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, account)
 
-	// Test adding a file with a subdirectory in the name
+	// Test that adding a file with a subdirectory is rejected (per spec: flat structure only)
 	file, err := account.AddFile(strings.NewReader("test content"), "posts/post-123.json", []*Friend{})
-	assert.NoError(t, err, "AddFile should succeed with subdirectories in filename")
-	assert.NotNil(t, file)
-
-	// Verify file was created - use the actual file path returned
-	assert.FileExists(t, file.Path, "File should exist at the path returned by AddFile")
-
-	// Verify we can read the file content back
-	reader, err := file.Reader(account)
-	assert.NoError(t, err)
-	content, err := io.ReadAll(reader)
-	assert.NoError(t, err)
-	assert.Equal(t, "test content", string(content))
-
-	// Test with deeper nesting
-	file2, err := account.AddFile(strings.NewReader("nested content"), "a/b/c/deep.txt", []*Friend{})
-	assert.NoError(t, err, "AddFile should succeed with deeply nested directories")
-	assert.NotNil(t, file2)
-	assert.FileExists(t, file2.Path, "File should exist at deeply nested path")
+	assert.Error(t, err, "AddFile should reject subdirectories in filename per spec")
+	assert.Nil(t, file)
+	assert.Contains(t, err.Error(), "path separators", "Error should mention path separators")
 }
 
 func TestRemoveFile(t *testing.T) {
@@ -186,5 +171,30 @@ func TestListFiles(t *testing.T) {
 		unknownFpr, _ := FingerprintFromString("01234567891234567890")
 		files := account.ListFiles(unknownFpr, time.Now().Add(-time.Second), 10)
 		assert.Equal(t, 0, len(files))
+	})
+}
+
+func TestAddFileEnforcesFlatStructure(t *testing.T) {
+	account_dir := t.TempDir()
+	account, err := NewAccount(account_dir, "Test User", "test@example.com", "password")
+	assert.NoError(t, err)
+
+	t.Run("Rejects forward slash in filename", func(t T) {
+		_, err := account.AddFile(strings.NewReader("test"), "posts/2024/post.json", []*Friend{})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "path separators")
+	})
+
+	t.Run("Rejects backslash in filename", func(t T) {
+		_, err := account.AddFile(strings.NewReader("test"), "posts\\post.json", []*Friend{})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "path separators")
+	})
+
+	t.Run("Accepts simple flat filename", func(t T) {
+		file, err := account.AddFile(strings.NewReader("test"), "simple-post.json", []*Friend{})
+		assert.NoError(t, err)
+		assert.NotNil(t, file)
+		assert.Contains(t, file.Path, "simple-post.json.pgp")
 	})
 }

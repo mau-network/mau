@@ -17,17 +17,17 @@ import (
 	"os"
 	"path"
 	"slices"
+	"strings"
 	"time"
 
 	_ "crypto/sha256"
 
-	
 	"github.com/ProtonMail/go-crypto/openpgp"
-	
+
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
-	
+
 	"github.com/ProtonMail/go-crypto/openpgp/eddsa"
-	
+
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 )
 
@@ -256,7 +256,7 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 
 	dnsNames := a.prepareDNSNames(DNSNames)
 	template := buildCertificateTemplate(dnsNames, a.entity.PrimaryKey.CreationTime)
-	
+
 	return a.generateCertificate(template)
 }
 
@@ -422,26 +422,51 @@ func (a *Account) prepareEncryptionEntities(recipients []*Friend) []*openpgp.Ent
 }
 
 func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File, error) {
+	if err := validateFlatFileName(name); err != nil {
+		return nil, err
+	}
+
+	name = ensurePGPExtension(name)
+	filePath, err := a.prepareFilePath(name)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := a.writeEncryptedFile(filePath, r, recipients); err != nil {
+		return nil, err
+	}
+
+	return &File{Path: filePath}, nil
+}
+
+func validateFlatFileName(name string) error {
+	if strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		return errors.New("file name cannot contain path separators - only flat file structure is supported")
+	}
+	return nil
+}
+
+func ensurePGPExtension(name string) string {
 	if path.Ext(name) != ".pgp" {
-		name += ".pgp"
+		return name + ".pgp"
 	}
+	return name
+}
 
+func (a *Account) prepareFilePath(name string) (string, error) {
 	fpr := a.Fingerprint().String()
-	p := path.Join(a.path, fpr, name)
+	fprDir := path.Join(a.path, fpr)
 
-	// Create all parent directories for the file path
-	if err := os.MkdirAll(path.Dir(p), DirPerm); err != nil {
-		return nil, err
-	}
-	if err := a.handleExistingFile(p); err != nil {
-		return nil, err
+	if err := os.MkdirAll(fprDir, DirPerm); err != nil {
+		return "", err
 	}
 
-	if err := a.writeEncryptedFile(p, r, recipients); err != nil {
-		return nil, err
+	filePath := path.Join(fprDir, name)
+	if err := a.handleExistingFile(filePath); err != nil {
+		return "", err
 	}
 
-	return &File{Path: p}, nil
+	return filePath, nil
 }
 
 func (a *Account) handleExistingFile(p string) error {
