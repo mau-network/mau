@@ -59,8 +59,8 @@ func (a *Account) Server(knownNodes []*Peer) (*Server, error) {
 
 func createHTTPServer(router *http.ServeMux, cert tls.Certificate) http.Server {
 	return http.Server{
-		Handler:   router,
-		TLSConfig: createServerTLSConfig(cert),
+		Handler:           router,
+		TLSConfig:         createServerTLSConfig(cert),
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       120 * time.Second,
@@ -112,7 +112,7 @@ func (s *Server) Serve(l net.Listener, externalAddress string) error {
 	if l == nil || l.Addr() == nil {
 		return errors.New("listener cannot be nil")
 	}
-	
+
 	port := l.Addr().(*net.TCPAddr).Port
 
 	if err := s.serveMDNS(port); err != nil {

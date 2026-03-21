@@ -22,13 +22,12 @@ import (
 
 	_ "crypto/sha256"
 
-	
 	"github.com/ProtonMail/go-crypto/openpgp"
-	
+
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
-	
+
 	"github.com/ProtonMail/go-crypto/openpgp/eddsa"
-	
+
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 )
 
@@ -257,7 +256,7 @@ func (a *Account) certificate(DNSNames []string) (cert tls.Certificate, err erro
 
 	dnsNames := a.prepareDNSNames(DNSNames)
 	template := buildCertificateTemplate(dnsNames, a.entity.PrimaryKey.CreationTime)
-	
+
 	return a.generateCertificate(template)
 }
 
@@ -434,7 +433,7 @@ func (a *Account) AddFile(r io.Reader, name string, recipients []*Friend) (*File
 
 	fpr := a.Fingerprint().String()
 	fprDir := path.Join(a.path, fpr)
-	
+
 	// Ensure fingerprint directory exists
 	if err := os.MkdirAll(fprDir, DirPerm); err != nil {
 		return nil, err

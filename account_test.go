@@ -94,7 +94,7 @@ func TestGetFile(t *testing.T) {
 
 	assert.NotNil(t, file)
 	assert.NotNil(t, opened)
-	
+
 	assert.Equal(t, file.Path, opened.Path)
 	assert.Equal(t, file.Name(), opened.Name())
 	assert.Equal(t, file.Deleted(), opened.Deleted())

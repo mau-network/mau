@@ -17,9 +17,9 @@ import (
 // Kademlia: A Peer-to-Peer Information System Based on the XOR Metric
 
 const (
-	dht_B                = 20 * 8              // number of buckets (160 bits for v4 keys, adaptable) // number of buckets
-	dht_K                = 20                  // max length of k bucket (replication parameter)
-	dht_ALPHA            = 3                   // parallelism factor
+	dht_B                = 20 * 8 // number of buckets (160 bits for v4 keys, adaptable) // number of buckets
+	dht_K                = 20     // max length of k bucket (replication parameter)
+	dht_ALPHA            = 3      // parallelism factor
 	dht_STALL_PERIOD     = time.Hour
 	dht_PING_MIN_BACKOFF = 30 * time.Second // minimum time between pings to the same peer
 )
@@ -72,7 +72,7 @@ func (d *dhtServer) sendPing(ctx context.Context, peer *Peer) error {
 	}
 
 	err = d.executePing(ctx, client, peer.Address)
-	
+
 	if err == nil {
 		d.updateLastPingTime(peer.Fingerprint)
 	}
@@ -642,18 +642,18 @@ func xor(a, b Fingerprint) Fingerprint {
 	if a == nil || b == nil {
 		return nil
 	}
-	
+
 	// Use length of shortest fingerprint for XOR
 	minLen := len(a)
 	if len(b) < minLen {
 		minLen = len(b)
 	}
-	
+
 	c := make([]byte, minLen)
 	for i := 0; i < minLen; i++ {
 		c[i] = a[i] ^ b[i]
 	}
-	
+
 	return Fingerprint(c)
 }
 

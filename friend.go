@@ -7,11 +7,10 @@ import (
 	"path"
 	"path/filepath"
 
-	
 	"github.com/ProtonMail/go-crypto/openpgp"
-	
+
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
-	
+
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 )
 
