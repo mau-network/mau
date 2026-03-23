@@ -178,9 +178,10 @@ export class Account {
     const publicKey = await deserializePublicKey(armoredPublicKey);
     const fingerprint = getFingerprint(publicKey);
 
-    // Save friend's public key
+    // Save friend's public key in binary format (per spec)
     const friendKeyPath = this.storage.join(this.getMauDir(), `${fingerprint}.pgp`);
-    await this.storage.writeText(friendKeyPath, armoredPublicKey);
+    const binaryKey = publicKey.write();
+    await this.storage.writeFile(friendKeyPath, binaryKey);
 
     // Create content directory for friend
     const friendContentDir = this.getFriendContentDir(fingerprint);
@@ -249,8 +250,9 @@ export class Account {
       if (entry.endsWith('.pgp') && entry !== ACCOUNT_KEY_FILENAME) {
         const keyPath = this.storage.join(mauDir, entry);
         try {
-          const armoredKey = await this.storage.readText(keyPath);
-          const publicKey = await deserializePublicKey(armoredKey);
+          // Read binary format (per spec)
+          const binaryKey = await this.storage.readFile(keyPath);
+          const publicKey = await openpgp.readKey({ binaryKey });
           const fingerprint = getFingerprint(publicKey);
           this.friends.set(fingerprint, publicKey);
         } catch (err) {
