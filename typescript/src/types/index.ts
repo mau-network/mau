@@ -118,7 +118,7 @@ export const FILE_PERM = 0o600;
 export const DIR_PERM = 0o700;
 export const HTTP_TIMEOUT_MS = 30000;
 export const SERVER_RESULT_LIMIT = 20;
-export const URI_PROTOCOL_NAME = 'mau';
+export const URI_PROTOCOL_NAME = 'https';
 
 // Kademlia DHT constants
 export const DHT_B = 160; // Number of bits for key space
