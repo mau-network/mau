@@ -85,10 +85,10 @@ export class Server {
       return await this.handleAuth(req);
     } else if (resource.includes('.versions/')) {
       // Get version: /p2p/<fingerprint>/<file>.versions/<hash>
-      return await this.handleFileVersion(resource);
+      return await this.handleFileVersion(resource, req);
     } else {
       // Get file: /p2p/<fingerprint>/<file>
-      return await this.handleFile(resource);
+      return await this.handleFile(resource, req);
     }
   }
 
@@ -201,9 +201,9 @@ export class Server {
   }
 
   /**
-   * Handle file download request
+   * Handle file download request with Range support for resumable downloads
    */
-  private async handleFile(fileName: string): Promise<ServerResponse> {
+  private async handleFile(fileName: string, req?: ServerRequest): Promise<ServerResponse> {
     try {
       const { validateFileName } = await import('./crypto/index.js');
       const { InvalidFileNameError } = await import('./types/index.js');
@@ -215,12 +215,38 @@ export class Server {
       const contentDir = this.account.getContentDir();
       const filePath = this.storage.join(contentDir, fileName);
       const data = await this.storage.readFile(filePath);
+      const totalSize = data.length;
+
+      // Parse Range header
+      const rangeHeader = req?.headers['range'];
+      if (rangeHeader && rangeHeader.startsWith('bytes=')) {
+        const rangeMatch = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+        if (rangeMatch) {
+          const start = parseInt(rangeMatch[1], 10);
+          const end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : totalSize - 1;
+          
+          if (start >= 0 && start < totalSize && end >= start && end < totalSize) {
+            const rangeData = data.slice(start, end + 1);
+            return {
+              status: 206,
+              headers: {
+                'Content-Type': 'application/octet-stream',
+                'Content-Length': rangeData.length.toString(),
+                'Content-Range': `bytes ${start}-${end}/${totalSize}`,
+                'Accept-Ranges': 'bytes',
+              },
+              body: rangeData,
+            };
+          }
+        }
+      }
 
       return {
         status: 200,
         headers: {
           'Content-Type': 'application/octet-stream',
           'Content-Length': data.length.toString(),
+          'Accept-Ranges': 'bytes',
         },
         body: data,
       };
@@ -230,9 +256,9 @@ export class Server {
   }
 
   /**
-   * Handle file version download request
+   * Handle file version download request with Range support
    */
-  private async handleFileVersion(resource: string): Promise<ServerResponse> {
+  private async handleFileVersion(resource: string, req?: ServerRequest): Promise<ServerResponse> {
     const match = resource.match(/^(.+)\.versions\/([^/]+)$/);
     if (!match) {
       return this.notFound();
@@ -258,12 +284,38 @@ export class Server {
       }
 
       const data = await this.storage.readFile(versionPath);
+      const totalSize = data.length;
+
+      // Parse Range header
+      const rangeHeader = req?.headers['range'];
+      if (rangeHeader && rangeHeader.startsWith('bytes=')) {
+        const rangeMatch = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+        if (rangeMatch) {
+          const start = parseInt(rangeMatch[1], 10);
+          const end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : totalSize - 1;
+          
+          if (start >= 0 && start < totalSize && end >= start && end < totalSize) {
+            const rangeData = data.slice(start, end + 1);
+            return {
+              status: 206,
+              headers: {
+                'Content-Type': 'application/octet-stream',
+                'Content-Length': rangeData.length.toString(),
+                'Content-Range': `bytes ${start}-${end}/${totalSize}`,
+                'Accept-Ranges': 'bytes',
+              },
+              body: rangeData,
+            };
+          }
+        }
+      }
 
       return {
         status: 200,
         headers: {
           'Content-Type': 'application/octet-stream',
           'Content-Length': data.length.toString(),
+          'Accept-Ranges': 'bytes',
         },
         body: data,
       };
