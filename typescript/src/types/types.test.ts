@@ -75,7 +75,7 @@ describe('Types Module', () => {
     });
 
     it('should define URI_PROTOCOL_NAME', () => {
-      expect(URI_PROTOCOL_NAME).toBe('mau');
+      expect(URI_PROTOCOL_NAME).toBe('https');
     });
   });
 });
