@@ -277,7 +277,7 @@ export class Server {
       const contentDir = this.account.getContentDir();
       const filePath = this.storage.join(contentDir, fileName);
       const versionDir = `${filePath}.versions`;
-      const versionPath = this.storage.join(versionDir, versionHash);
+      const versionPath = this.storage.join(versionDir, `${versionHash}.pgp`);
 
       if (!(await this.storage.exists(versionPath))) {
         return this.notFound();
