@@ -46,19 +46,29 @@ func main() {
 		initCmd := flag.NewFlagSet("init", flag.ExitOnError)
 		name := initCmd.String("name", "", "name")
 		email := initCmd.String("email", "", "email")
+		passphrase := initCmd.String("passphrase", "", "passphrase (if empty, prompt interactively)")
 		if err := initCmd.Parse(os.Args[2:]); err != nil {
 			log.Fatalf("Failed to parse init flags: %v", err)
 		}
 
-		passphrase := getPasswordFunc()
+		pass := *passphrase
+		if pass == "" {
+			pass = getPasswordFunc()
+		}
 
 		fmt.Println("Initializing account...")
-		_, err := NewAccount(wd, *name, *email, passphrase)
+		_, err := NewAccount(wd, *name, *email, pass)
 		raise(err)
 		fmt.Println("Done")
 
 	case "show":
-		account := getAccount()
+		showCmd := flag.NewFlagSet("show", flag.ExitOnError)
+		passphrase := showCmd.String("passphrase", "", "passphrase (if empty, prompt interactively)")
+		if err := showCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatalf("Failed to parse show flags: %v", err)
+		}
+
+		account := getAccountWithPassphrase(*passphrase)
 
 		fmt.Println("Name: ", account.Name())
 		fmt.Println("Email: ", account.Email())
@@ -335,22 +345,29 @@ func main() {
 		fmt.Println("Deleted", f.Name())
 
 	case "serve":
-		account := getAccount()
+		serveCmd := flag.NewFlagSet("serve", flag.ExitOnError)
+		passphrase := serveCmd.String("passphrase", "", "passphrase (if empty, prompt interactively)")
+		port := serveCmd.String("port", "0", "port to listen on (0 for random)")
+		if err := serveCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatalf("Failed to parse serve flags: %v", err)
+		}
+
+		account := getAccountWithPassphrase(*passphrase)
 		server, err := account.Server(nil)
 		raise(err)
 		if server == nil {
 			log.Fatal("Failed to create server")
 		}
 
-		listener, err := ListenTCP(":0")
+		listener, err := ListenTCP(":" + *port)
 		raise(err)
 		if listener == nil {
 			log.Fatal("Failed to create TCP listener")
 		}
 
-		port := listener.Addr().(*net.TCPAddr).Port
+		portNum := listener.Addr().(*net.TCPAddr).Port
 		fmt.Println("Account: ", account.Name(), account.Fingerprint())
-		fmt.Println("Using port:", port)
+		fmt.Println("Using port:", portNum)
 
 		if err := server.Serve(listener, ""); err != nil {
 			log.Fatalf("Server error: %v", err)
@@ -411,8 +428,16 @@ func main() {
 }
 
 func getAccount() *Account {
+	return getAccountWithPassphrase("")
+}
+
+func getAccountWithPassphrase(passphrase string) *Account {
 	wd, _ := os.Getwd()
-	account, err := OpenAccount(wd, getPasswordFunc())
+	pass := passphrase
+	if pass == "" {
+		pass = getPasswordFunc()
+	}
+	account, err := OpenAccount(wd, pass)
 	raise(err)
 	if account == nil {
 		log.Fatal("Failed to open account")

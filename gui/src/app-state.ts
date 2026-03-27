@@ -3,6 +3,7 @@ import { message } from 'antd';
 import type { Account } from '@mau-network/mau';
 import { AccountManager } from './account/manager';
 import { StatusStoreManager } from './status/store';
+import { getNetworkConfig } from './config/network';
 import type { StatusPost } from './types/index';
 
 interface AppState {
@@ -15,7 +16,7 @@ interface AppState {
 }
 
 export function useAppState(): AppState {
-  const [accountManager] = useState(() => AccountManager.create());
+  const [accountManager] = useState(() => AccountManager.create(getNetworkConfig()));
   const [account, setAccount] = useState<Account | null>(null);
   const [statusStore, setStatusStore] = useState<StatusStoreManager | null>(null);
   const [posts, setPosts] = useState<StatusPost[]>([]);

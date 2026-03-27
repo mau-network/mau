@@ -1,4 +1,4 @@
-import { Account, File } from '@mau-network/mau';
+import { Account } from '@mau-network/mau';
 import type { StatusPost } from '../types/index';
 import { v4 as uuidv4 } from 'uuid';
 

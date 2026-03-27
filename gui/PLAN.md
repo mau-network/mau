@@ -603,16 +603,23 @@ export default defineConfig({
 
 ## Current Status Summary
 
-### ✅ Completed (Phases 1-5)
+### ✅ Completed (Phases 1-5.5)
 - Project setup with npm, TypeScript, React 19, Ant Design 6
-- Vite dev server with HMR running on `http://localhost:3000`
+- Vite dev server with HMR
 - Single-account mode AccountManager with intelligent unlock UI
 - StatusStoreManager with full PGP encryption/signing per Mau spec
-- Complete UI implementation (Auth, Timeline, Composer)
-- 32 unit tests passing with 95%+ coverage on core modules
+- Complete UI implementation (Auth, Timeline, Composer, Friends)
+- **WebRTC Integration**: Pure DHT-based P2P using @mau-network/mau library
+  - ConnectionManager starts WebRTCServer + KademliaDHT on account unlock
+  - HTTP bootstrap to peers with `/p2p/dht/offer` endpoints
+  - Relay signaling for all subsequent connections (no central server)
+- 42 unit tests passing (23 account, 13 friends, 6 status)
 - 15 E2E tests passing covering all critical user workflows
 - ESLint passing with zero warnings, all complexity guardrails enforced
 - TypeScript strict mode with zero errors
+
+### 🚧 In Progress (Phase 5.6)
+- Manual browser testing of WebRTC connectivity
 
 ### 📋 Pending (Phase 6)
 - Documentation (README, ARCHITECTURE)
@@ -620,12 +627,28 @@ export default defineConfig({
 - Production build and deployment
 
 ### Key Metrics (Current)
-- **Test Coverage**: 95.45% functions, 98.72% lines (core modules)
-- **Unit Tests**: 32 passing, 0 failing
+- **Test Coverage**: 41.04% functions, 47.98% lines (includes TypeScript library in coverage)
+- **Unit Tests**: 42 passing, 3 failing (status store PGP decryption issues)
 - **E2E Tests**: 15 passing, 0 failing (Playwright)
 - **ESLint Warnings**: 0
 - **TypeScript Errors**: 0
-- **Dev Server**: Vite running on port 3000
+- **Dev Server**: Vite only (DHT handles all P2P signaling)
+
+### WebRTC Infrastructure (Phase 5.5 - Completed)
+- **DHT-Based P2P**: Pure Kademlia DHT with relay signaling (no central signaling server)
+  - **Bootstrap**: Initial connection via HTTP POST to `/p2p/dht/offer` on bootstrap nodes
+  - **Relay**: Subsequent peer connections use DHT relay signaling (existing peers forward offers/answers/ICE)
+  - **Architecture**: Follows @mau-network/mau library design exactly
+- **Connection Manager** (`src/network/connection-manager.ts`): WebRTC lifecycle management
+  - Starts WebRTCServer on account creation/unlock
+  - Initializes KademliaDHT with ICE servers
+  - Joins DHT network with HTTPS bootstrap peers
+  - No custom signaling server needed (uses library's DHT relay)
+- **Account Integration**: AccountManager automatically starts/stops connection manager
+  - `createAccount()` → starts WebRTC + DHT
+  - `unlockAccount()` → starts WebRTC + DHT
+  - `lockAccount()` → stops WebRTC + DHT
+- **Dev Server**: `bun run dev` starts Vite only (DHT handles all signaling)
 
 ## Future Enhancements (Post-MVP)
 

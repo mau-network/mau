@@ -1,5 +1,7 @@
 import { Account, BrowserStorage } from '@mau-network/mau';
 import type { AccountState } from '../types/index';
+import { ConnectionManager } from '../network/connection-manager';
+import type { ConnectionManagerConfig } from '../network/connection-manager';
 
 const ACCOUNT_KEY = 'mau:account';
 const ACCOUNT_DIR = 'mau:account';
@@ -7,14 +9,16 @@ const ACCOUNT_DIR = 'mau:account';
 export class AccountManager {
   private storage: BrowserStorage;
   private currentAccount: Account | null = null;
+  private connectionManager: ConnectionManager;
 
-  private constructor(storage: BrowserStorage) {
+  private constructor(storage: BrowserStorage, connectionConfig?: ConnectionManagerConfig) {
     this.storage = storage;
+    this.connectionManager = new ConnectionManager(connectionConfig);
   }
 
-  static async create(): Promise<AccountManager> {
+  static async create(connectionConfig?: ConnectionManagerConfig): Promise<AccountManager> {
     const storage = await BrowserStorage.create();
-    return new AccountManager(storage);
+    return new AccountManager(storage, connectionConfig);
   }
 
   async createAccount(name: string, email: string, passphrase: string): Promise<Account> {
@@ -32,6 +36,9 @@ export class AccountManager {
     await this.saveAccountState(account);
     this.currentAccount = account;
 
+    // Start WebRTC connections
+    await this.connectionManager.start(account);
+
     return account;
   }
 
@@ -47,6 +54,9 @@ export class AccountManager {
     await this.updateLastUnlocked();
     this.currentAccount = account;
 
+    // Start WebRTC connections
+    await this.connectionManager.start(account);
+
     return account;
   }
 
@@ -61,6 +71,19 @@ export class AccountManager {
 
   getCurrentAccount(): Account | null {
     return this.currentAccount;
+  }
+
+  async lockAccount(): Promise<void> {
+    if (!this.currentAccount) {
+      throw new Error('No account unlocked');
+    }
+
+    await this.connectionManager.stop();
+    this.currentAccount = null;
+  }
+
+  getConnectionManager(): ConnectionManager {
+    return this.connectionManager;
   }
 
   async exportPublicKey(): Promise<string> {

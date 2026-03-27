@@ -5,7 +5,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"bun run dev:peer\" \"bun run dev:gui\"",
+    "dev:peer": "./dev-server.sh",
+    "dev:gui": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "test": "bun test --coverage src",
@@ -34,6 +36,7 @@
     "@typescript-eslint/eslint-plugin": "^8.57.2",
     "@typescript-eslint/parser": "^8.57.2",
     "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
     "eslint": "^10.1.0",
     "fake-indexeddb": "^6.2.5",
     "husky": "^9.1.7",
