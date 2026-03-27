@@ -11,3 +11,4 @@ gui/mau-gui-poc
 *.out
 coverage*.out
 *.prof
+/node_modules/
