@@ -331,6 +331,33 @@ bun test --coverage
   - [x] Multi-post timeline rendering (5 posts with order verification)
   - [x] 15 E2E tests passing across 5 test files
 
+### Phase 5.5: Friend Management ✅ COMPLETE
+- [x] Friend management in AccountManager
+  - [x] exportPublicKey() - Export user's public key as armored string
+  - [x] addFriend(publicKeyArmor) - Import and add friend to account
+  - [x] removeFriend(fingerprint) - Remove friend by fingerprint
+  - [x] listFriends() - List all friends with metadata (name, email, fingerprint)
+- [x] Friends UI component (FriendsPage)
+  - [x] Display user's public key with copy button
+  - [x] Friends list with name, email, fingerprint
+  - [x] Add friend modal (paste or upload .pgp file)
+  - [x] Remove friend with confirmation dialog
+  - [x] Sidebar navigation between Feed and Friends pages
+- [x] Unit tests for friend management
+  - [x] 13 unit tests passing (manager-friends.test.ts)
+  - [x] Test coverage for all friend operations
+  - [x] Persistence tests across account unlock
+- [x] E2E tests for friends workflow
+  - [x] 8 E2E tests passing (friends.spec.ts)
+  - [x] Display and copy public key
+  - [x] Add friend with pasted key
+  - [x] Remove friend with confirmation
+  - [x] Navigation between pages
+  - [x] Error handling for invalid keys
+- [x] Integration with @mau-network/mau Account class
+  - [x] All operations delegate to Account.addFriend(), Account.removeFriend(), etc.
+  - [x] AccountManager acts as thin wrapper with UI-friendly formatting
+
 ### Phase 6: Documentation & Deployment
 - [ ] Write user documentation (README.md)
 - [ ] Update ARCHITECTURE.md
@@ -656,6 +683,6 @@ export default defineConfig({
 
 ---
 
-**Document Version**: 2.0  
+**Document Version**: 2.1  
 **Last Updated**: 2026-03-27  
-**Status**: Phase 1-4 Complete | Phase 5 In Progress
+**Status**: Phase 1-5.5 Complete | Phase 6 Pending

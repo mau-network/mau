@@ -63,6 +63,72 @@ export class AccountManager {
     return this.currentAccount;
   }
 
+  async exportPublicKey(): Promise<string> {
+    if (!this.currentAccount) {
+      throw new Error('No account unlocked');
+    }
+    
+    // Use the Account's internal method to get public key object
+    const publicKey = this.currentAccount.getPublicKeyObject();
+    
+    // Serialize to armored format
+    return publicKey.armor();
+  }
+
+  async addFriend(publicKeyArmor: string): Promise<{ fingerprint: string; name: string; email: string }> {
+    if (!this.currentAccount) {
+      throw new Error('No account unlocked');
+    }
+
+    // Add to account (Account.addFriend handles parsing and storage)
+    const fingerprint = await this.currentAccount.addFriend(publicKeyArmor);
+    
+    // Retrieve the stored public key to extract metadata
+    const publicKey = this.currentAccount.getFriendKey(fingerprint);
+    
+    if (!publicKey) {
+      throw new Error('Failed to retrieve added friend');
+    }
+    
+    const user = publicKey.users[0];
+    const name = user?.userID?.name || 'Unknown';
+    const email = user?.userID?.email || '';
+    
+    return { fingerprint, name, email };
+  }
+
+  async removeFriend(fingerprint: string): Promise<void> {
+    if (!this.currentAccount) {
+      throw new Error('No account unlocked');
+    }
+    
+    await this.currentAccount.removeFriend(fingerprint);
+  }
+
+  async listFriends(): Promise<Array<{ fingerprint: string; name: string; email: string }>> {
+    if (!this.currentAccount) {
+      throw new Error('No account unlocked');
+    }
+
+    const fingerprints = this.currentAccount.getFriends();
+    const friends: Array<{ fingerprint: string; name: string; email: string }> = [];
+
+    for (const fingerprint of fingerprints) {
+      const publicKey = this.currentAccount.getFriendKey(fingerprint);
+      
+      if (publicKey) {
+        const user = publicKey.users[0];
+        friends.push({
+          fingerprint,
+          name: user?.userID?.name || 'Unknown',
+          email: user?.userID?.email || '',
+        });
+      }
+    }
+
+    return friends;
+  }
+
   private async deleteAccount(): Promise<void> {
     try {
       // Delete account state
