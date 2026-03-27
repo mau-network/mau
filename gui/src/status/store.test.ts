@@ -27,7 +27,8 @@ describe('StatusStoreManager', () => {
       expect(post.id).toBeDefined();
       expect(post.content).toBe('Hello, world!');
       expect(post.createdAt).toBeGreaterThan(0);
-      expect(post.signature).toBeDefined();
+      expect(post.fileName).toBeDefined();
+      expect(post.fileName).toMatch(/^status-.*\.pgp$/);
     });
 
     test('should reject empty content', async () => {
