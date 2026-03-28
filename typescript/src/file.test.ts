@@ -83,4 +83,19 @@ describe('File', () => {
     files = await account.listFiles();
     expect(files.length).toBe(0);
   });
+
+  it('should create version files with .pgp extension', async () => {
+    const file = await account.createFile('versioned.txt');
+    
+    await file.writeText('Version 1');
+    await file.writeText('Version 2');
+
+    // Get versions through the API
+    const versions = await file.getVersions();
+    expect(versions.length).toBe(1); // One version
+
+    // Verify the version file path has .pgp extension
+    const versionPath = versions[0].getPath();
+    expect(versionPath.endsWith('.pgp')).toBe(true);
+  });
 });

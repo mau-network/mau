@@ -183,7 +183,8 @@ export class File {
     const versionDir = `${this.filePath}.versions`;
     await this.storage.mkdir(versionDir);
 
-    const versionPath = this.storage.join(versionDir, checksum);
+    // Per spec: version files should have .pgp extension
+    const versionPath = this.storage.join(versionDir, `${checksum}.pgp`);
     if (!(await this.storage.exists(versionPath))) {
       await this.storage.writeFile(versionPath, currentData);
     }
