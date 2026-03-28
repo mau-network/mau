@@ -12,12 +12,19 @@ import { FriendsPage } from './friends';
 const { Header, Content, Sider } = Layout;
 const { Title } = Typography;
 
-export function AppHeader(): React.ReactElement {
+export function AppHeader({ account }: { account: Account | null }): React.ReactElement {
   return (
     <Header style={{ background: '#fff', padding: '0 24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-      <Title level={3} style={{ margin: '16px 0' }}>
-        Mau Status
-      </Title>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Title level={3} style={{ margin: '16px 0' }}>
+          Mau Status
+        </Title>
+        {account && (
+          <Typography.Text type="secondary" style={{ fontSize: '12px', fontFamily: 'monospace' }}>
+            {account.getFingerprint().slice(0, 16)}...
+          </Typography.Text>
+        )}
+      </div>
     </Header>
   );
 }

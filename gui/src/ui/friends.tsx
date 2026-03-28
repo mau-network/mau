@@ -22,6 +22,7 @@ export function FriendsPage({ accountManager }: FriendsPageProps): React.ReactEl
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [publicKeyInput, setPublicKeyInput] = useState('');
   const [myPublicKey, setMyPublicKey] = useState<string>('');
+  const [myFingerprint, setMyFingerprint] = useState<string>('');
 
   useEffect(() => {
     void loadFriends();
@@ -44,6 +45,12 @@ export function FriendsPage({ accountManager }: FriendsPageProps): React.ReactEl
     try {
       const key = await accountManager.exportPublicKey();
       setMyPublicKey(key);
+      
+      // Get fingerprint from current account
+      const account = accountManager.getCurrentAccount();
+      if (account) {
+        setMyFingerprint(account.getFingerprint());
+      }
     } catch (error) {
       console.error('Failed to export public key:', error);
     }
@@ -102,21 +109,28 @@ export function FriendsPage({ accountManager }: FriendsPageProps): React.ReactEl
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       {/* My Public Key Section */}
       <Card title="My Public Key">
-        <Text type="secondary">Share this key with others so they can add you as a friend</Text>
-        <TextArea
-          value={myPublicKey}
-          readOnly
-          rows={6}
-          style={{ marginTop: 12, fontFamily: 'monospace', fontSize: 11 }}
-        />
-        <Button
-          type="primary"
-          icon={<CopyOutlined />}
-          onClick={copyMyPublicKey}
-          style={{ marginTop: 12 }}
-        >
-          Copy Public Key
-        </Button>
+        <Space direction="vertical" size="small" style={{ width: '100%' }}>
+          <Text type="secondary">Share this key with others so they can add you as a friend</Text>
+          {myFingerprint && (
+            <Text strong style={{ fontFamily: 'monospace', fontSize: 12 }}>
+              Fingerprint: {myFingerprint}
+            </Text>
+          )}
+          <TextArea
+            value={myPublicKey}
+            readOnly
+            rows={6}
+            style={{ marginTop: 8, fontFamily: 'monospace', fontSize: 11 }}
+          />
+          <Button
+            type="primary"
+            icon={<CopyOutlined />}
+            onClick={copyMyPublicKey}
+            style={{ marginTop: 8 }}
+          >
+            Copy Public Key
+          </Button>
+        </Space>
       </Card>
 
       <Divider />

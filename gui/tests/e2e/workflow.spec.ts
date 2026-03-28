@@ -78,6 +78,9 @@ test.describe('Complete User Workflows', () => {
     await page.getByRole('button', { name: 'Post' }).click();
     await expect(page.getByText('My persistent post')).toBeVisible({ timeout: 5000 });
 
+    // Wait for status to be fully persisted to IndexedDB
+    await page.waitForTimeout(1000);
+
     // Step 2: Reload page to simulate app restart
     await page.reload();
     await page.waitForLoadState('networkidle');

@@ -9,7 +9,7 @@ export function App(): React.ReactElement {
   return (
     <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm }}>
       <Layout style={{ minHeight: '100vh' }}>
-        <AppHeader />
+        <AppHeader account={account} />
         <AppContent
           account={account}
           accountManager={accountManager}

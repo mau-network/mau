@@ -36,8 +36,10 @@ export class AccountManager {
     await this.saveAccountState(account);
     this.currentAccount = account;
 
-    // Start WebRTC connections
-    await this.connectionManager.start(account);
+    // Start WebRTC connections in background (non-blocking)
+    this.connectionManager.start(account).catch(err => {
+      console.error('Failed to start connection manager:', err);
+    });
 
     return account;
   }
@@ -54,8 +56,10 @@ export class AccountManager {
     await this.updateLastUnlocked();
     this.currentAccount = account;
 
-    // Start WebRTC connections
-    await this.connectionManager.start(account);
+    // Start WebRTC connections in background (non-blocking)
+    this.connectionManager.start(account).catch(err => {
+      console.error('Failed to start connection manager:', err);
+    });
 
     return account;
   }

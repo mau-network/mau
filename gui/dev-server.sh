@@ -1,59 +1,43 @@
 #!/usr/bin/env bash
-# Development Bootstrap Peer
-#
-# Starts a Mau Go server that acts as a bootstrap peer for the GUI during development.
-# This server exposes /p2p/<fingerprint> endpoints and handles DHT bootstrap via /p2p/dht/offer.
+# Mau Development Bootstrap Server (Node.js)
+# This script starts the Node.js WebRTC bootstrap server for development
 
 set -e
 
-PEER_DIR=".dev-peer"
-PEER_BIN=".dev-peer-bin"
-PASSPHRASE="dev-server-pass-12345"
-PORT="8081"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TYPESCRIPT_DIR="$(cd "$SCRIPT_DIR/../typescript" && pwd)"
+SERVER_SCRIPT="$TYPESCRIPT_DIR/bootstrap-server.mjs"
+PORT=8444
 
-echo "🚀 Starting Mau Development Bootstrap Peer..."
-echo ""
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-# Build the mau binary if it doesn't exist
-if [ ! -f "$PEER_BIN" ]; then
-	echo "📦 Building mau CLI..."
-	cd .. && go build -o gui/$PEER_BIN ./cmd/mau && cd gui
-	echo "✅ Built mau CLI"
+echo -e "${BLUE}🚀 Starting Mau Development Bootstrap Peer (Node.js)...${NC}\n"
+
+# Check if TypeScript is built
+if [ ! -d "$TYPESCRIPT_DIR/dist" ]; then
+	echo -e "${YELLOW}📦 TypeScript library not built, building now...${NC}"
+	cd "$TYPESCRIPT_DIR"
+	npm run build
 	echo ""
 fi
 
-# Create account if it doesn't exist
-if [ ! -d "$PEER_DIR" ]; then
-	echo "🔑 Creating new peer account..."
-	mkdir -p "$PEER_DIR"
-	cd "$PEER_DIR"
-	../$PEER_BIN init -name "Dev Bootstrap Peer" -email "dev@mau.local" -passphrase "$PASSPHRASE"
-	cd ..
-	echo "✅ Created peer account"
-	echo ""
+# Check if Node.js is available
+if ! command -v node &>/dev/null; then
+	echo -e "${YELLOW}❌ Node.js not found. Please install Node.js ≥18${NC}"
+	exit 1
 fi
 
-# Get fingerprint
-cd "$PEER_DIR"
-FINGERPRINT=$(../$PEER_BIN show -passphrase "$PASSPHRASE" | grep "Fingerprint:" | awk '{print $2}')
-cd ..
+# Check Node.js version
+NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
+if [ "$NODE_VERSION" -lt 18 ]; then
+	echo -e "${YELLOW}❌ Node.js version 18 or higher required (found: $(node --version))${NC}"
+	exit 1
+fi
 
-echo "✨ Development bootstrap peer starting!"
-echo ""
-echo "📌 Fingerprint: $FINGERPRINT"
-echo ""
-echo "📍 Endpoints:"
-echo "   http://localhost:$PORT/p2p/$FINGERPRINT - File list"
-echo "   POST http://localhost:$PORT/p2p/dht/offer - DHT bootstrap"
-echo ""
-echo "🔗 To configure the GUI, add this to .env:"
-echo "   VITE_DEV_PEER_FINGERPRINT=$FINGERPRINT"
-echo "   VITE_DEV_PEER_ADDRESS=localhost:$PORT"
-echo ""
-echo "💡 The GUI will automatically use this peer for DHT bootstrap"
-echo "⏳ Starting server..."
-echo ""
-
-# Start the server (runs in the account directory, which is PEER_DIR)
-cd "$PEER_DIR"
-exec ../$PEER_BIN serve -passphrase "$PASSPHRASE" -port "$PORT"
+# Start the bootstrap server
+cd "$TYPESCRIPT_DIR"
+exec node "$SERVER_SCRIPT" --port "$PORT"

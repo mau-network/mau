@@ -12,64 +12,63 @@ Browser-based GUI for the Mau P2P network. Built with React, TypeScript, and the
 
 ## Quick Start
 
-### 1. Install Dependencies
+### Start Development Server
+
+The easiest way to get started:
 
 ```bash
+# Install dependencies
 bun install
+
+# Start both bootstrap peer and GUI
+npm run dev
 ```
 
-### 2. Start Development Bootstrap Peer
+This automatically:
+1. Starts Node.js bootstrap peer (WebRTC server)
+2. Starts GUI dev server
+3. Opens browser at http://localhost:5173
 
-The GUI needs a bootstrap peer to join the DHT network. For development, run a local Go server:
+The bootstrap peer uses the TypeScript library and runs in Node.js - no Go compilation needed!
 
+### Manual Setup (Advanced)
+
+If you want to run components separately:
+
+**Terminal 1: Bootstrap Peer**
 ```bash
-# Terminal 1: Start the bootstrap peer
-bun run dev:peer
+cd ../typescript
+node bootstrap-server.mjs --port 8444
 ```
 
-The script will output a fingerprint like:
-```
-📌 Fingerprint: 1e7017fb8ce8865504136f718f508e19906bf729
-```
-
-### 3. Configure Bootstrap Peer
-
-Copy the fingerprint and add it to `.env` (create from `.env.example`):
-
+**Terminal 2: GUI**
 ```bash
-cp .env.example .env
-# Edit .env and set:
-VITE_DEV_PEER_FINGERPRINT=1e7017fb8ce8865504136f718f508e19906bf729
-VITE_DEV_PEER_ADDRESS=localhost:8081
-```
-
-### 4. Start GUI Development Server
-
-```bash
-# Terminal 2: Start the GUI
+cd gui
 bun run dev:gui
-
-# Or run both together:
-bun run dev
 ```
-
-The GUI will be available at `http://localhost:5173`
 
 ## Architecture
 
 ### P2P Connectivity
 
-The GUI uses a **pure DHT architecture** with no centralized signaling server:
+The GUI uses **Node.js WebRTC bootstrap server** (pure TypeScript) for DHT network join:
 
-1. **Bootstrap**: First connection via HTTP POST to bootstrap peer's `/p2p/dht/offer`
-2. **Relay**: Subsequent connections use DHT relay signaling through existing peers
-3. **WebRTC**: Peer-to-peer data channels for file sharing and communication
+1. **Bootstrap**: Browser connects to Node.js server via WebSocket signaling
+2. **WebRTC**: Establishes data channel with server
+3. **DHT**: Server adds browser to DHT routing table
+4. **Discovery**: Browser queries server for other peers
+5. **Relay**: Browser connects to other peers via DHT relay signaling
 
 ```
-Browser (GUI) → HTTP Bootstrap → Go Server (dev peer)
-              → WebRTC DHT Join
-              → Relay Signaling → Other Peers
+Browser A ──┐
+            ├──> WebSocket ──> Node.js Bootstrap Server
+Browser B ──┘                  (TypeScript Library)
+                               ├─ WebRTCServer
+                               ├─ KademliaDHT
+                               └─ Tracks all peers
 ```
+
+**Why Node.js?** Instead of implementing WebRTC in Go, we reuse the existing TypeScript library. The bootstrap server is literally just another Mau peer running in Node.js!
 
 ### Components
 
@@ -82,7 +81,7 @@ Browser (GUI) → HTTP Bootstrap → Go Server (dev peer)
 
 Bootstrap peers are configured in `src/config/network.ts`:
 
-- **Development**: Uses local Go server via environment variables
+- **Development**: Automatically configured by `npm run dev`
 - **Production**: Configurable public bootstrap peers
 
 ## Development
@@ -135,10 +134,17 @@ The development bootstrap peer (`dev-server.sh`) does the following:
 
 1. Builds the Go mau CLI binary (if not exists)
 2. Creates a dev account in `.dev-peer/` (if not exists)
-3. Starts the server on port 8081
+3. Starts two servers:
+   - **HTTPS Server** (port 8443): mTLS file serving for Go clients
+   - **WebSocket Signaling** (port 8444): Browser-compatible signaling
 4. Exposes:
-   - `GET /p2p/{fingerprint}` - File list endpoint
-   - `POST /p2p/dht/offer` - DHT bootstrap endpoint
+   - `GET /p2p/{fingerprint}` - File list endpoint (HTTPS, mTLS)
+   - `WS ws://localhost:8444` - WebSocket signaling for DHT bootstrap
+
+**Why two servers?**
+- Go clients use HTTPS with mTLS for authenticated connections
+- Browser clients use WebSocket for signaling (browsers can't do mTLS programmatically)
+- After bootstrap, all clients use WebRTC data channels for P2P communication
 
 The peer data (`.dev-peer/` directory and `.dev-peer-bin` binary) are git-ignored.
 
@@ -158,8 +164,8 @@ bun run test:e2e       # Terminal 2
 All environment variables must be prefixed with `VITE_` to be exposed to the browser:
 
 ```bash
-VITE_DEV_PEER_FINGERPRINT=<fingerprint>  # Dev bootstrap peer fingerprint
-VITE_DEV_PEER_ADDRESS=localhost:8081     # Dev bootstrap peer address
+VITE_DEV_PEER_FINGERPRINT=<fingerprint>      # Dev bootstrap peer fingerprint
+VITE_DEV_PEER_WS_ADDRESS=localhost:8444      # WebSocket signaling URL
 ```
 
 See `.env.example` for the complete list.
@@ -176,7 +182,15 @@ Output will be in `dist/` directory.
 
 ### Bootstrap Peers
 
-For production, configure public bootstrap peers in `src/config/network.ts`:
+For production, configure public bootstrap peers in `src/config/network.ts` using WebSocket URLs:
+
+```typescript
+const PRODUCTION_BOOTSTRAP_PEERS: Peer[] = [
+  { fingerprint: 'abc123...', address: 'wss://bootstrap.mau.network:443' }
+];
+```
+
+**Important:** Use `wss://` (WebSocket Secure) for production to ensure encrypted signaling.
 
 ```typescript
 const PRODUCTION_BOOTSTRAP_PEERS: Peer[] = [
@@ -188,14 +202,18 @@ const PRODUCTION_BOOTSTRAP_PEERS: Peer[] = [
 
 ### Bootstrap peer won't start
 
-- **Port 8081 in use**: Change `PORT` in `dev-server.sh`
+- **Ports in use**: Change `HTTPS_PORT` or `WS_PORT` in `dev-server.sh` (defaults: 8443, 8444)
 - **Build fails**: Run `go build -o gui/.dev-peer-bin ./cmd/mau` from repo root
+- **Permission denied**: Run `chmod +x dev-server.sh`
 
 ### GUI can't connect to DHT
 
-- Check `.env` has correct fingerprint from dev peer output
+- Check `.env` has correct fingerprint and WebSocket address from dev peer output
 - Verify dev peer is running (`bun run dev:peer`)
-- Check browser console for connection logs
+- Check browser console for WebSocket connection logs
+- Look for: `[DHT] WebSocket connected, registering fingerprint...`
+- **WebSocket connection failed**: Ensure port 8444 is not blocked by firewall
+- **CORS errors**: The signaling server allows all origins in development
 
 ### Tests fail
 

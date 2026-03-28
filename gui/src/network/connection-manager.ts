@@ -66,7 +66,7 @@ export class ConnectionManager {
     // Join DHT network with bootstrap peers if available
     if (this.config.bootstrapPeers.length > 0) {
       console.log(`[ConnectionManager] Joining DHT with ${this.config.bootstrapPeers.length} bootstrap peer(s)...`);
-      console.log('[ConnectionManager] Bootstrap uses HTTP POST to /p2p/dht/offer');
+      console.log('[ConnectionManager] Bootstrap uses WebSocket signaling (browser) or HTTPS with mTLS (Go)');
       console.log('[ConnectionManager] Subsequent connections use DHT relay signaling');
       try {
         await this.dht.join(this.config.bootstrapPeers);

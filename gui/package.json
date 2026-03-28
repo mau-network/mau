@@ -5,8 +5,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"bun run dev:peer\" \"bun run dev:gui\"",
+    "dev": "./dev.sh",
     "dev:peer": "./dev-server.sh",
+    "dev:peer:wait": "./dev-server-wait.sh",
     "dev:gui": "vite",
     "build": "vite build",
     "preview": "vite preview",

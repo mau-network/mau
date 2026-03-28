@@ -3,6 +3,8 @@
  * 
  * Bootstrap peers are used for initial DHT network join.
  * During development, a local Go server acts as the bootstrap peer.
+ * 
+ * Browser clients use WebSocket signaling (no mTLS required).
  */
 
 import type { Peer } from '@mau-network/mau';
@@ -15,19 +17,22 @@ import type { ConnectionManagerConfig } from '../network/connection-manager';
  * Run `bun run dev:peer` to start the bootstrap peer and see the fingerprint.
  * 
  * IMPORTANT: The fingerprint below is a placeholder. Update it with the actual
- * fingerprint from your dev server, or set VITE_DEV_PEER_FINGERPRINT in .env
+ * fingerprint from your dev server, or set environment variables in .env:
+ * - VITE_DEV_PEER_FINGERPRINT: Peer's PGP fingerprint
+ * - VITE_DEV_PEER_WS_ADDRESS: WebSocket URL (e.g., localhost:8444)
  */
 const DEV_BOOTSTRAP_FINGERPRINT = import.meta.env.VITE_DEV_PEER_FINGERPRINT || '';
-const DEV_BOOTSTRAP_ADDRESS = import.meta.env.VITE_DEV_PEER_ADDRESS || 'localhost:8081';
+const DEV_BOOTSTRAP_WS_ADDRESS = import.meta.env.VITE_DEV_PEER_WS_ADDRESS || 'localhost:8444';
 
 /**
  * Production bootstrap peers
  * 
  * These are public bootstrap peers that help GUI clients join the DHT network.
  * Add production bootstrap peers here when available.
+ * Use WebSocket URLs (ws:// or wss://) for browser compatibility.
  */
 const PRODUCTION_BOOTSTRAP_PEERS: Peer[] = [
-  // Example: { fingerprint: 'abc123...', address: 'bootstrap.mau.network:443' }
+  // Example: { fingerprint: 'abc123...', address: 'wss://bootstrap.mau.network:443' }
 ];
 
 /**
@@ -39,17 +44,25 @@ export function getNetworkConfig(): ConnectionManagerConfig {
   const bootstrapPeers: Peer[] = [];
   
   if (isDevelopment && DEV_BOOTSTRAP_FINGERPRINT) {
-    console.log('[NetworkConfig] Using development bootstrap peer');
+    const wsUrl = DEV_BOOTSTRAP_WS_ADDRESS.startsWith('ws://') || DEV_BOOTSTRAP_WS_ADDRESS.startsWith('wss://')
+      ? DEV_BOOTSTRAP_WS_ADDRESS
+      : `ws://${DEV_BOOTSTRAP_WS_ADDRESS}`;
+    
+    console.log('[NetworkConfig] Using development bootstrap peer (WebSocket)');
+    console.log(`[NetworkConfig] Fingerprint: ${DEV_BOOTSTRAP_FINGERPRINT.slice(0, 16)}...`);
+    console.log(`[NetworkConfig] WebSocket URL: ${wsUrl}`);
+    
     bootstrapPeers.push({
       fingerprint: DEV_BOOTSTRAP_FINGERPRINT,
-      address: DEV_BOOTSTRAP_ADDRESS,
+      address: wsUrl,
     });
   } else if (!isDevelopment) {
     console.log('[NetworkConfig] Using production bootstrap peers');
     bootstrapPeers.push(...PRODUCTION_BOOTSTRAP_PEERS);
   } else {
     console.warn('[NetworkConfig] No bootstrap peers configured');
-    console.warn('[NetworkConfig] Set VITE_DEV_PEER_FINGERPRINT in .env or run dev-server.sh');
+    console.warn('[NetworkConfig] Set VITE_DEV_PEER_FINGERPRINT and VITE_DEV_PEER_WS_ADDRESS in .env');
+    console.warn('[NetworkConfig] Run: bun run dev:peer to start bootstrap peer');
   }
   
   return {

@@ -28,9 +28,43 @@ export function useAppState(): AppState {
         const store = await StatusStoreManager.create(account);
         setStatusStore(store);
         await loadPosts(store);
+        
+        // Expose connection manager and DHT state to window for E2E testing
+        const manager = await accountManager;
+        if (typeof window !== 'undefined') {
+          (window as any).connectionManager = manager.getConnectionManager();
+          (window as any).testGetDHTState = () => {
+            const dht = manager.getConnectionManager().getDHT();
+            if (!dht) return null;
+            
+            // Access internal connection state via reflection
+            // This is for testing only - conns is private but we need to verify connections
+            const connsMap = (dht as any).conns as Map<string, any>;
+            const peers: string[] = [];
+            
+            if (connsMap) {
+              for (const [fingerprint, conn] of connsMap.entries()) {
+                if (conn.ch && conn.ch.readyState === 'open') {
+                  peers.push(fingerprint.slice(0, 16));
+                }
+              }
+            }
+            
+            return {
+              isActive: true,
+              timestamp: Date.now(),
+              connectedPeers: peers,
+              peerCount: peers.length,
+            };
+          };
+          
+          (window as any).testGetAccountFingerprint = () => {
+            return account.getFingerprint();
+          };
+        }
       })();
     }
-  }, [account]);
+  }, [account, accountManager]);
 
   const loadPosts = async (store: StatusStoreManager): Promise<void> => {
     setLoading(true);
