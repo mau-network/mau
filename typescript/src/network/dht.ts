@@ -97,12 +97,14 @@ export class KademliaDHT {
   private readonly maxConnectionAttempts = 5; // Stop retrying after 5 failed attempts
   private readonly localICECandidates: RTCIceCandidate[] = []; // Pre-gathered ICE candidates
   private iceGatheringComplete = false;
+  private joinTime = 0; // Track when DHT joined for uptime calculation
   
   // Peer state tracking for discovery/connection decoupling
   private readonly peerState = new Map<Fingerprint, PeerState>();
   
   private timer: ReturnType<typeof setInterval> | null = null;
   private bootstrapTimer: ReturnType<typeof setInterval> | null = null;
+  private bootstrapActive = false;
 
   constructor(account: Account, iceServers: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }]) {
     this.account = account;
@@ -193,8 +195,67 @@ export class KademliaDHT {
       return;
     }
 
-    // Run lookup for our own fingerprint to discover peers
-    await this.lookup(this.me());
+    // If routing table is empty, query bootstrap for self to get seed peers
+    if (totalPeers === 0) {
+      await this.lookup(this.me());
+      return;
+    }
+
+    // Otherwise, refresh stale buckets by looking up random targets in their ranges
+    const now = Date.now();
+    for (let i = 0; i < DHT_B; i++) {
+      const bucket = this.buckets[i];
+      
+      // Skip empty buckets or recently refreshed ones
+      if (bucket.peers.length === 0 || now - bucket.lastLookup < DHT_STALL_PERIOD_MS) {
+        continue;
+      }
+      
+      // Generate a random target fingerprint in this bucket's range
+      // Bucket i contains peers with leadingZeros(XOR(peer, me)) == i
+      const target = this.randomFingerprintForBucket(i);
+      await this.lookup(target);
+      
+      // Only refresh one bucket per call to avoid overwhelming the network
+      break;
+    }
+  }
+
+  /**
+   * Generate a random fingerprint that would fall into the specified bucket.
+   * Bucket i contains peers where leadingZeros(XOR(peer, me)) == i.
+   */
+  private randomFingerprintForBucket(bucketIndex: number): Fingerprint {
+    const myBytes = hex20(this.me());
+    const targetBytes = new Uint8Array(20);
+    
+    // Generate random bytes
+    crypto.getRandomValues(targetBytes);
+    
+    // Set the first (bucketIndex) bits to match our fingerprint
+    // Then set bit (bucketIndex) to differ from our fingerprint
+    const bytePos = Math.floor(bucketIndex / 8);
+    const bitPos = bucketIndex % 8;
+    
+    // Copy matching prefix
+    for (let i = 0; i < bytePos; i++) {
+      targetBytes[i] = myBytes[i];
+    }
+    
+    // Set the divergence bit at bucketIndex position
+    if (bytePos < 20) {
+      const mask = 0x80 >> bitPos;
+      
+      // Ensure bits 0..bitPos-1 of this byte match myBytes (the prefix)
+      // and bit bitPos differs (the divergence point)
+      const prefixMask = ~((mask << 1) - 1) & 0xFF;  // bits 0..bitPos-1 = 1
+      targetBytes[bytePos] = (myBytes[bytePos] & prefixMask)           // copy prefix bits
+                           | ((myBytes[bytePos] ^ mask) & mask)         // flip divergence bit
+                           | (targetBytes[bytePos] & ~prefixMask & ~mask);  // keep random low bits
+    }
+    
+    // Convert to hex fingerprint
+    return Array.from(targetBytes).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
   }
 
   /**
@@ -208,6 +269,12 @@ export class KademliaDHT {
     // Scan routing table for peers to connect to
     for (const bucket of this.buckets) {
       for (const peer of bucket.peers) {
+        // Skip self — registerSelf() places our own fingerprint in the routing table so it
+        // appears in find_peer responses, but we must never attempt to connect to ourselves.
+        if (normalizeFingerprint(peer.fingerprint) === this.me()) {
+          continue;
+        }
+
         // Skip if already connected
         if (this.conns.has(peer.fingerprint)) {
           continue;
@@ -251,6 +318,8 @@ export class KademliaDHT {
     // Gather ICE candidates once before any connections
     await this.gatherICECandidates();
     
+    this.joinTime = Date.now();
+    
     await Promise.allSettled(bootstrapPeers.map(p => {
       // Use WebSocket signaling if address starts with 'ws://' or 'wss://'
       if (p.address.startsWith('ws://') || p.address.startsWith('wss://')) {
@@ -267,21 +336,103 @@ export class KademliaDHT {
     // Start aggressive bootstrap discovery (every 3 seconds when we have few peers)
     // This helps when bootstrap peer initially has no other peers to share
     console.log('[DHT] Starting bootstrap discovery timer (every 3s)');
+    this.bootstrapActive = true;
     this.bootstrapTimer = setInterval(() => {
+      // Check if bootstrap is still active
+      if (!this.bootstrapActive) {
+        if (this.bootstrapTimer) {
+          clearInterval(this.bootstrapTimer);
+          this.bootstrapTimer = null;
+        }
+        return;
+      }
+      
       console.log('[DHT] Bootstrap discovery timer fired');
       this.bootstrapDiscovery().catch(err => console.warn('[DHT] Bootstrap discovery error:', err));
     }, 3_000);
   }
 
   stop(): void {
-    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    // Stop bootstrap first
+    this.bootstrapActive = false;
     if (this.bootstrapTimer) { clearInterval(this.bootstrapTimer); this.bootstrapTimer = null; }
+    
+    // Stop periodic refresh
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    
+    // Close all connections
     for (const c of this.conns.values()) { c.ch.close(); c.pc.close(); }
     this.conns.clear();
   }
 
   resolver(): FingerprintResolver {
     return (fpr: Fingerprint) => this.findAddress(fpr);
+  }
+
+  /**
+   * Get DHT statistics and health metrics
+   */
+  stats(): {
+    connected: number;
+    discovered: number;
+    bucketFill: number[];
+    uptime: number;
+    bootstrapActive: boolean;
+  } {
+    const bucketFill = this.buckets.map(b => b.peers.length);
+    const discovered = this.buckets.reduce((sum, b) => sum + b.peers.length, 0);
+    const uptime = this.joinTime > 0 ? Date.now() - this.joinTime : 0;
+    
+    return {
+      connected: this.conns.size,
+      discovered,
+      bucketFill,
+      uptime,
+      bootstrapActive: this.bootstrapActive,
+    };
+  }
+
+  /**
+   * Register the bootstrap node itself in the routing table.
+   * 
+   * This is used by bootstrap servers to ensure they appear in find_peer responses
+   * even before any clients have connected. Without this, the first client gets
+   * zero peers (the "0 peers" bug).
+   * 
+   * Note: Normally nodes don't add themselves to their routing table, but bootstrap
+   * nodes are special - they need to be discoverable before any other peers connect.
+   * 
+   * @param address The address where this node can be reached (e.g., "ws://localhost:8444")
+   */
+  registerSelf(address: string): void {
+    const myFingerprint = this.me();
+    console.log(`[DHT] Registering self in routing table: ${myFingerprint.slice(0, 16)}... at ${address}`);
+    
+    // Create a peer entry for ourselves
+    const selfPeer: Peer = { 
+      fingerprint: myFingerprint, 
+      address 
+    };
+    
+    // Find the appropriate bucket (bucket 0 since XOR distance to self is 0, which has 160 leading zeros)
+    // Actually, all bits match so it goes to the highest bucket (159)
+    // But since we're never going to connect to ourselves, we can just put it in bucket 159
+    const bucketIdx = DHT_B - 1;
+    const bucket = this.buckets[bucketIdx];
+    
+    // Add to bucket if not already present
+    const exists = bucket.peers.find(p => normalizeFingerprint(p.fingerprint) === myFingerprint);
+    if (!exists) {
+      bucket.peers.push(selfPeer);
+      bucket.lastLookup = Date.now();
+      console.log(`[DHT] Self registered in bucket ${bucketIdx} - bootstrap will now appear in find_peer responses`);
+    }
+    
+    // Mark as discovered in peer state
+    const state = this.getPeerState(myFingerprint);
+    state.discovered = true;
+    state.discoveredAt = Date.now();
+    this.setPeerState(myFingerprint, state);
   }
 
   async findAddress(target: Fingerprint): Promise<string | null> {
@@ -482,6 +633,39 @@ export class KademliaDHT {
       if (myFpr < from) {
         // My outbound connection wins - reject this inbound offer
         console.log(`[DHT] Rejecting inbound offer from ${from.slice(0, 16)}... (tie-break: my outbound wins)`);
+        
+        // Set a timeout to verify our outbound connection succeeds
+        // If it doesn't complete within 30s, allow retry
+        setTimeout(() => {
+          if (!this.conns.has(from) && this.connecting.has(from)) {
+            console.log(`[DHT] Tie-break outbound to ${from.slice(0, 16)}... failed to complete, cleaning up`);
+            this.connecting.delete(from);
+            const outbound = this.rout.get(from);
+            if (outbound) {
+              this.rout.delete(from);
+              outbound.pc.close();
+              outbound.reject(new Error('Connection tie-break: outbound timeout'));
+            }
+            
+            // Update peer state to record the failed attempt (if not already counted)
+            // This enables exponential backoff on next retry
+            // Check if attempt was already counted by connectKnownPeers() by comparing timestamps
+            const state = this.getPeerState(from);
+            const now = Date.now();
+            const wasRecentlyIncremented = state.lastAttempt > 0 && (now - state.lastAttempt) < 29_000;
+            
+            if (!wasRecentlyIncremented) {
+              // Attempt not yet counted, increment now
+              state.connectionAttempts++;
+              state.lastAttempt = now;
+              this.setPeerState(from, state);
+              console.log(`[DHT] Tie-break timeout for ${from.slice(0, 16)}... - attempt ${state.connectionAttempts} recorded`);
+            } else {
+              console.log(`[DHT] Tie-break timeout for ${from.slice(0, 16)}... - attempt already counted`);
+            }
+          }
+        }, 30_000);
+        
         return;
       } else {
         // Their outbound connection wins - cancel my outbound attempt and accept this offer
@@ -500,47 +684,73 @@ export class KademliaDHT {
 
     console.log(`[DHT] Received relay offer from ${from.slice(0, 16)}... via ${sender.slice(0, 16)}...`);
 
+    // Validate offer before creating PeerConnection
+    if (!msg.offer || !msg.offer.type || !msg.offer.sdp) {
+      console.error(`[DHT] Invalid offer from ${from.slice(0, 16)}... - missing type or sdp`);
+      return;
+    }
+
     const pc = new RTCPeerConnection({ iceServers: this.ice });
     this.rin.set(from, { pc, queued: [] });
     
-    // Monitor connection state changes
-    let connectionState = 'new';
-    pc.onconnectionstatechange = () => {
-      const newState = pc.connectionState;
-      if (newState !== connectionState) {
-        console.log(`[DHT] Inbound from ${from.slice(0, 16)}... connection state: ${connectionState} → ${newState}`);
-        connectionState = newState;
-      }
-    };
-
-    pc.ondatachannel = (ev): void => { 
-      console.log(`[DHT] Data channel received from ${from.slice(0, 16)}... (state: ${ev.channel.readyState})`);
-      
-      // Monitor channel state changes
-      ev.channel.onopen = () => {
-        console.log(`[DHT] Inbound from ${from.slice(0, 16)}... data channel: opening → open`);
+    try {
+      // Monitor connection state changes
+      let connectionState = 'new';
+      pc.onconnectionstatechange = () => {
+        const newState = pc.connectionState;
+        if (newState !== connectionState) {
+          console.log(`[DHT] Inbound from ${from.slice(0, 16)}... connection state: ${connectionState} → ${newState}`);
+          connectionState = newState;
+        }
       };
-      ev.channel.onerror = (err) => {
-        console.error(`[DHT] Inbound from ${from.slice(0, 16)}... data channel error:`, err);
+
+      pc.ondatachannel = (ev): void => { 
+        console.log(`[DHT] Data channel received from ${from.slice(0, 16)}... (state: ${ev.channel.readyState})`);
+        
+        // Monitor channel state changes
+        ev.channel.onopen = () => {
+          console.log(`[DHT] Inbound from ${from.slice(0, 16)}... data channel: opening → open`);
+        };
+        ev.channel.onerror = (err) => {
+          console.error(`[DHT] Inbound from ${from.slice(0, 16)}... data channel error:`, err);
+        };
+        
+        this.register(pc, ev.channel, from).catch((err): void => {
+          console.error(`[DHT] Inbound from ${from.slice(0, 16)}... registration failed:`, err.message);
+        }); 
       };
       
-      this.register(pc, ev.channel, from).catch((err): void => {
-        console.error(`[DHT] Inbound from ${from.slice(0, 16)}... registration failed:`, err.message);
-      }); 
-    };
-    
-    pc.onicecandidate = (ev): void => {
-      if (ev.candidate) {
-        console.log(`[DHT] Sending ICE candidate to ${from.slice(0, 16)}... via relay`);
-        this.send(sender, { type: 'relay_ice', from: this.account.getFingerprint(), to: msg.from, candidate: ev.candidate });
-      }
-    };
+      pc.onicecandidate = (ev): void => {
+        if (ev.candidate) {
+          console.log(`[DHT] Sending ICE candidate to ${from.slice(0, 16)}... via relay`);
+          this.send(sender, { type: 'relay_ice', from: this.account.getFingerprint(), to: msg.from, candidate: ev.candidate });
+        }
+      };
 
-    await pc.setRemoteDescription(msg.offer);
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    console.log(`[DHT] Sending answer to ${from.slice(0, 16)}... via ${sender.slice(0, 16)}...`);
-    this.send(sender, { type: 'relay_answer', from: this.account.getFingerprint(), to: msg.from, answer });
+      await pc.setRemoteDescription(msg.offer);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      
+      // Apply any queued ICE candidates that arrived early
+      // Must happen AFTER setLocalDescription but BEFORE sending answer
+      // This ensures ICE negotiation can use all candidates
+      const inbound = this.rin.get(from);
+      if (inbound && inbound.queued.length > 0) {
+        console.log(`[DHT] Applying ${inbound.queued.length} queued ICE candidates from ${from.slice(0, 16)}...`);
+        for (const candidate of inbound.queued) {
+          await pc.addIceCandidate(candidate).catch(() => {});
+        }
+        inbound.queued = []; // Clear queue after applying
+      }
+      
+      console.log(`[DHT] Sending answer to ${from.slice(0, 16)}... via ${sender.slice(0, 16)}...`);
+      this.send(sender, { type: 'relay_answer', from: this.account.getFingerprint(), to: msg.from, answer });
+    } catch (err) {
+      // Clean up on failure
+      console.error(`[DHT] Failed to process offer from ${from.slice(0, 16)}...:`, err);
+      this.rin.delete(from);
+      pc.close();
+    }
   }
 
   // ── Relay: answer ─────────────────────────────────────────────────────────────
@@ -673,10 +883,10 @@ export class KademliaDHT {
         // Intentionally empty - we reuse pre-gathered candidates
       };
 
-      // Create and send offer with pre-gathered candidates
+      // Create and send offer
       await pc.setLocalDescription(await pc.createOffer());
 
-      console.log(`[DHT] Sending offer with ${this.localICECandidates.length} pre-gathered candidates via WebSocket...`);
+      console.log(`[DHT] Sending offer via WebSocket...`);
       
       // Send offer
       ws.send(JSON.stringify({
@@ -685,8 +895,14 @@ export class KademliaDHT {
         to: peer.fingerprint,
         offer: pc.localDescription,
       }));
+
+      // Wait for answer BEFORE sending ICE candidates
+      const answer = await answerPromise;
+      console.log('[DHT] Received answer, setting remote description...');
+      await pc.setRemoteDescription(answer);
       
-      // Send pre-gathered ICE candidates
+      // Send pre-gathered ICE candidates AFTER remote description is set
+      console.log(`[DHT] Sending ${this.localICECandidates.length} pre-gathered ICE candidates via WebSocket...`);
       for (const candidate of this.localICECandidates) {
         ws.send(JSON.stringify({
           type: 'ice',
@@ -695,11 +911,6 @@ export class KademliaDHT {
           candidate: candidate.toJSON(),
         }));
       }
-
-      // Wait for answer
-      const answer = await answerPromise;
-      console.log('[DHT] Received answer, setting remote description...');
-      await pc.setRemoteDescription(answer);
 
       // Wait for data channel to open
       await new Promise<void>((resolve, reject) => {
@@ -799,17 +1010,7 @@ export class KademliaDHT {
       await pc.setLocalDescription(await pc.createOffer());
       console.log(`[DHT] ${tfpr.slice(0, 16)}... offer created, sending via relay`);
 
-      // Send pre-gathered ICE candidates
-      console.log(`[DHT] ${tfpr.slice(0, 16)}... sending ${this.localICECandidates.length} pre-gathered ICE candidates`);
-      for (const candidate of this.localICECandidates) {
-        this.send(rfpr, { 
-          type: 'relay_ice', 
-          from: this.account.getFingerprint(), 
-          to: target.fingerprint, 
-          candidate: candidate.toJSON() 
-        });
-      }
-
+      // Send offer and wait for answer BEFORE sending ICE candidates
       await new Promise<void>((resolve, reject) => {
         this.rout.set(tfpr, { pc, resolve, reject });
         this.send(rfpr, { type: 'relay_offer', from: this.account.getFingerprint(), to: target.fingerprint, offer: pc.localDescription! });
@@ -821,6 +1022,17 @@ export class KademliaDHT {
           } 
         }, 30_000);
       });
+
+      // Send pre-gathered ICE candidates AFTER remote description is set
+      console.log(`[DHT] ${tfpr.slice(0, 16)}... answer received, sending ${this.localICECandidates.length} pre-gathered ICE candidates`);
+      for (const candidate of this.localICECandidates) {
+        this.send(rfpr, { 
+          type: 'relay_ice', 
+          from: this.account.getFingerprint(), 
+          to: target.fingerprint, 
+          candidate: candidate.toJSON() 
+        });
+      }
 
       console.log(`[DHT] ${tfpr.slice(0, 16)}... answer received, waiting for channel to open...`);
       this.rout.delete(tfpr);
@@ -837,16 +1049,30 @@ export class KademliaDHT {
 
   async handleHTTPOffer(fromFpr: Fingerprint, offer: RTCSessionDescriptionInit, peerAddress: string): Promise<RTCSessionDescriptionInit> {
     const fpr = normalizeFingerprint(fromFpr);
+    
+    // Validate offer before creating PeerConnection
+    if (!offer?.type || !offer?.sdp) {
+      throw new Error('Invalid offer: missing type or sdp');
+    }
+    
     const pc = new RTCPeerConnection({ iceServers: this.ice });
     this.rin.set(fpr, { pc, queued: [] });
-    pc.ondatachannel = (ev): void => {
-      this.register(pc, ev.channel, fpr).then((): void => this.addPeer({ fingerprint: fromFpr, address: peerAddress })).catch((): void => {});
-    };
-    await pc.setRemoteDescription(offer);
-    await pc.setLocalDescription(await pc.createAnswer());
-    await waitICE(pc);
-    this.rin.delete(fpr);
-    return pc.localDescription as RTCSessionDescriptionInit;
+    
+    try {
+      pc.ondatachannel = (ev): void => {
+        this.register(pc, ev.channel, fpr).then((): void => this.addPeer({ fingerprint: fromFpr, address: peerAddress })).catch((): void => {});
+      };
+      await pc.setRemoteDescription(offer);
+      await pc.setLocalDescription(await pc.createAnswer());
+      await waitICE(pc);
+      this.rin.delete(fpr);
+      return pc.localDescription as RTCSessionDescriptionInit;
+    } catch (err) {
+      // Clean up on failure
+      this.rin.delete(fpr);
+      pc.close();
+      throw err;
+    }
   }
 
   // ── Register open connection ──────────────────────────────────────────────────
@@ -863,8 +1089,18 @@ export class KademliaDHT {
         this.conns.set(fpr, conn);
         ch.onmessage = (ev: MessageEvent<string>): void => this.onMsg(fpr, ev.data);
         ch.onclose = (): void => { this.conns.delete(fpr); };
+        
+        // Apply any remaining queued ICE candidates (fallback for edge cases)
+        // Most candidates should have been applied in onOffer() after setLocalDescription
         const inbound = this.rin.get(fpr);
-        if (inbound) { for (const c of inbound.queued) {await pc.addIceCandidate(c).catch((): void => {});} this.rin.delete(fpr); }
+        if (inbound && inbound.queued.length > 0) {
+          console.log(`[DHT] Applying ${inbound.queued.length} remaining queued ICE candidates for ${fpr.slice(0, 16)}...`);
+          for (const c of inbound.queued) {
+            await pc.addIceCandidate(c).catch((): void => {});
+          }
+        }
+        if (inbound) { this.rin.delete(fpr); }
+        
         resolve();
       };
       if (ch.readyState === 'open') { onOpen().catch(reject); }
@@ -895,20 +1131,22 @@ export class KademliaDHT {
    * Helps discover peers that join after initial bootstrap
    */
   private async bootstrapDiscovery(): Promise<void> {
-    const connectedCount = this.conns.size;
-    const totalPeers = this.buckets.reduce((sum, b) => sum + b.peers.length, 0);
+    const stats = this.stats();
     
     // Stop aggressive discovery once we have enough connections (excluding ourselves)
-    if (connectedCount >= DHT_K) {
+    if (stats.connected >= DHT_K) {
+      console.log(`[DHT] Bootstrap discovery complete: ${stats.connected} connections established`);
+      this.bootstrapActive = false;
       if (this.bootstrapTimer) {
-        console.log(`[DHT] Bootstrap discovery complete: ${connectedCount} connections established`);
         clearInterval(this.bootstrapTimer);
         this.bootstrapTimer = null;
       }
       return;
     }
     
-    console.log(`[DHT] Bootstrap discovery: ${connectedCount} connected, ${totalPeers} known peers`);
+    // Log current state
+    const nonEmptyBuckets = stats.bucketFill.filter(n => n > 0).length;
+    console.log(`[DHT] Bootstrap discovery: ${stats.connected} connected, ${stats.discovered} discovered, ${nonEmptyBuckets} buckets with peers`);
     
     // Phase 1: Discover new peers (only if needed)
     await this.discoverPeers();
@@ -937,6 +1175,11 @@ export class KademliaDHT {
       for (const bucket of this.buckets) {
         for (const peer of bucket.peers) {
           const fpr = normalizeFingerprint(peer.fingerprint);
+          
+          // Skip self (bootstrap servers register themselves in routing table)
+          if (fpr === this.me()) {
+            continue;
+          }
           
           // Skip if already connected OR connection attempt in progress
           if (this.conns.has(fpr) || this.rout.has(fpr) || this.connecting.has(fpr)) {

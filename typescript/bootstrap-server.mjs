@@ -13,12 +13,13 @@
 // Set up WebRTC polyfill for Node.js FIRST
 import './node-webrtc-polyfill.mjs';
 
-import { Account, BrowserStorage, WebRTCServer, KademliaDHT } from './dist/index.js';
+import { Account, WebRTCServer, KademliaDHT } from './dist/index.js';
 import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import * as fs from 'fs/promises';
+import { NodeFSStorage } from './node-fs-storage.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -79,8 +80,9 @@ async function getBootstrapAccount(dataDir) {
   // Create data directory if it doesn't exist
   await fs.mkdir(dataDir, { recursive: true });
 
-  const storage = await BrowserStorage.create();
-  const accountPath = join(dataDir, 'account');
+  // Use NodeFSStorage for actual filesystem persistence
+  const storage = new NodeFSStorage(dataDir);
+  const accountPath = 'account'; // Relative to dataDir
 
   try {
     // Try to load existing account
@@ -247,7 +249,7 @@ class SignalingServer {
 }
 
 /**
- * Update GUI .env file with server configuration
+ * Update GUI .env file with server configuration (only if changed)
  */
 async function updateGUIEnv(fingerprint, port) {
   const guiEnvPath = join(__dirname, '../gui/.env');
@@ -258,6 +260,17 @@ VITE_DEV_PEER_WS_ADDRESS=localhost:${port}
 `;
 
   try {
+    // Check if file exists and has the same content
+    try {
+      const existing = await fs.readFile(guiEnvPath, 'utf-8');
+      if (existing.trim() === envContent.trim()) {
+        console.log(`✅ GUI .env file already up-to-date`);
+        return;
+      }
+    } catch {
+      // File doesn't exist or can't be read, write it
+    }
+    
     await fs.writeFile(guiEnvPath, envContent, 'utf-8');
     console.log(`✅ Updated GUI .env file`);
   } catch (err) {
@@ -308,6 +321,12 @@ async function main() {
   // Start DHT (no bootstrap peers - this IS the bootstrap)
   await dht.join([]);
   console.log('✅ DHT initialized\n');
+  
+  // Register bootstrap server itself in routing table
+  // This ensures the first client gets at least one peer (the bootstrap) in find_peer responses
+  const wsAddress = `ws://localhost:${config.port}`;
+  dht.registerSelf(wsAddress);
+  console.log(`✅ Bootstrap self-registered at ${wsAddress}\n`);
 
   // Create HTTP server for WebSocket
   const httpServer = createServer((req, res) => {
