@@ -4,7 +4,7 @@
  * Goal: Gather ICE candidates ONCE at startup, reuse for all connections
  */
 
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach } from '@jest/globals';
 import type { Account } from '../account.js';
 import { KademliaDHT } from './dht.js';
 

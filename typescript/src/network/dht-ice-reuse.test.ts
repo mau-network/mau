@@ -3,7 +3,7 @@
  * Verifies that pre-gathered ICE candidates are reused across connections
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import type { Account } from '../account.js';
 import { KademliaDHT } from './dht.js';
 

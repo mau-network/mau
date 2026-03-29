@@ -7,7 +7,7 @@
  * - No redundant DHT lookups
  */
 
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach } from '@jest/globals';
 import type { Account } from '../account.js';
 import { KademliaDHT } from './dht.js';
 
@@ -111,9 +111,9 @@ describe('DHT Discovery/Connection Decoupling', () => {
 
     let connectRelayCalled = false;
     const originalConnectRelay = (dht as any).connectRelay;
-    (dht as any).connectRelay = async () => {
+    (dht as any).connectRelay = async (...args: unknown[]): Promise<unknown> => {
       connectRelayCalled = true;
-      return originalConnectRelay?.apply(dht, arguments);
+      return originalConnectRelay?.apply(dht, args);
     };
 
     // Act
