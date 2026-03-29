@@ -444,6 +444,14 @@ export class KademliaDHT {
   }
 
   /**
+   * Find nearest peers to a target fingerprint (max 160 as per Kademlia spec)
+   * Used by /kad/find_peer HTTP endpoint
+   */
+  findPeer(target: Fingerprint): Peer[] {
+    return this.nearest(target, 160);
+  }
+
+  /**
    * Register an already-established WebRTC connection with the DHT
    * This is used by bootstrap servers to register connections established via WebSocket signaling
    */
