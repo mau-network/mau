@@ -121,6 +121,14 @@ export class KademliaDHT {
     return found?.address ?? null;
   }
 
+  /**
+   * Find nearest peers to a target fingerprint (max 160 as per Kademlia spec)
+   * Used by /kad/find_peer HTTP endpoint
+   */
+  findPeer(target: Fingerprint): Peer[] {
+    return this.nearest(target, 160);
+  }
+
   // ── Routing table ────────────────────────────────────────────────────────────
 
   private me(): Fingerprint { return normalizeFingerprint(this.account.getFingerprint()); }
