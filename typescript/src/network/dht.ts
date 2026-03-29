@@ -444,6 +444,14 @@ export class KademliaDHT {
   }
 
   /**
+   * Find nearest peers to a target fingerprint (max 160 as per Kademlia spec)
+   * Used by /kad/find_peer HTTP endpoint
+   */
+  findPeer(target: Fingerprint): Peer[] {
+    return this.nearest(target, 160);
+  }
+
+  /**
    * Register an already-established WebRTC connection with the DHT
    * This is used by bootstrap servers to register connections established via WebSocket signaling
    */
@@ -696,7 +704,7 @@ export class KademliaDHT {
     try {
       // Monitor connection state changes
       let connectionState = 'new';
-      pc.onconnectionstatechange = () => {
+      pc.onconnectionstatechange = (): void => {
         const newState = pc.connectionState;
         if (newState !== connectionState) {
           console.log(`[DHT] Inbound from ${from.slice(0, 16)}... connection state: ${connectionState} → ${newState}`);
@@ -704,14 +712,14 @@ export class KademliaDHT {
         }
       };
 
-      pc.ondatachannel = (ev): void => { 
+      pc.ondatachannel = (ev): void => {
         console.log(`[DHT] Data channel received from ${from.slice(0, 16)}... (state: ${ev.channel.readyState})`);
-        
+
         // Monitor channel state changes
-        ev.channel.onopen = () => {
+        ev.channel.onopen = (): void => {
           console.log(`[DHT] Inbound from ${from.slice(0, 16)}... data channel: opening → open`);
         };
-        ev.channel.onerror = (err) => {
+        ev.channel.onerror = (err): void => {
           console.error(`[DHT] Inbound from ${from.slice(0, 16)}... data channel error:`, err);
         };
         
@@ -801,10 +809,10 @@ export class KademliaDHT {
     const ch = pc.createDataChannel('dht', { ordered: true });
     
     // Disable automatic ICE gathering - we'll use pre-gathered candidates
-    pc.onicecandidate = () => {
+    pc.onicecandidate = (): void => {
       // Intentionally empty - we reuse pre-gathered candidates
     };
-    
+
     await pc.setLocalDescription(await pc.createOffer());
     
     // Build offer with pre-gathered ICE candidates
@@ -841,8 +849,8 @@ export class KademliaDHT {
     try {
       // Wait for WebSocket to open
       await new Promise<void>((resolve, reject) => {
-        ws.onopen = () => resolve();
-        ws.onerror = (err) => reject(new Error(`WebSocket connection failed: ${err}`));
+        ws.onopen = (): void => resolve();
+        ws.onerror = (err): void => reject(new Error(`WebSocket connection failed: ${err}`));
         setTimeout(() => reject(new Error('WebSocket connection timeout')), 10_000);
       });
 
@@ -858,7 +866,7 @@ export class KademliaDHT {
       const answerPromise = new Promise<RTCSessionDescriptionInit>((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('Answer timeout')), 30_000);
         
-        ws.onmessage = (event) => {
+        ws.onmessage = (event): void => {
           try {
             const msg = JSON.parse(event.data as string);
             
@@ -879,7 +887,7 @@ export class KademliaDHT {
       });
 
       // Disable automatic ICE gathering - we'll use pre-gathered candidates
-      pc.onicecandidate = () => {
+      pc.onicecandidate = (): void => {
         // Intentionally empty - we reuse pre-gathered candidates
       };
 
@@ -915,11 +923,11 @@ export class KademliaDHT {
       // Wait for data channel to open
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('Data channel timeout')), 30_000);
-        ch.onopen = () => {
+        ch.onopen = (): void => {
           clearTimeout(timeout);
           resolve();
         };
-        ch.onerror = (err) => {
+        ch.onerror = (err): void => {
           clearTimeout(timeout);
           reject(err);
         };
@@ -963,38 +971,38 @@ export class KademliaDHT {
       
       // Monitor data channel state
       console.log(`[DHT] ${tfpr.slice(0, 16)}... created data channel (state: ${ch.readyState})`);
-      ch.onopen = () => {
+      ch.onopen = (): void => {
         console.log(`[DHT] ${tfpr.slice(0, 16)}... data channel: opening → open`);
       };
-      ch.onerror = (err) => {
+      ch.onerror = (err): void => {
         console.error(`[DHT] ${tfpr.slice(0, 16)}... data channel error:`, err);
       };
-      ch.onclose = () => {
+      ch.onclose = (): void => {
         console.log(`[DHT] ${tfpr.slice(0, 16)}... data channel closed`);
       };
-      
+
       // Monitor connection state changes
       let connectionState = 'new';
       let iceGatheringState = 'new';
       let iceConnectionState = 'new';
-      
-      pc.onconnectionstatechange = () => {
+
+      pc.onconnectionstatechange = (): void => {
         const newState = pc.connectionState;
         if (newState !== connectionState) {
           console.log(`[DHT] ${tfpr.slice(0, 16)}... connection state: ${connectionState} → ${newState}`);
           connectionState = newState;
         }
       };
-      
-      pc.onicegatheringstatechange = () => {
+
+      pc.onicegatheringstatechange = (): void => {
         const newState = pc.iceGatheringState;
         if (newState !== iceGatheringState) {
           console.log(`[DHT] ${tfpr.slice(0, 16)}... ICE gathering: ${iceGatheringState} → ${newState}`);
           iceGatheringState = newState;
         }
       };
-      
-      pc.oniceconnectionstatechange = () => {
+
+      pc.oniceconnectionstatechange = (): void => {
         const newState = pc.iceConnectionState;
         if (newState !== iceConnectionState) {
           console.log(`[DHT] ${tfpr.slice(0, 16)}... ICE connection: ${iceConnectionState} → ${newState}`);
@@ -1003,7 +1011,7 @@ export class KademliaDHT {
       };
 
       // Ignore automatic ICE candidates - we'll use pre-gathered ones
-      pc.onicecandidate = () => {
+      pc.onicecandidate = (): void => {
         // Intentionally empty - we reuse pre-gathered candidates
       };
 

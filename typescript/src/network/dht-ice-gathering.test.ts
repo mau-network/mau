@@ -4,7 +4,7 @@
  * Goal: Gather ICE candidates ONCE at startup, reuse for all connections
  */
 
-import { describe, it, expect, beforeEach, jest } from 'bun:test';
+import { describe, it, expect, beforeEach } from '@jest/globals';
 import type { Account } from '../account.js';
 import { KademliaDHT } from './dht.js';
 
@@ -74,15 +74,15 @@ class MockRTCPeerConnection {
 describe('DHT ICE Gathering', () => {
   let dht: KademliaDHT;
   let pcCreationCount: number;
-  let originalRTCPC: any;
+  let _originalRTCPC: any;
 
   beforeEach(() => {
     pcCreationCount = 0;
-    originalRTCPC = (global as any).RTCPeerConnection;
-    
+    _originalRTCPC = (global as any).RTCPeerConnection;
+
     // Wrap to count creations
     (global as any).RTCPeerConnection = class extends MockRTCPeerConnection {
-      constructor(...args: any[]) {
+      constructor(..._args: any[]) {
         super();
         pcCreationCount++;
       }

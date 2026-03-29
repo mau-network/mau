@@ -58,6 +58,15 @@ export class Server {
       return this.handleDHTOffer(req);
     }
 
+    // Kademlia endpoints
+    if (req.method === 'GET' && req.path === '/kad/ping') {
+      return this.handleKadPing();
+    }
+    const kadFindMatch = req.path.match(/^\/kad\/find_peer\/([0-9a-f]+)$/);
+    if (req.method === 'GET' && kadFindMatch) {
+      return await this.handleKadFindPeer(kadFindMatch[1]);
+    }
+
     if (req.method !== 'GET') {
       return this.methodNotAllowed();
     }
@@ -171,6 +180,44 @@ export class Server {
   }
 
   /**
+   * Handle Kademlia ping: GET /kad/ping
+   * Returns 200 OK to signal peer is reachable
+   */
+  private handleKadPing(): ServerResponse {
+    return {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'ok' }),
+    };
+  }
+
+  /**
+   * Handle Kademlia find peer: GET /kad/find_peer/<fingerprint>
+   * Returns nearest known peers (max 160) ordered by distance to target
+   */
+  private async handleKadFindPeer(targetFingerprint: string): Promise<ServerResponse> {
+    if (!this.dht) {
+      return { status: 404, headers: { 'Content-Type': 'text/plain' }, body: 'DHT not enabled' };
+    }
+
+    try {
+      // Get peers from DHT routing table
+      const peers = await this.dht.findPeer(targetFingerprint);
+      
+      return {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(peers.map(p => ({
+          fingerprint: p.fingerprint,
+          address: p.address,
+        }))),
+      };
+    } catch (err) {
+      return { status: 500, headers: { 'Content-Type': 'text/plain' }, body: 'Internal Server Error' };
+    }
+  }
+
+  /**
    * Handle mTLS challenge-response: GET /p2p/<fingerprint>/auth?challenge=<hex>
    *
    * Signs the caller's challenge with the account private key so the client can
@@ -277,7 +324,7 @@ export class Server {
       const contentDir = this.account.getContentDir();
       const filePath = this.storage.join(contentDir, fileName);
       const versionDir = `${filePath}.versions`;
-      const versionPath = this.storage.join(versionDir, versionHash);
+      const versionPath = this.storage.join(versionDir, `${versionHash}.pgp`);
 
       if (!(await this.storage.exists(versionPath))) {
         return this.notFound();

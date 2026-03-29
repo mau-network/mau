@@ -91,6 +91,9 @@ export class WebRTCClient {
       throw new Error('No connection to complete');
     }
     await this.connection.setRemoteDescription(answer);
+    // Yield to allow the native ICE stack to process candidates from the
+    // remote SDP before the caller can close the connection.
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
   }
 
   /**

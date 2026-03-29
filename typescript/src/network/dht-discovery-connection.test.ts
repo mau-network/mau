@@ -7,10 +7,9 @@
  * - No redundant DHT lookups
  */
 
-import { describe, it, expect, beforeEach, jest } from 'bun:test';
+import { describe, it, expect, beforeEach } from '@jest/globals';
 import type { Account } from '../account.js';
 import { KademliaDHT } from './dht.js';
-import type { Peer } from '../types/index.js';
 
 // Mock Account
 const mockAccount = {
@@ -68,8 +67,11 @@ describe('DHT Discovery/Connection Decoupling', () => {
       });
     }
 
+    // Reset lastLookup to simulate stale buckets (addPeer sets lastLookup=Date.now())
+    (dht as any).buckets.forEach((b: any): void => { b.lastLookup = 0; });
+
     let lookupCalled = false;
-    (dht as any).lookup = async () => {
+    (dht as any).lookup = async (): Promise<undefined> => {
       lookupCalled = true;
       return undefined;
     };
@@ -112,9 +114,9 @@ describe('DHT Discovery/Connection Decoupling', () => {
 
     let connectRelayCalled = false;
     const originalConnectRelay = (dht as any).connectRelay;
-    (dht as any).connectRelay = async () => {
+    (dht as any).connectRelay = async (...args: unknown[]): Promise<unknown> => {
       connectRelayCalled = true;
-      return originalConnectRelay?.apply(dht, arguments);
+      return originalConnectRelay?.apply(dht, args);
     };
 
     // Act
@@ -207,7 +209,7 @@ describe('DHT Discovery/Connection Decoupling', () => {
     (dht as any).connectKnownPeers = async () => { connectCalled++; };
 
     // Mock to prevent actual timer
-    const originalBootstrap = (dht as any).bootstrapDiscovery?.bind(dht);
+    const _originalBootstrap = (dht as any).bootstrapDiscovery?.bind(dht);
     (dht as any).bootstrapDiscovery = async () => {
       await (dht as any).discoverPeers();
       await (dht as any).connectKnownPeers();

@@ -3,7 +3,7 @@
  * Verifies that pre-gathered ICE candidates are reused across connections
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import type { Account } from '../account.js';
 import { KademliaDHT } from './dht.js';
 
@@ -70,11 +70,18 @@ describe('DHT ICE Candidate Reuse', () => {
       address: 'http://relay:8080' 
     });
     
-    // Mock the send method to capture relay_ice messages
+    // Mock the send method to capture relay_ice messages and simulate answer
+    const targetFpr = 'c'.repeat(40);
     const sentICECandidates: any[] = [];
-    (dht as any).send = (fpr: string, msg: any) => {
+    (dht as any).send = (_fpr: string, msg: any): void => {
       if (msg.type === 'relay_ice') {
         sentICECandidates.push(msg.candidate);
+      } else if (msg.type === 'relay_offer') {
+        // Simulate receiving an answer so ICE candidates are sent
+        setTimeout((): void => {
+          const rout = (dht as any).rout.get(targetFpr);
+          if (rout) { rout.resolve(); }
+        }, 0);
       }
     };
     
@@ -105,7 +112,7 @@ describe('DHT ICE Candidate Reuse', () => {
       address: 'http://target:8080',
     };
     
-    const connectPromise = (dht as any).connectRelay(targetPeer, { 
+    const _connectPromise = (dht as any).connectRelay(targetPeer, {
       fingerprint: relayFpr, 
       address: 'http://relay:8080' 
     });
@@ -166,7 +173,7 @@ describe('DHT ICE Candidate Reuse', () => {
     };
     
     // Start the connection attempt (don't await - it will timeout waiting for channel)
-    const connectPromise = (dht as any).connectHTTP(peer);
+    const _connectPromise = (dht as any).connectHTTP(peer);
     
     // Wait for fetch to be called
     await new Promise(resolve => setTimeout(resolve, 100));

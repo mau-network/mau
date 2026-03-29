@@ -28,7 +28,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: typescript
-        run: npm ci --ignore-scripts
+        run: npm ci --no-workspaces --ignore-scripts
 
       - name: Build native modules
         working-directory: typescript
@@ -40,7 +40,7 @@ jobs:
 
       - name: Type check
         working-directory: typescript
-        run: npx tsc --noEmit
+        run: ./node_modules/.bin/tsc --noEmit
 
       - name: Run tests
         working-directory: typescript
