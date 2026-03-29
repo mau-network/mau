@@ -105,7 +105,7 @@ describe('DHT ICE Candidate Reuse', () => {
       address: 'http://target:8080',
     };
     
-    const connectPromise = (dht as any).connectRelay(targetPeer, { 
+    const _connectPromise = (dht as any).connectRelay(targetPeer, {
       fingerprint: relayFpr, 
       address: 'http://relay:8080' 
     });
@@ -166,7 +166,7 @@ describe('DHT ICE Candidate Reuse', () => {
     };
     
     // Start the connection attempt (don't await - it will timeout waiting for channel)
-    const connectPromise = (dht as any).connectHTTP(peer);
+    const _connectPromise = (dht as any).connectHTTP(peer);
     
     // Wait for fetch to be called
     await new Promise(resolve => setTimeout(resolve, 100));

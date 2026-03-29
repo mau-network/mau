@@ -7,10 +7,9 @@
  * - No redundant DHT lookups
  */
 
-import { describe, it, expect, beforeEach, jest } from 'bun:test';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import type { Account } from '../account.js';
 import { KademliaDHT } from './dht.js';
-import type { Peer } from '../types/index.js';
 
 // Mock Account
 const mockAccount = {
@@ -207,7 +206,7 @@ describe('DHT Discovery/Connection Decoupling', () => {
     (dht as any).connectKnownPeers = async () => { connectCalled++; };
 
     // Mock to prevent actual timer
-    const originalBootstrap = (dht as any).bootstrapDiscovery?.bind(dht);
+    const _originalBootstrap = (dht as any).bootstrapDiscovery?.bind(dht);
     (dht as any).bootstrapDiscovery = async () => {
       await (dht as any).discoverPeers();
       await (dht as any).connectKnownPeers();

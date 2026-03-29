@@ -183,7 +183,7 @@ describe('DHT registerConnection integration', () => {
           break;
         }
       }
-      if (found) break;
+      if (found) { break; }
     }
     
     expect(found).toBe(true);
