@@ -46,6 +46,10 @@ jobs:
         working-directory: typescript
         run: npm test
 
+      - name: Run E2E tests
+        working-directory: typescript
+        run: npm run test:e2e -- --no-coverage
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
