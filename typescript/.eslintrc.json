@@ -41,7 +41,7 @@
       "files": ["*.test.ts", "jest.setup.ts", "jest.config.ts"],
       "rules": {
         "max-lines-per-function": "off",
-        "@typescript-eslint/no-explicit-any": "warn",
+        "@typescript-eslint/no-explicit-any": "off",
         "@typescript-eslint/explicit-function-return-type": "off"
       }
     }
