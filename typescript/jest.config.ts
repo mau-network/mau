@@ -5,7 +5,7 @@ const config: Config = {
   testEnvironment: 'node',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   roots: ['<rootDir>/src'],
-  testMatch: ['**/*.test.ts', '!**/*.browser.test.ts', '!**/dht-bootstrap-e2e.test.ts', '!**/webrtc-real.test.ts'],
+  testMatch: ['**/*.test.ts', '!**/*.browser.test.ts', '!**/dht-bootstrap-e2e.test.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
