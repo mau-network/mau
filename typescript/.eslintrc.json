@@ -19,12 +19,7 @@
         "varsIgnorePattern": "^_"
       }
     ],
-    "no-console": [
-      "warn",
-      {
-        "allow": ["warn", "error"]
-      }
-    ],
+
     "eqeqeq": ["error", "always"],
     "curly": ["error", "all"],
     "complexity": ["warn", 15],
@@ -45,7 +40,6 @@
     {
       "files": ["*.test.ts", "jest.setup.ts", "jest.config.ts"],
       "rules": {
-        "no-console": "off",
         "max-lines-per-function": "off",
         "@typescript-eslint/no-explicit-any": "warn",
         "@typescript-eslint/explicit-function-return-type": "off"
