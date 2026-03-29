@@ -280,9 +280,10 @@ describe('Real WebRTC E2E Tests', () => {
 
     await client.completeConnection(answer);
 
-    // Wait for ICE gathering to finish before closing to avoid
-    // "ICE candidate on closed connection" errors when running in parallel.
+    // Wait for ICE gathering and allow async ICE candidate processing to drain
+    // before closing to avoid "ICE candidate on closed connection" errors.
     await client.waitForICEGathering();
+    await new Promise<void>(resolve => setTimeout(resolve, 200));
 
     client.close();
     server.closeConnection(clientAccount.getFingerprint());

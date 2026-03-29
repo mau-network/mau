@@ -67,8 +67,11 @@ describe('DHT Discovery/Connection Decoupling', () => {
       });
     }
 
+    // Reset lastLookup to simulate stale buckets (addPeer sets lastLookup=Date.now())
+    (dht as any).buckets.forEach((b: any): void => { b.lastLookup = 0; });
+
     let lookupCalled = false;
-    (dht as any).lookup = async () => {
+    (dht as any).lookup = async (): Promise<undefined> => {
       lookupCalled = true;
       return undefined;
     };

@@ -70,11 +70,18 @@ describe('DHT ICE Candidate Reuse', () => {
       address: 'http://relay:8080' 
     });
     
-    // Mock the send method to capture relay_ice messages
+    // Mock the send method to capture relay_ice messages and simulate answer
+    const targetFpr = 'c'.repeat(40);
     const sentICECandidates: any[] = [];
-    (dht as any).send = (fpr: string, msg: any) => {
+    (dht as any).send = (_fpr: string, msg: any): void => {
       if (msg.type === 'relay_ice') {
         sentICECandidates.push(msg.candidate);
+      } else if (msg.type === 'relay_offer') {
+        // Simulate receiving an answer so ICE candidates are sent
+        setTimeout((): void => {
+          const rout = (dht as any).rout.get(targetFpr);
+          if (rout) { rout.resolve(); }
+        }, 0);
       }
     };
     
