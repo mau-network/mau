@@ -180,6 +180,9 @@ export class Account {
     const publicKey = await deserializePublicKey(armoredPublicKey);
     const fingerprint = getFingerprint(publicKey);
 
+    // Save friend's public key in binary format encrypted with account key (per spec)
+    // Spec: "All friends' public keys should be encrypted with the account key"
+    // Rationale: Prevents malicious programs from tampering with the contact list
     const friendKeyPath = this.storage.join(this.getMauDir(), `${fingerprint}.pgp`);
     const binaryKey = publicKey.write();
     
@@ -259,6 +262,7 @@ export class Account {
             this.privateKey,
             [this.publicKey]
           );
+          
           const publicKey = await openpgp.readKey({ binaryKey });
           const fingerprint = getFingerprint(publicKey);
           this.friends.set(fingerprint, publicKey);
