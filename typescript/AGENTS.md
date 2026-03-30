@@ -2,28 +2,50 @@
 
 This document provides guidance for AI agents working on the Mau TypeScript implementation.
 
+**Current Version**: 0.2.0  
+**Last Updated**: 2026-03-28
+
 ## Project Structure
 
 ```
 typescript/
-├── src/                    # Source code
-│   ├── account.ts         # Account/identity management
-│   ├── client.ts          # HTTP client for peer sync
-│   ├── server.ts          # HTTP server for serving files
-│   ├── file.ts            # File operations with encryption
-│   ├── index.ts           # Public API exports
-│   ├── crypto/            # PGP encryption/signing
-│   ├── network/           # P2P networking (WebRTC, resolvers)
-│   ├── storage/           # Storage backends (filesystem, IndexedDB)
-│   └── types/             # TypeScript type definitions
-├── examples/              # Usage examples
-├── dist/                  # Compiled JavaScript (git-ignored)
-├── coverage/              # Test coverage reports (git-ignored)
-├── README.md              # User documentation
-├── BROWSER.md             # Browser testing guide
-└── package.json           # Dependencies and scripts
+├── src/                           # Source code (TypeScript)
+│   ├── account.ts                # Account/identity management
+│   ├── client.ts                 # HTTP client for peer sync
+│   ├── server.ts                 # HTTP server for serving files
+│   ├── file.ts                   # File operations with encryption
+│   ├── index.ts                  # Public API exports
+│   ├── crypto/                   # PGP encryption/signing
+│   │   ├── index.ts             # Crypto utilities exports
+│   │   └── pgp.ts               # OpenPGP operations
+│   ├── network/                  # P2P networking
+│   │   ├── dht.ts               # Kademlia DHT implementation
+│   │   ├── resolvers.ts         # Peer discovery resolvers
+│   │   ├── signaling.ts         # WebRTC signaling coordination
+│   │   ├── webrtc.ts            # WebRTC client
+│   │   ├── webrtc-server.ts     # WebRTC server
+│   │   └── index.ts             # Network exports
+│   ├── storage/                  # Storage backends
+│   │   ├── browser.ts           # IndexedDB storage (browser-only)
+│   │   └── index.ts             # Storage exports
+│   └── types/                    # TypeScript type definitions
+│       └── index.ts             # All type exports
+├── bootstrap-server.mjs          # Node.js WebRTC bootstrap server
+├── node-webrtc-polyfill.mjs     # WebRTC polyfill setup for Node.js
+├── examples/                     # Usage examples
+├── dist/                         # Compiled JavaScript (git-ignored)
+├── coverage/                     # Test coverage reports (git-ignored)
+├── .bootstrap-peer-node/        # Bootstrap server data (git-ignored)
+├── README.md                     # User documentation
+├── BROWSER.md                    # Browser testing guide
+├── jest.config.ts               # Jest test configuration
+├── jest.setup.ts                # Test environment setup (polyfills)
+├── tsconfig.json                # TypeScript compiler config
+├── vite.config.ts               # Vite bundler config
+└── package.json                 # Dependencies and scripts
 
-Test files: `*.test.ts` alongside source files
+Test files: `*.test.ts` alongside source files (165 test files total)
+Special: `*.test.ts.disabled` - temporarily disabled tests
 ```
 
 ## Core Principles
@@ -45,11 +67,15 @@ Test files: `*.test.ts` alongside source files
 - Export types from `src/types/index.ts`
 
 ### 4. Test Coverage
-- Target: >50% branch coverage (current: ~41%)
-- Every public method should have at least one test
-- Integration tests for critical paths (sync, encryption)
-- Focus on high-impact areas: `account.ts` (40%), `client.ts` (47%), `server.ts` (48%)
-- Low-coverage areas need attention: `dht.ts` (13%), `signaling.ts` (20%), `webrtc-server.ts` (15%)
+- Target: >50% branch coverage (current status varies by module)
+- **165 test files** covering unit, integration, and E2E scenarios
+- Test naming conventions:
+  - `*.test.ts` - Active unit/integration tests
+  - `*-e2e.test.ts` - End-to-end tests
+  - `*-extended.test.ts` - Extended/edge case tests
+  - `*.test.ts.disabled` - Temporarily disabled tests
+- High-coverage modules: `account.ts`, `client.ts`, `server.ts`
+- Recent improvements: DHT implementation (dht.ts) now includes comprehensive bug fixes
 
 ### 5. Security First
 - All files are PGP-encrypted before storage
@@ -94,13 +120,24 @@ npm run preview               # Preview production build
 # Node.js testing
 node test-integration.mjs
 
+# Bootstrap server (WebSocket signaling for peers)
+node bootstrap-server.mjs --port 8444 --data-dir ./.bootstrap-peer-node
+
 # Automated browser testing (Playwright)
 npx playwright test
 ```
 
+**Bootstrap Server:**
+- Provides WebSocket signaling for initial peer connections
+- Uses Kademlia DHT to share discovered peers
+- Auto-updates `../gui/.env` with fingerprint and address
+- Runs on Node.js (not browser-compatible due to WebSocket server)
+- Data persisted in `--data-dir` (default: `./.bootstrap-peer-node/`)
+
 **Test Files:**
 - `*.test.ts` - Jest unit/integration tests (run in Node.js with polyfills)
-- Test environment uses `fake-indexeddb` and `@roamhq/wrtc` to simulate browser APIs
+- Test environment uses `fake-indexeddb` and `node-datachannel` to simulate browser APIs
+- WebRTC polyfill configured in `jest.setup.ts` and `node-webrtc-polyfill.mjs`
 
 ## Key Implementation Details
 
@@ -110,9 +147,31 @@ The codebase is organized into these key modules:
 
 - **Core**: `account.ts`, `file.ts`, `client.ts`, `server.ts`, `index.ts`
 - **Cryptography**: `crypto/pgp.ts`, `crypto/index.ts` - OpenPGP operations
-- **Networking**: `network/webrtc.ts`, `network/webrtc-server.ts`, `network/resolvers.ts`, `network/dht.ts`, `network/signaling.ts`
-- **Storage**: `storage/browser.ts`, `storage/index.ts` (filesystem storage removed)
+- **Networking**: 
+  - `network/dht.ts` - Kademlia DHT with WebRTC data channels
+  - `network/webrtc.ts`, `network/webrtc-server.ts` - WebRTC P2P
+  - `network/resolvers.ts` - Peer discovery strategies
+  - `network/signaling.ts` - WebRTC signaling coordination
+- **Storage**: `storage/browser.ts`, `storage/index.ts` - IndexedDB only (filesystem storage removed)
 - **Types**: `types/index.ts` - TypeScript type definitions
+- **Bootstrap**: `bootstrap-server.mjs` - WebSocket signaling server for initial peer discovery
+
+### Recent DHT Improvements (2026-03-28)
+
+The Kademlia DHT implementation (`network/dht.ts`) received major bug fixes:
+
+1. **Discovery Algorithm**: Fixed zero-peers bug by implementing proper bucket refresh instead of self-lookup
+2. **ICE Candidates**: Corrected ordering - candidates now sent after SDP answer (prevents remote description errors)
+3. **Connection Tie-Breaking**: Added timeout guards for simultaneous connection attempts
+4. **Memory Leak**: Added try/catch with cleanup for malformed relay offers
+5. **Bootstrap Timer**: Implemented `bootstrapActive` flag for reliable timer lifecycle management
+6. **Observability**: Added `stats()` method exposing connected/discovered peer counts, bucket fill, uptime
+
+The DHT now supports:
+- Pre-gathered ICE candidates (reduces STUN queries)
+- Exponential backoff for connection retries
+- Discovery/connection decoupling for better peer management
+- Bootstrap discovery timer (3-second intervals until DHT_K peers found)
 
 ### Storage Abstraction
 ```typescript
@@ -158,13 +217,27 @@ Read:
 ```
 
 ### WebRTC Architecture
+
+#### Core Components
 - **WebRTCClient** (`network/webrtc.ts`): Initiates connections, creates offers
 - **WebRTCServer** (`network/webrtc-server.ts`): Accepts connections, handles answers
 - **Signaling** (`network/signaling.ts`): Coordinates peer connection establishment
+- **KademliaDHT** (`network/dht.ts`): Distributed peer discovery over WebRTC data channels
+- **Bootstrap Server** (`bootstrap-server.mjs`): WebSocket signaling server for initial connections
+
+#### Features
 - **mTLS**: PGP-based challenge-response authentication after data channel opens
 - **HTTP-over-datachannel**: Text-based HTTP/1.1 protocol for file synchronization
+- **DHT-relay signaling**: After bootstrap, peers relay connection offers through existing connections
+- **Pre-gathered ICE**: STUN queries happen once at startup, candidates reused for all connections
+- **Connection pooling**: Exponential backoff and max retry limits prevent connection storms
 
-**Note:** WebRTC implementation uses native browser APIs. In Node.js tests, `@roamhq/wrtc` provides polyfill.
+#### Signaling Methods
+1. **HTTP signaling**: Initial bootstrap via POST to `/p2p/dht/offer` endpoint
+2. **WebSocket signaling**: Browser-compatible bootstrap via `ws://` or `wss://` addresses
+3. **DHT-relay signaling**: Relay offers/answers through existing peer connections
+
+**Note:** WebRTC implementation uses native browser APIs. In Node.js tests, `node-datachannel` provides polyfill.
 
 ## Common Patterns
 
@@ -386,11 +459,14 @@ await Promise.race([
 ### Development
 - **typescript**: TypeScript compiler (v5.3.3)
 - **jest**: Test framework with ts-jest for TypeScript support
-- **@roamhq/wrtc**: WebRTC polyfill for Node.js testing
+- **node-datachannel**: WebRTC polyfill for Node.js testing (native module)
+- **@roamhq/wrtc**: Alternative WebRTC polyfill (listed but node-datachannel is used)
 - **fake-indexeddb**: IndexedDB mock for Node.js tests
 - **vite**: Browser bundler and dev server
 - **typedoc**: API documentation generator
 - **eslint** + **prettier**: Code quality and formatting
+- **playwright**: End-to-end browser testing
+- **puppeteer**: Additional browser automation support
 
 ## When Making Changes
 
@@ -593,6 +669,30 @@ console.log('Data channel state:', client.dataChannelState);
 console.log(await storage.readDir(rootDir));
 ```
 
+### DHT Debugging
+```typescript
+// Get DHT health metrics
+const dht = new KademliaDHT(account);
+await dht.join([bootstrapPeer]);
+
+// Check stats periodically
+setInterval(() => {
+  const stats = dht.stats();
+  console.table({
+    Connected: stats.connected,
+    Discovered: stats.discovered,
+    'Bootstrap Active': stats.bootstrapActive,
+    'Uptime (s)': Math.floor(stats.uptime / 1000),
+    'Buckets with Peers': stats.bucketFill.filter(n => n > 0).length,
+  });
+}, 5000);
+
+// Common issues:
+// - stats.connected = 0 → Check bootstrap server is running and reachable
+// - stats.discovered > 0 but connected = 0 → Connection attempts failing (check ICE, relay)
+// - stats.bootstrapActive = true after 30s → Discovery/connection loop (check logs)
+```
+
 ## Troubleshooting
 
 ### Common Issues
@@ -610,6 +710,7 @@ console.log(await storage.readDir(rootDir));
 - Increase Jest timeout: `jest.setTimeout(30000)`
 - Check for unclosed connections (WebRTC, HTTP servers)
 - Use `--detectOpenHandles` to find leaks
+- Note: WebRTC polyfill (node-datachannel) requires native compilation and may have setup issues
 
 **Browser IndexedDB errors:**
 - Clear browser storage: DevTools → Application → Clear Storage
@@ -664,12 +765,31 @@ npm run lint && npm test && npm run build && npm run build:browser
 
 - **Mau Specification**: `../docs/` directory
 - **Go Implementation**: `../` (reference implementation)
+- **DHT Implementation Plan**: `../gui/PLAN.md` (recent bug fixes documented)
 - **OpenPGP Spec**: RFC 4880
 - **WebRTC Spec**: W3C WebRTC 1.0
 - **Kademlia Paper**: Original DHT paper by Maymounkov & Mazières
 - **TypeDoc**: [https://typedoc.org](https://typedoc.org)
 - **Jest**: [https://jestjs.io](https://jestjs.io)
 - **Vite**: [https://vitejs.dev](https://vitejs.dev)
+
+## Known Issues & Limitations
+
+### WebRTC Polyfill
+- `node-datachannel` requires native compilation (C++ bindings)
+- Installation may fail in some environments (workspace protocol issues)
+- Tests using WebRTC may be skipped if polyfill unavailable
+- Alternative: Use `@roamhq/wrtc` (pure JavaScript, but less maintained)
+
+### DHT Bootstrap
+- First client connecting to bootstrap gets no peers (chicken-egg problem)
+- Mitigated by: Bootstrap discovery timer runs every 3s until DHT_K peers found
+- Bootstrap server should have stable uptime for network health
+
+### Browser Compatibility
+- IndexedDB required (all modern browsers support it)
+- WebRTC DataChannels required (Safari 15+, Chrome 56+, Firefox 22+)
+- HTTPS required for WebRTC in production (localhost exempted)
 
 ## Getting Help
 

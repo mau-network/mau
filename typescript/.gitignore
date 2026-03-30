@@ -5,3 +5,5 @@ dist
 .DS_Store
 coverage
 .nyc_output
+example-data
+test-data-*

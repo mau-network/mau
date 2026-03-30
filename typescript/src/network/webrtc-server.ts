@@ -14,6 +14,7 @@ import { getFingerprint, deserializePublicKey } from '../crypto/index.js';
 export interface WebRTCServerConfig {
   iceServers?: RTCIceServer[];
   allowedPeers?: Fingerprint[]; // If set, only these peers can connect
+  onConnectionEstablished?: (connectionId: Fingerprint, peer: RTCPeerConnection, channel: RTCDataChannel) => void;
 }
 
 export interface WebRTCConnection {
@@ -143,7 +144,23 @@ export class WebRTCServer {
    * Setup data channel event handlers
    */
   private setupDataChannel(connectionId: string, channel: RTCDataChannel): void {
+    console.log(`[WebRTCServer] Setting up data channel for ${connectionId.slice(0, 16)}... (current state: ${channel.readyState})`);
+    
     channel.onopen = (): void => {
+      console.log(`[WebRTCServer] Data channel opened for ${connectionId.slice(0, 16)}...`);
+      
+      // Notify callback when connection is established
+      if (this.config.onConnectionEstablished) {
+        console.log(`[WebRTCServer] Invoking onConnectionEstablished callback for ${connectionId.slice(0, 16)}...`);
+        const connection = this.connections.get(connectionId);
+        if (connection) {
+          this.config.onConnectionEstablished(connectionId, connection.peer, channel);
+        } else {
+          console.warn(`[WebRTCServer] Connection ${connectionId.slice(0, 16)}... not found in connections map`);
+        }
+      } else {
+        console.log(`[WebRTCServer] No onConnectionEstablished callback configured`);
+      }
     };
 
     channel.onclose = (): void => {

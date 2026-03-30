@@ -1,0 +1,59 @@
+{
+  "name": "@mau-network/gui",
+  "version": "0.1.0",
+  "description": "Status update social app built on Mau P2P network",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "./dev.sh",
+    "dev:peer": "./dev-server.sh",
+    "dev:peer:wait": "./dev-server-wait.sh",
+    "dev:gui": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "bun test --coverage src",
+    "test:e2e": "playwright test",
+    "test:watch": "bun test --watch",
+    "lint": "eslint src --ext .ts --max-warnings 0",
+    "format": "prettier --write 'src/**/*.ts'",
+    "format:check": "prettier --check 'src/**/*.ts'",
+    "typecheck": "tsc --noEmit",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^6.1.1",
+    "@mau-network/mau": "workspace:*",
+    "antd": "^6.3.4",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/bun": "latest",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/uuid": "^11.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.2",
+    "@typescript-eslint/parser": "^8.57.2",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
+    "eslint": "^10.1.0",
+    "fake-indexeddb": "^6.2.5",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "playwright": "^1.58.2",
+    "prettier": "^3.8.1",
+    "vite": "^8.0.3"
+  },
+  "peerDependencies": {
+    "typescript": "^6.0.2"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --max-warnings 0",
+      "prettier --write",
+      "bun test --bail"
+    ]
+  }
+}

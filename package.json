@@ -1,0 +1,9 @@
+{
+  "name": "mau",
+  "version": "0.2.0",
+  "private": true,
+  "workspaces": [
+    "typescript",
+    "gui"
+  ]
+}

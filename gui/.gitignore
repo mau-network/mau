@@ -1,35 +1,38 @@
-# Compiled binaries
-mau-gui
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
+# dependencies (bun install)
+node_modules
 
-# Test binaries
-*.test
-*.out
+# output
+out
+dist
+*.tgz
 
-# Go workspace file
-go.work
+# code coverage
+coverage
+*.lcov
 
-# Dependency directories
-vendor/
+# playwright test artifacts
+playwright-report
+test-results
 
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# logs
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
-# Debug files
-debug.log
-*.log
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
 
-# Application data (for development)
-.mau-gui-poc/
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
 
-# OS files
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
 .DS_Store
-Thumbs.db

@@ -11,6 +11,7 @@
     "dev": "vite",
     "preview": "vite preview",
     "test": "jest",
+    "test:e2e": "jest --config jest.e2e.config.ts",
     "lint": "eslint src --ext .ts --max-warnings 0",
     "format": "prettier --write 'src/**/*.ts'",
     "docs": "typedoc",
