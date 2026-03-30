@@ -150,8 +150,8 @@ describe('Client', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     // calls[0] is the auth handshake; calls[1] is the actual file list request
-    const callUrl = mockFetch.mock.calls[1][0];
-    expect(callUrl).toContain('after=2024-01-01');
+    const callOptions = mockFetch.mock.calls[1][1];
+    expect(callOptions?.headers?.['If-Modified-Since']).toBe(afterDate.toUTCString());
   });
 
   it('should download file from peer', async () => {

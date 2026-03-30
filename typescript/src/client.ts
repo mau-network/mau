@@ -182,8 +182,10 @@ export class Client {
     const address = await this.ensureReady();
     const url = new URL(`${URI_PROTOCOL_NAME}://${address}/p2p/${this.peer}`);
 
+    const headers: Record<string, string> = {};
     if (after) {
-      url.searchParams.set('after', after.toISOString());
+      // Per spec: use If-Modified-Since header for incremental sync
+      headers['If-Modified-Since'] = after.toUTCString();
     }
 
     const controller = new AbortController();
@@ -191,6 +193,7 @@ export class Client {
 
     try {
       const response = await this.fetchWithRetry(url.toString(), {
+        headers,
         signal: controller.signal,
       });
 
