@@ -26,6 +26,8 @@ import {
   deserializePrivateKey,
   deserializePublicKey,
   getFingerprint,
+  signAndEncrypt,
+  decryptAndVerify,
 } from './crypto/index.js';
 
 export class Account {
@@ -184,8 +186,6 @@ export class Account {
     const friendKeyPath = this.storage.join(this.getMauDir(), `${fingerprint}.pgp`);
     const binaryKey = publicKey.write();
     
-    // Encrypt with account's public key
-    const { signAndEncrypt } = await import('./crypto/index.js');
     const encryptedKey = await signAndEncrypt(binaryKey, this.privateKey, [this.publicKey]);
     await this.storage.writeText(friendKeyPath, encryptedKey);
 
@@ -256,9 +256,7 @@ export class Account {
       if (entry.endsWith('.pgp') && entry !== ACCOUNT_KEY_FILENAME) {
         const keyPath = this.storage.join(mauDir, entry);
         try {
-          // Read encrypted key (per spec: keys are encrypted with account key)
           const encryptedKey = await this.storage.readText(keyPath);
-          const { decryptAndVerify } = await import('./crypto/index.js');
           const { data: binaryKey } = await decryptAndVerify(
             encryptedKey,
             this.privateKey,
