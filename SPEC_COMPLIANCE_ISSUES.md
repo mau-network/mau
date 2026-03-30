@@ -1,5 +1,7 @@
 # Mau TypeScript Implementation - Spec Compliance Issues
 
+**Last Updated:** 2026-03-30
+
 ## Missing Features
 
 ### 1. MDNS Service Discovery (§ Peer-to-Peer Stack)
@@ -22,38 +24,45 @@
 
 **Impact:** Users behind NAT cannot receive inbound connections. While DHT relay signaling helps establish WebRTC connections, there's no automatic port forwarding via UPNP/NAT-PMP for the HTTP server.
 
-### 3. Friend Keys Encryption (§ Why are friends' keys encrypted?)
+## Recently Fixed Issues
+
+### ✅ If-Modified-Since Header (§ Data Exchange) — Fixed in PR #82
+**Spec Requirement:** "Client will send the update time as a value for the HTTP header `If-Modified-Since`"
+
+**Was:** Using query parameter `?after=<date>` instead of standard HTTP header
+
+**Fixed:** Client now sends `If-Modified-Since` header per spec
+
+### ✅ Friend Keys Encryption (§ Why are friends' keys encrypted?) — Fixed
 **Spec Requirement:** "All friends' public keys should be encrypted with the account key"
 
-**Rationale (from spec):** "To make sure the friend public key is added by the account instead of a malicious program. If the public key is written in a plain format it means adding a friend is not an authenticated operation any program can do it without the user's permission"
+**Was:** Keys saved in binary format but NOT encrypted
 
-**Status:** **BUG** - Keys saved in binary format but NOT encrypted
+**Fixed:** Keys now encrypted with account's public key before writing to disk
 
-**Location:** `src/account.ts:187-189`
-```typescript
-const friendKeyPath = this.storage.join(this.getMauDir(), `${fingerprint}.pgp`);
-const binaryKey = publicKey.write();
-await this.storage.writeFile(friendKeyPath, binaryKey); // Should encrypt with account key
-```
+### ✅ Version File Extensions — Fixed
+**Spec Requirement:** Version files should have `.pgp` extension
 
-**Impact:** Friend keys can be tampered with by malicious programs. This defeats the authentication mechanism for the contact list.
+**Was:** Version files saved without `.pgp` extension
 
-**Fix Required:** Encrypt `binaryKey` with account's public key before writing to disk.
+**Fixed:** All version files now use `.pgp` extension
 
 ## Implementation Quality
 
 All core features are implemented:
 - ✅ PGP identity management
 - ✅ File encryption/signing
-- ✅ Versioning
+- ✅ Versioning with SHA-256 checksums
 - ✅ HTTP server interface (file list, file download, Range support)
 - ✅ Kademlia DHT over WebRTC with relay signaling
 - ✅ Client sync with retry and backoff
 - ✅ mTLS challenge-response authentication
+- ✅ Friend keys encrypted with account key
+- ✅ If-Modified-Since header for incremental sync
 
 ## Summary
 
-**Critical Bug:** Friend keys not encrypted (security issue)  
-**Missing Features:** MDNS discovery (2 implementations), NAT traversal (requires native libs)  
+**Missing Features:** MDNS discovery, NAT traversal (requires native libs)  
+**Recent Fixes:** If-Modified-Since header, friend key encryption, version file extensions
 
-The TypeScript implementation is otherwise solid and follows the spec closely.
+The TypeScript implementation is solid and follows the spec closely. Remaining gaps are optional features that require native libraries (mDNS, UPNP/NAT-PMP).
