@@ -17,17 +17,18 @@ Browser-based GUI for the Mau P2P network. Built with React, TypeScript, and the
 The easiest way to get started:
 
 ```bash
-# Install dependencies
-bun install
+# Install dependencies (from project root)
+npm install
 
 # Start both bootstrap peer and GUI
-npm run dev
+npm run dev -w gui
 ```
 
 This automatically:
-1. Starts Node.js bootstrap peer (WebRTC server)
-2. Starts GUI dev server
-3. Opens browser at http://localhost:5173
+1. Builds TypeScript library if needed
+2. Starts Node.js bootstrap peer on port 8444
+3. Starts Vite dev server on http://localhost:3000
+4. Runs both concurrently with colored output
 
 The bootstrap peer uses the TypeScript library and runs in Node.js - no Go compilation needed!
 
@@ -37,14 +38,12 @@ If you want to run components separately:
 
 **Terminal 1: Bootstrap Peer**
 ```bash
-cd ../typescript
-node bootstrap-server.mjs --port 8444
+npm run dev:peer -w gui
 ```
 
 **Terminal 2: GUI**
 ```bash
-cd gui
-bun run dev:gui
+npm run dev:gui -w gui
 ```
 
 ## Architecture
@@ -90,20 +89,24 @@ Bootstrap peers are configured in `src/config/network.ts`:
 
 ```bash
 # Development
-bun run dev          # Run bootstrap peer + GUI concurrently
-bun run dev:peer     # Run bootstrap peer only (port 8081)
-bun run dev:gui      # Run GUI only (port 5173)
+npm run dev -w gui          # Run bootstrap peer + GUI concurrently
+npm run dev:peer -w gui     # Run bootstrap peer only (port 8444)
+npm run dev:gui -w gui      # Run GUI only (port 3000)
+
+# Building
+npm run build -w gui        # Build GUI for production
+npm run build:ts -w gui     # Build TypeScript library only
 
 # Testing
-bun test             # Run unit tests
-bun run test:e2e     # Run E2E tests (requires GUI running)
+npm run test:e2e -w gui     # Run E2E tests (Playwright)
 
 # Code Quality
-bun run lint         # Run ESLint
-bun run type-check   # Run TypeScript compiler
+npm run lint -w gui         # Run ESLint
+npm run typecheck -w gui    # Run TypeScript compiler
+npm run format -w gui       # Format with Prettier
 
-# Build
-bun run build        # Build for production
+# Production
+npm run build -w gui        # Build for production
 ```
 
 ### Project Structure
@@ -122,7 +125,6 @@ gui/
 │   ├── app-state.ts      # Global app state
 │   └── main.tsx          # Entry point
 ├── tests/                # E2E tests
-├── dev-server.sh         # Development bootstrap peer script
 ├── .env                  # Environment variables (git-ignored)
 ├── .env.example          # Environment template
 └── vite.config.ts        # Vite configuration
@@ -130,33 +132,25 @@ gui/
 
 ### Bootstrap Peer Setup
 
-The development bootstrap peer (`dev-server.sh`) does the following:
+The development bootstrap peer (Node.js) provides:
 
-1. Builds the Go mau CLI binary (if not exists)
-2. Creates a dev account in `.dev-peer/` (if not exists)
-3. Starts two servers:
-   - **HTTPS Server** (port 8443): mTLS file serving for Go clients
-   - **WebSocket Signaling** (port 8444): Browser-compatible signaling
-4. Exposes:
-   - `GET /p2p/{fingerprint}` - File list endpoint (HTTPS, mTLS)
-   - `WS ws://localhost:8444` - WebSocket signaling for DHT bootstrap
+1. **WebSocket Signaling** (port 8444): Browser-compatible signaling for DHT bootstrap
+2. **WebRTC Data Channels**: Peer-to-peer communication after connection
+3. **Auto-configuration**: Creates `.env` file automatically with peer fingerprint
 
-**Why two servers?**
-- Go clients use HTTPS with mTLS for authenticated connections
-- Browser clients use WebSocket for signaling (browsers can't do mTLS programmatically)
-- After bootstrap, all clients use WebRTC data channels for P2P communication
-
-The peer data (`.dev-peer/` directory and `.dev-peer-bin` binary) are git-ignored.
+The bootstrap server is implemented using the TypeScript library (`../typescript/bootstrap-server.mjs`).
 
 ### Testing
 
-```bash
-# Unit tests
-bun test
+Unit tests use bun:test runtime and require bun to run. E2E tests use Playwright and work with npm.
 
-# E2E tests (requires GUI running)
-bun run dev:gui        # Terminal 1
-bun run test:e2e       # Terminal 2
+```bash
+# E2E tests (Playwright - works with npm)
+npm run dev:gui -w gui    # Terminal 1
+npm run test:e2e -w gui   # Terminal 2
+
+# Unit tests (requires bun)
+bun test
 ```
 
 ### Environment Variables
@@ -175,7 +169,7 @@ See `.env.example` for the complete list.
 ### Building
 
 ```bash
-bun run build
+npm run build -w gui
 ```
 
 Output will be in `dist/` directory.
@@ -202,14 +196,13 @@ const PRODUCTION_BOOTSTRAP_PEERS: Peer[] = [
 
 ### Bootstrap peer won't start
 
-- **Ports in use**: Change `HTTPS_PORT` or `WS_PORT` in `dev-server.sh` (defaults: 8443, 8444)
-- **Build fails**: Run `go build -o gui/.dev-peer-bin ./cmd/mau` from repo root
-- **Permission denied**: Run `chmod +x dev-server.sh`
+- **Build fails**: Ensure TypeScript library is built: `npm run build:ts -w gui`
+- **Port in use**: Change port in package.json or stop other services on port 8444
 
 ### GUI can't connect to DHT
 
-- Check `.env` has correct fingerprint and WebSocket address from dev peer output
-- Verify dev peer is running (`bun run dev:peer`)
+- Check `.env` has correct fingerprint and WebSocket address
+- Verify dev peer is running: `npm run dev:peer -w gui`
 - Check browser console for WebSocket connection logs
 - Look for: `[DHT] WebSocket connected, registering fingerprint...`
 - **WebSocket connection failed**: Ensure port 8444 is not blocked by firewall
@@ -217,19 +210,20 @@ const PRODUCTION_BOOTSTRAP_PEERS: Peer[] = [
 
 ### Tests fail
 
-Some test failures are expected:
-- Status store tests: Known issue with encryption
-- E2E tests: Require proper setup with `bun run test:e2e`
+- Unit tests require bun runtime (use `bun test` instead of npm)
+- E2E tests require GUI running: `npm run dev:gui -w gui` first
 
 ## Technology Stack
 
-- **Runtime**: Bun 1.3+
-- **Framework**: React 18 + TypeScript
-- **Build**: Vite
-- **UI**: Ant Design
+- **Package Manager**: npm (workspace)
+- **Runtime**: Node.js 18+ (server), Browser (GUI)
+- **Framework**: React 19 + TypeScript
+- **Build**: Vite 8
+- **UI**: Ant Design 6
 - **Storage**: IndexedDB (via `@mau-network/mau`)
 - **Crypto**: PGP (OpenPGP.js)
 - **P2P**: WebRTC + Kademlia DHT
+- **Testing**: Playwright (E2E), bun:test (unit)
 
 ## Contributing
 

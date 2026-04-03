@@ -6,6 +6,40 @@
  * node-datachannel polyfill set up in jest.setup.ts.
  */
 
+// TODO(testing): Add regression tests for recent DHT bug fixes
+// Per AGENTS.md, these bugs were fixed but lack explicit regression tests:
+// 1. Discovery algorithm zero-peers bug (fixed: proper bucket refresh)
+// 2. ICE candidate ordering (fixed: candidates sent AFTER SDP answer)
+// 3. Connection tie-breaking timeouts (fixed: timeout guards added)
+// 4. Memory leak in relay offers (fixed: try/catch with cleanup)
+// 5. Bootstrap timer lifecycle (fixed: bootstrapActive flag)
+//
+// Recommended test cases:
+// describe('DHT Regressions', () => {
+//   it('should discover peers even when routing table is empty', async () => {
+//     // Test for zero-peers bug fix
+//   });
+//   
+//   it('should send ICE candidates AFTER SDP answer', async () => {
+//     // Test for ICE ordering fix - verify message sequence
+//   });
+//   
+//   it('should handle simultaneous connection attempts with timeout', async () => {
+//     // Test for tie-breaking fix
+//   });
+//   
+//   it('should cleanup relay state on malformed offers', async () => {
+//     // Test for memory leak fix - send malformed relay_offer
+//   });
+//   
+//   it('should stop bootstrap timer after reaching DHT_K peers', async () => {
+//     // Test for bootstrap lifecycle - verify bootstrapActive flag behavior
+//   });
+// });
+//
+// Priority: HIGH - Prevent regressions
+// Impact: Confidence in DHT reliability, prevent bug reintroduction
+
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { KademliaDHT } from './dht';
 import { Account } from '../account';

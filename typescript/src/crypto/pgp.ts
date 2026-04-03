@@ -35,6 +35,37 @@ export async function generateKeyPair(options: AccountOptions): Promise<KeyPair>
     throw new MauError('Passphrase required', 'PASSPHRASE_REQUIRED');
   }
 
+  // TODO(security): Add comprehensive PGP key validation
+  // Current validation only checks RSA key size (line 56-60). Missing:
+  // 1. Key expiration validation (accepts expired keys silently)
+  // 2. Revocation status checking
+  // 3. Self-signature verification on imported friend keys
+  // 4. User ID matching (email in PGP key vs claimed identity)
+  //
+  // Recommendation: Add verifyKeyIntegrity() function:
+  // async function verifyKeyIntegrity(publicKey: PublicKey): Promise<void> {
+  //   // Check expiration
+  //   const expirationTime = await publicKey.getExpirationTime();
+  //   if (expirationTime && new Date() > expirationTime) {
+  //     throw new ExpiredKeyError();
+  //   }
+  //   
+  //   // Verify self-signatures
+  //   const valid = await publicKey.verifyPrimaryUser();
+  //   if (!valid) {
+  //     throw new InvalidKeySignatureError();
+  //   }
+  //   
+  //   // Check user IDs
+  //   const userIDs = publicKey.getUserIDs();
+  //   if (userIDs.length === 0) {
+  //     throw new MissingUserIDError();
+  //   }
+  // }
+  //
+  // Priority: HIGH - Security hardening
+  // Impact: Accepting expired/invalid keys compromises authentication
+
   const keyOptions: openpgp.GenerateKeyOptions = {
     userIDs: [{ name: options.name, email: options.email }],
     passphrase: options.passphrase,

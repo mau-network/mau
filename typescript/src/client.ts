@@ -30,6 +30,23 @@ import { deserializePublicKey, getFingerprint, verify, normalizeFingerprint } fr
  * console.log(`Downloaded ${stats.downloaded} files`);
  * ```
  */
+// TODO(performance): Add rate limiting to prevent accidental DoS
+// Current implementation uses p-retry with exponential backoff per-request, but no global
+// rate limiting across concurrent sync operations. When syncing 100+ peers simultaneously,
+// or when a bootstrap server restarts, retry storms can occur.
+//
+// Recommendation: Implement token bucket rate limiter
+// class RateLimiter {
+//   constructor(private tokens: number, private refillRate: number) {}
+//   async acquire(): Promise<void> {
+//     while (this.tokens < 1) await sleep(1000 / this.refillRate);
+//     this.tokens--;
+//   }
+// }
+//
+// Priority: MEDIUM
+// Impact: Accidental DoS when syncing many peers, retry storms on failures
+
 export class Client {
   private account: Account;
   private storage: Storage;

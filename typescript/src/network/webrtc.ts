@@ -94,6 +94,21 @@ export class WebRTCClient {
     // Yield to allow the native ICE stack to process candidates from the
     // remote SDP before the caller can close the connection.
     await new Promise<void>(resolve => setTimeout(resolve, 0));
+    
+    // TODO(security): CRITICAL - Add WebRTC certificate pinning verification
+    // After connection established, verify the peer certificate matches the expected PGP fingerprint.
+    // Go implementation (client.go:59) verifies peer certificate with VerifyPeerCertificate callback.
+    // Current TypeScript implementation only does PGP challenge-response AFTER data channel opens,
+    // which leaves a window for MITM attacks during signaling phase.
+    // 
+    // Recommendation:
+    // const cert = await this.connection.getConfiguration().certificates?.[0];
+    // if (cert && !await verifyCertMatchesPGPKey(cert, this.peer)) {
+    //   throw new IncorrectPeerCertificateError();
+    // }
+    //
+    // Priority: HIGH - Security vulnerability
+    // Impact: MITM attacks possible if attacker controls signaling server
   }
 
   /**
@@ -112,6 +127,10 @@ export class WebRTCClient {
    */
   async performMTLS(maxRetries = 2): Promise<boolean> {
     if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+      // TODO(error-handling): Replace generic Error with custom error class
+      // Should be: throw new DataChannelNotReadyError();
+      // Add to types/index.ts: export class DataChannelNotReadyError extends MauError
+      // Priority: MEDIUM - Part of error handling standardization
       throw new Error('Data channel not ready');
     }
     return pRetry(() => this.doPerformMTLS(), {

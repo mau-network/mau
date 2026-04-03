@@ -28,8 +28,44 @@ export interface ServerResponse {
 /**
  * Server handles HTTP requests for file serving
  * 
- * This is a framework-agnostic implementation that can be
- * integrated with any HTTP server (Express, http.createServer, etc.)
+ * This is a framework-agnostic implementation that can be integrated with any
+ * HTTP server (Express, http.createServer, etc.) by calling `handleRequest()`.
+ * 
+ * ## Design Decision: Class vs Function
+ * 
+ * The Server is implemented as a class rather than a simple function factory for
+ * the following reasons:
+ * 
+ * 1. **Future Extensibility**: Class structure allows easy addition of lifecycle
+ *    methods (start/stop), middleware pipeline, connection pooling, or rate limiting
+ *    without breaking the public API.
+ * 
+ * 2. **State Encapsulation**: Configuration and dependencies (account, storage, DHT)
+ *    are encapsulated as private properties, providing clear boundaries.
+ * 
+ * 3. **Testability**: Class instances can be easily mocked and tested in isolation.
+ *    Private methods like `handleFile()`, `handleAuth()` are organized under a
+ *    single namespace.
+ * 
+ * 4. **Consistency**: Matches the API design of other core classes (Account, Client,
+ *    File) which also use class-based patterns with factory methods.
+ * 
+ * While the Go implementation uses `http.ServeMux` directly, the TypeScript version
+ * benefits from the class structure for browser-first architecture where lifecycle
+ * hooks and state management become more relevant (e.g., WebRTC connection pools,
+ * DHT integration, request logging).
+ * 
+ * @example
+ * ```typescript
+ * const server = new Server(account, storage, { resultsLimit: 50 }, dht);
+ * const response = await server.handleRequest({
+ *   method: 'GET',
+ *   url: '/p2p/abc123/file.txt',
+ *   path: '/p2p/abc123/file.txt',
+ *   query: {},
+ *   headers: {},
+ * });
+ * ```
  */
 export class Server {
   private account: Account;

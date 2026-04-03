@@ -11,4 +11,13 @@ gui/mau-gui-poc
 *.out
 coverage*.out
 *.prof
+
+# Node.js
 /node_modules/
+package-lock.json
+
+# Lock files for non-npm package managers (project uses npm)
+pnpm-lock.yaml
+pnpm-workspace.yaml
+bun.lock
+yarn.lock

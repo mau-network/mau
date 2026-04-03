@@ -105,6 +105,10 @@ export class WebSocketSignaling {
   async send(message: SignalingMessage): Promise<void> {
     await this.connected;
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      // TODO(error-handling): Replace generic Error with custom error class
+      // Should be: throw new WebSocketNotConnectedError();
+      // Add to types/index.ts
+      // Priority: MEDIUM - Part of error handling standardization
       throw new Error('WebSocket not connected');
     }
     this.ws.send(JSON.stringify(message));

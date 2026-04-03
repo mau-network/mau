@@ -5,15 +5,15 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "./dev.sh",
-    "dev:peer": "./dev-server.sh",
-    "dev:peer:wait": "./dev-server-wait.sh",
+    "dev": "npm run build:ts && concurrently -n peer,gui -c cyan,magenta \"npm run dev:peer\" \"npm run dev:gui\"",
+    "dev:peer": "cd ../typescript && node bootstrap-server.mjs --port 8444",
     "dev:gui": "vite",
     "build": "vite build",
+    "build:ts": "cd ../typescript && npm run build",
     "preview": "vite preview",
-    "test": "bun test --coverage src",
+    "test": "echo 'GUI tests require bun:test runtime. Install bun or migrate to jest.' && exit 1",
     "test:e2e": "playwright test",
-    "test:watch": "bun test --watch",
+    "test:watch": "echo 'GUI tests require bun:test runtime. Install bun or migrate to jest.' && exit 1",
     "lint": "eslint src --ext .ts --max-warnings 0",
     "format": "prettier --write 'src/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts'",
@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.1",
-    "@mau-network/mau": "workspace:*",
+    "@mau-network/mau": "*",
     "antd": "^6.3.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -30,7 +30,6 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
-    "@types/bun": "latest",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/uuid": "^11.0.0",
@@ -52,8 +51,7 @@
   "lint-staged": {
     "*.ts": [
       "eslint --max-warnings 0",
-      "prettier --write",
-      "bun test --bail"
+      "prettier --write"
     ]
   }
 }

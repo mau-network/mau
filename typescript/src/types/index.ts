@@ -128,6 +128,28 @@ export const DHT_STALL_PERIOD_MS = 3600000; // 1 hour
 export const DHT_PING_MIN_BACKOFF_MS = 30000; // 30 seconds
 
 /** Errors */
+// TODO(architecture): Standardize error handling across codebase
+// Current implementation has 3 different error handling patterns:
+// 1. Custom error classes (Account, File) - throw new PassphraseRequiredError()
+// 2. Generic errors (WebRTC, Storage) - throw new Error('Data channel not ready')
+// 3. Return null (Resolvers) - return null on failure
+//
+// Inconsistent error handling makes debugging difficult. Consumers don't know whether
+// to expect exceptions or null checks.
+//
+// Recommendation: Add missing custom error classes for all failure modes:
+// - DataChannelNotReadyError
+// - ExpiredKeyError
+// - InvalidKeySignatureError
+// - MissingUserIDError
+// - ConnectionTimeoutError
+//
+// Convert all "throw new Error()" to custom error classes with error codes.
+// Convert null-returning functions to throw on failure for consistency.
+//
+// Priority: MEDIUM
+// Impact: Better error handling, easier debugging, consistent API
+
 export class MauError extends Error {
   constructor(message: string, public code: string) {
     super(message);

@@ -135,6 +135,18 @@ export class BrowserStorage implements Storage {
     return parts.join('/').replace(/\/+/g, '/').replace(/^\//, '');
   }
 
+  // TODO(cleanup): Remove unused batch operations or document their purpose
+  // writeBatch() and readBatch() are not called anywhere in the codebase.
+  // Verification: grep -r "writeBatch\|readBatch" typescript/src/ returns only these definitions.
+  //
+  // Options:
+  // 1. REMOVE if not planned for future use
+  // 2. DOCUMENT with JSDoc explaining future bulk sync optimization plans
+  // 3. ADD TESTS to ensure they work correctly if keeping
+  //
+  // Priority: LOW - Cleanup/maintenance
+  // Impact: Dead code increases maintenance burden (26 LOC unused)
+
   async writeBatch(files: Array<{ path: string; data: Uint8Array }>): Promise<void> {
     const tx = this.db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);

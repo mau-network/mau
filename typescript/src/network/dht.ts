@@ -84,6 +84,41 @@ function waitICE(pc: RTCPeerConnection): Promise<void> {
 
 // ── KademliaDHT ───────────────────────────────────────────────────────────────
 
+// TODO(architecture): REFACTOR - Split this 1255 LOC monolith into smaller modules
+// Current file violates Single Responsibility Principle with 35+ private methods.
+//
+// Recommended structure:
+// network/dht/
+//   ├── routing-table.ts   (Bucket management, XOR distance - ~300 LOC)
+//   ├── connection-pool.ts (WebRTC lifecycle, relay signaling - ~400 LOC)
+//   ├── discovery.ts       (Peer discovery algorithm - ~300 LOC)
+//   ├── bootstrap.ts       (Bootstrap timer, ICE gathering - ~200 LOC)
+//   └── index.ts           (Public API, orchestration - ~150 LOC)
+//
+// Benefits:
+// - Easier testing (mock connection pool without routing table)
+// - Better code navigation
+// - Reduced merge conflicts
+// - Each module has single, clear responsibility
+//
+// Priority: MEDIUM
+// Impact: Maintainability, testability
+
+// TODO(reliability): Add timeout guards to all network operations
+// Many async operations lack timeouts and can stall indefinitely on slow/dead peers.
+// Example: connectToPeer() at line 299, send() operations.
+//
+// Recommendation: Wrap all external calls with Promise.race() timeout:
+// async connectWithTimeout(peer: Peer, timeoutMs = 10000): Promise<void> {
+//   return Promise.race([
+//     this.connectToPeer(peer),
+//     new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs))
+//   ]);
+// }
+//
+// Priority: HIGH
+// Impact: Deadlocked discovery loop, poor peer health
+
 export class KademliaDHT {
   private readonly account: Account;
   private readonly ice: RTCIceServer[];

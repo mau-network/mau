@@ -84,6 +84,14 @@ export class WebRTCServer {
     const answer = await peer.createAnswer();
     await peer.setLocalDescription(answer);
 
+    // TODO(security): CRITICAL - Add WebRTC certificate pinning verification
+    // After remote description is set, verify the peer certificate matches expected PGP fingerprint.
+    // Similar to webrtc.ts, we should verify the peer's certificate before accepting the connection.
+    // Current implementation relies solely on data channel authentication which happens later.
+    //
+    // Priority: HIGH - Security vulnerability
+    // Impact: Malicious peers could establish connections during MITM scenarios
+
     // Wait for ICE gathering to complete so the answer SDP contains all
     // candidates — no trickle-ICE signaling channel required.
     await new Promise<void>((resolve): void => {
