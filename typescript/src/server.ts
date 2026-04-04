@@ -80,8 +80,11 @@ export class Server {
     const fingerprint = pathMatch[1];
     const resource = pathMatch[3];
 
-    // Verify fingerprint matches account
-    if (fingerprint !== this.account.getFingerprint()) {
+    // Check if this is the account's own content or a friend's content (relay)
+    const isOwnContent = fingerprint === this.account.getFingerprint();
+    const isFriendContent = !isOwnContent && this.account.hasFriend(fingerprint);
+    
+    if (!isOwnContent && !isFriendContent) {
       return this.notFound();
     }
 
@@ -105,6 +108,12 @@ export class Server {
    * Handle file list request
    */
   private async handleFileList(req: ServerRequest): Promise<ServerResponse> {
+    const pathMatch = req.path.match(/^\/p2p\/([0-9a-f]+)/);
+    if (!pathMatch) {
+      return this.notFound();
+    }
+    const fingerprint = pathMatch[1];
+
     // Parse If-Modified-Since header for incremental sync
     let modifiedSince = 0;
     const ifModifiedSinceHeader = req.headers['if-modified-since'];
@@ -115,7 +124,12 @@ export class Server {
       }
     }
 
-    const files = await this.account.listFiles();
+    // Get content directory (own or friend's)
+    const contentDir = fingerprint === this.account.getFingerprint()
+      ? this.account.getContentDir()
+      : this.account.getFriendContentDir(fingerprint);
+
+    const files = await this.account.listFiles(contentDir);
     const fileList: FileListItem[] = [];
 
     for (const file of files) {
@@ -259,7 +273,15 @@ export class Server {
         throw new InvalidFileNameError('contains invalid characters or path separators');
       }
 
-      const contentDir = this.account.getContentDir();
+      // Extract fingerprint from request path
+      const pathMatch = req?.path.match(/^\/p2p\/([0-9a-f]+)/);
+      const fingerprint = pathMatch?.[1] || this.account.getFingerprint();
+
+      // Get content directory (own or friend's)
+      const contentDir = fingerprint === this.account.getFingerprint()
+        ? this.account.getContentDir()
+        : this.account.getFriendContentDir(fingerprint);
+
       const filePath = this.storage.join(contentDir, fileName);
       const data = await this.storage.readFile(filePath);
       const totalSize = data.length;
@@ -321,7 +343,15 @@ export class Server {
         throw new InvalidFileNameError('contains invalid characters or path separators');
       }
 
-      const contentDir = this.account.getContentDir();
+      // Extract fingerprint from request path
+      const pathMatch = req?.path.match(/^\/p2p\/([0-9a-f]+)/);
+      const fingerprint = pathMatch?.[1] || this.account.getFingerprint();
+
+      // Get content directory (own or friend's)
+      const contentDir = fingerprint === this.account.getFingerprint()
+        ? this.account.getContentDir()
+        : this.account.getFriendContentDir(fingerprint);
+
       const filePath = this.storage.join(contentDir, fileName);
       const versionDir = `${filePath}.versions`;
       const versionPath = this.storage.join(versionDir, `${versionHash}.pgp`);

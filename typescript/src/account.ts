@@ -242,6 +242,13 @@ export class Account {
   }
 
   /**
+   * Alias for isFriend (for clarity in relay contexts)
+   */
+  hasFriend(fingerprint: Fingerprint): boolean {
+    return this.isFriend(fingerprint);
+  }
+
+  /**
    * Load all friends from disk
    */
   private async loadFriends(): Promise<void> {
@@ -371,30 +378,31 @@ export class Account {
   }
 
   /**
-   * List all files in this account's content directory
+   * List all files in a content directory (defaults to own content)
+   * @param contentDir Optional content directory (defaults to own content dir)
    * @returns Array of File instances
    * 
    * @example
    * ```typescript
+   * // List own files
    * const files = await account.listFiles();
-   * for (const file of files) {
-   *   console.log(file.getName());
-   * }
+   * // List friend's files
+   * const friendFiles = await account.listFiles(account.getFriendContentDir(friendFingerprint));
    * ```
    */
-  async listFiles(): Promise<Array<import('./file.js').File>> {
+  async listFiles(contentDir?: string): Promise<Array<import('./file.js').File>> {
     const { File } = await import('./file.js');
-    const contentDir = this.getContentDir();
+    const targetDir = contentDir || this.getContentDir();
     
-    if (!(await this.storage.exists(contentDir))) {
+    if (!(await this.storage.exists(targetDir))) {
       return [];
     }
 
-    const entries = await this.storage.readDir(contentDir);
+    const entries = await this.storage.readDir(targetDir);
     const files: Array<import('./file.js').File> = [];
 
     for (const entry of entries) {
-      const filePath = this.storage.join(contentDir, entry);
+      const filePath = this.storage.join(targetDir, entry);
       const stats = await this.storage.stat(filePath);
       
       // Skip directories and version directories
