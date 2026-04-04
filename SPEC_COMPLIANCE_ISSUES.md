@@ -1,6 +1,6 @@
 # Mau TypeScript Implementation - Spec Compliance Issues
 
-**Last Updated:** 2026-03-30
+**Last Updated:** 2026-04-04
 
 ## Missing Features
 
@@ -25,6 +25,13 @@
 **Impact:** Users behind NAT cannot receive inbound connections. While DHT relay signaling helps establish WebRTC connections, there's no automatic port forwarding via UPNP/NAT-PMP for the HTTP server.
 
 ## Recently Fixed Issues
+
+### ✅ Content Relay (§ Data Exchange) — Fixed in PR #83 (2026-04-04)
+**Spec Requirement:** "Using another fingerprint in the request to `/<user-fingerprint>`, `/<user-fingerprint>/<filename>` and `/<user-fingerprint>/<file-name>.versions/<version-hash>` will allow a user to relay other people content if desired."
+
+**Was:** Server only served its own content (rejected requests for friend fingerprints)
+
+**Fixed:** Server now accepts requests for friend fingerprints and serves their content from friend directories
 
 ### ✅ If-Modified-Since Header (§ Data Exchange) — Fixed in PR #82
 **Spec Requirement:** "Client will send the update time as a value for the HTTP header `If-Modified-Since`"
