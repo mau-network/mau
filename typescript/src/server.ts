@@ -130,17 +130,29 @@ export class Server {
       : this.account.getFriendContentDir(fingerprint);
 
     const files = await this.account.listFiles(contentDir);
-    const fileList: FileListItem[] = [];
-
+    
+    // Build list of files with their modification times
+    const filesWithTime: Array<{ file: typeof files[0]; modTime: number }> = [];
+    
     for (const file of files) {
+      const stats = await this.storage.stat(file.getPath());
+      const modTime = stats.modifiedTime || 0;
+      
       // Check modification time if filtering is requested
-      if (modifiedSince > 0) {
-        const stats = await this.storage.stat(file.getPath());
-        if (stats.modifiedTime && stats.modifiedTime <= modifiedSince) {
-          continue; // Skip files not modified since the specified time
-        }
+      if (modifiedSince > 0 && modTime <= modifiedSince) {
+        continue; // Skip files not modified since the specified time
       }
-
+      
+      filesWithTime.push({ file, modTime });
+    }
+    
+    // Sort by modification time (oldest first) per spec
+    filesWithTime.sort((a, b) => a.modTime - b.modTime);
+    
+    // Build final file list with checksums
+    const fileList: FileListItem[] = [];
+    
+    for (const { file } of filesWithTime) {
       const [sum, size] = await Promise.all([file.getChecksum(), file.getSize()]);
 
       fileList.push({
