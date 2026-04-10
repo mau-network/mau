@@ -185,7 +185,6 @@ export class Account {
     // Rationale: Prevents malicious programs from tampering with the contact list
     const friendKeyPath = this.storage.join(this.getMauDir(), `${fingerprint}.pgp`);
     const binaryKey = publicKey.write();
-    
     const encryptedKey = await signAndEncrypt(binaryKey, this.privateKey, [this.publicKey]);
     await this.storage.writeText(friendKeyPath, encryptedKey);
 
@@ -256,13 +255,13 @@ export class Account {
       if (entry.endsWith('.pgp') && entry !== ACCOUNT_KEY_FILENAME) {
         const keyPath = this.storage.join(mauDir, entry);
         try {
+          // Read and decrypt friend key (encrypted with account key per spec)
           const encryptedKey = await this.storage.readText(keyPath);
           const { data: binaryKey } = await decryptAndVerify(
             encryptedKey,
             this.privateKey,
             [this.publicKey]
           );
-          
           const publicKey = await openpgp.readKey({ binaryKey });
           const fingerprint = getFingerprint(publicKey);
           this.friends.set(fingerprint, publicKey);
