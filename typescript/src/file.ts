@@ -133,15 +133,30 @@ export class File {
 
   /**
    * Write, sign, and encrypt file content
+   * @param data Content to write
+   * @param recipients Optional array of friend fingerprints to encrypt for (defaults to self + all friends)
    */
-  async write(data: Uint8Array | string): Promise<void> {
+  async write(data: Uint8Array | string, recipients?: string[]): Promise<void> {
     // Archive current version if file exists
     if (await this.storage.exists(this.filePath)) {
       await this.archiveCurrentVersion();
     }
 
-    // Get encryption keys (self + friends)
-    const encryptionKeys = this.account.getAllPublicKeys();
+    // Get encryption keys
+    let encryptionKeys: import('openpgp').PublicKey[];
+    if (recipients) {
+      // Encrypt for self + specified friends only
+      encryptionKeys = [this.account.getPublicKeyObject()];
+      for (const fpr of recipients) {
+        const friendKey = this.account.getFriendKey(fpr);
+        if (friendKey) {
+          encryptionKeys.push(friendKey);
+        }
+      }
+    } else {
+      // Default: encrypt for self + all friends
+      encryptionKeys = this.account.getAllPublicKeys();
+    }
 
     // Sign and encrypt
     const armoredMessage = await signAndEncrypt(
@@ -156,17 +171,21 @@ export class File {
 
   /**
    * Write text content
+   * @param text Text content
+   * @param recipients Optional array of friend fingerprints to encrypt for
    */
-  async writeText(text: string): Promise<void> {
-    await this.write(text);
+  async writeText(text: string, recipients?: string[]): Promise<void> {
+    await this.write(text, recipients);
   }
 
   /**
    * Write JSON content
+   * @param obj JSON object
+   * @param recipients Optional array of friend fingerprints to encrypt for
    */
-  async writeJSON(obj: unknown): Promise<void> {
+  async writeJSON(obj: unknown, recipients?: string[]): Promise<void> {
     const text = JSON.stringify(obj, null, 2);
-    await this.write(text);
+    await this.write(text, recipients);
   }
 
   /**
