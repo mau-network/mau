@@ -361,8 +361,12 @@ export class Account {
       throw new InvalidFileNameError('contains invalid characters or path separators');
     }
 
+    // Per spec: all content files must have .pgp extension
+    // "Initially a file has one version (the latest version) which is written in `<file-name>.pgp`"
+    const normalizedFileName = fileName.endsWith('.pgp') ? fileName : `${fileName}.pgp`;
+
     const contentDir = this.getContentDir();
-    const filePath = this.storage.join(contentDir, fileName);
+    const filePath = this.storage.join(contentDir, normalizedFileName);
 
     return new File(this, this.storage, filePath, false);
   }

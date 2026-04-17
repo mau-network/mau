@@ -66,8 +66,8 @@ describe('Server', () => {
   it('should handle file download request', async () => {
     const response = await server.handleRequest({
       method: 'GET',
-      url: `/p2p/${account.getFingerprint()}/test1.json`,
-      path: `/p2p/${account.getFingerprint()}/test1.json`,
+      url: `/p2p/${account.getFingerprint()}/test1.json.pgp`,
+      path: `/p2p/${account.getFingerprint()}/test1.json.pgp`,
       query: {},
       headers: {},
     });
@@ -136,8 +136,8 @@ describe('Server', () => {
 
     const response = await server.handleRequest({
       method: 'GET',
-      url: `/p2p/${account.getFingerprint()}/versioned.json.versions/${version1}`,
-      path: `/p2p/${account.getFingerprint()}/versioned.json.versions/${version1}`,
+      url: `/p2p/${account.getFingerprint()}/versioned.json.pgp.versions/${version1}`,
+      path: `/p2p/${account.getFingerprint()}/versioned.json.pgp.versions/${version1}`,
       query: {},
       headers: {},
     });
