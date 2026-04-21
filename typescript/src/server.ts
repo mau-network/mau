@@ -187,6 +187,41 @@ export class Server {
   }
 
   /**
+   * Create Express/Connect middleware adapter
+   * 
+   * Converts Express req/res to Mau ServerRequest/ServerResponse format.
+   * 
+   * @example
+   * ```typescript
+   * const app = express();
+   * const server = account.createServer();
+   * app.use(server.expressMiddleware());
+   * ```
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  expressMiddleware(): (req: any, res: any, next: any) => void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (req: any, res: any, next: any): void => {
+      const mauReq: ServerRequest = {
+        method: req.method || 'GET',
+        url: req.url || req.originalUrl || '/',
+        path: req.path || req.url || '/',
+        query: (req.query || {}) as Record<string, string>,
+        headers: (req.headers || {}) as Record<string, string>,
+        body: req.body,
+      };
+
+      this.handleRequest(mauReq)
+        .then((mauRes) => {
+          res.status(mauRes.status);
+          Object.entries(mauRes.headers).forEach(([k, v]) => res.setHeader(k, v));
+          res.send(mauRes.body);
+        })
+        .catch(next);
+    };
+  }
+
+  /**
    * Handle DHT WebRTC offer: POST /p2p/dht/offer
    * Body: { from: Fingerprint, offer: RTCSessionDescriptionInit }
    * Response: { answer: RTCSessionDescriptionInit }

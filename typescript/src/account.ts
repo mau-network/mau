@@ -323,6 +323,39 @@ export class Account {
   }
 
   /**
+   * Get public keys for specific fingerprints
+   * 
+   * @param fingerprints Array of fingerprints to get keys for
+   * @returns Array of public keys (always includes self + specified recipients)
+   * @throws {MauError} If any fingerprint is not found
+   */
+  getPublicKeys(fingerprints: string[]): openpgp.PublicKey[] {
+    const keys: openpgp.PublicKey[] = [this.publicKey]; // Always include self
+    const notFound: string[] = [];
+    const ownFingerprint = this.getFingerprint();
+
+    for (const fp of fingerprints) {
+      if (fp === ownFingerprint) {
+        continue; // Already included
+      } else if (this.friends.has(fp)) {
+        keys.push(this.friends.get(fp)!);
+      } else {
+        notFound.push(fp);
+      }
+    }
+
+    if (notFound.length > 0) {
+      const { MauError } = require('./types/index.js');
+      throw new MauError(
+        `Fingerprints not found: ${notFound.join(', ')}`,
+        'FINGERPRINT_NOT_FOUND'
+      );
+    }
+
+    return keys;
+  }
+
+  /**
    * Get storage instance (for internal use)
    * @internal
    */
