@@ -202,11 +202,8 @@ describe('Server', () => {
       },
     });
 
-    expect(response.status).toBe(200);
-    const body = JSON.parse(response.body as string);
-    
-    // Since all files were created before the future date, none should be returned
-    expect(body.files.length).toBe(0);
+    // Per spec: should return 304 when no files modified since If-Modified-Since
+    expect(response.status).toBe(304);
   });
 
   it('should include all files when If-Modified-Since is in the past', async () => {

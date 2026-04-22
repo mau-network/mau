@@ -133,15 +133,25 @@ export class File {
 
   /**
    * Write, sign, and encrypt file content
+   * 
+   * @param data Content to write
+   * @param options.recipients Optional array of fingerprints to encrypt for (defaults to all friends)
    */
-  async write(data: Uint8Array | string): Promise<void> {
+  async write(data: Uint8Array | string, options?: { recipients?: string[] }): Promise<void> {
     // Archive current version if file exists
     if (await this.storage.exists(this.filePath)) {
       await this.archiveCurrentVersion();
     }
 
-    // Get encryption keys (self + friends)
-    const encryptionKeys = this.account.getAllPublicKeys();
+    // Get encryption keys
+    let encryptionKeys;
+    if (options?.recipients && options.recipients.length > 0) {
+      // Selective encryption - use specified recipients
+      encryptionKeys = this.account.getPublicKeys(options.recipients);
+    } else {
+      // Default - encrypt for self + all friends
+      encryptionKeys = this.account.getAllPublicKeys();
+    }
 
     // Sign and encrypt
     const armoredMessage = await signAndEncrypt(
@@ -156,17 +166,23 @@ export class File {
 
   /**
    * Write text content
+   * 
+   * @param text Text to write
+   * @param options.recipients Optional array of fingerprints to encrypt for
    */
-  async writeText(text: string): Promise<void> {
-    await this.write(text);
+  async writeText(text: string, options?: { recipients?: string[] }): Promise<void> {
+    await this.write(text, options);
   }
 
   /**
    * Write JSON content
+   * 
+   * @param obj Object to write as JSON
+   * @param options.recipients Optional array of fingerprints to encrypt for
    */
-  async writeJSON(obj: unknown): Promise<void> {
+  async writeJSON(obj: unknown, options?: { recipients?: string[] }): Promise<void> {
     const text = JSON.stringify(obj, null, 2);
-    await this.write(text);
+    await this.write(text, options);
   }
 
   /**
