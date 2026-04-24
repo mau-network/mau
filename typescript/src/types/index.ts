@@ -63,6 +63,9 @@ export interface Storage {
   
   /** Remove file or directory */
   remove(path: string): Promise<void>;
+
+  /** Rename/move file or directory */
+  rename(oldPath: string, newPath: string): Promise<void>;
   
   /** Get file stats */
   stat(path: string): Promise<{ size: number; isDirectory: boolean; modifiedTime?: number }>;

@@ -152,17 +152,37 @@ export class Server {
     }
 
     const files = await this.account.listFiles();
-    const fileList: FileListItem[] = [];
-
+    
+    // Collect files with their modification times for sorting
+    const filesWithStats: Array<{ file: typeof files[0]; modTime: number }> = [];
+    
     for (const file of files) {
-      // Check modification time if filtering is requested
-      if (modifiedSince > 0) {
-        const stats = await this.storage.stat(file.getPath());
-        if (stats.modifiedTime && stats.modifiedTime <= modifiedSince) {
-          continue; // Skip files not modified since the specified time
-        }
+      const stats = await this.storage.stat(file.getPath());
+      const modTime = stats.modifiedTime || 0;
+      
+      // Skip files not modified since the specified time
+      if (modifiedSince > 0 && modTime <= modifiedSince) {
+        continue;
       }
-
+      
+      filesWithStats.push({ file, modTime });
+    }
+    
+    // Per spec: return 304 if no files modified since If-Modified-Since
+    if (modifiedSince > 0 && filesWithStats.length === 0) {
+      return {
+        status: 304,
+        headers: {},
+        body: '',
+      };
+    }
+    
+    // Per spec: order files by modification date in ascending order (oldest first)
+    filesWithStats.sort((a, b) => a.modTime - b.modTime);
+    
+    const fileList: FileListItem[] = [];
+    
+    for (const { file } of filesWithStats) {
       const [sum, size] = await Promise.all([file.getChecksum(), file.getSize()]);
 
       fileList.push({
@@ -183,6 +203,41 @@ export class Server {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ files: fileList }),
+    };
+  }
+
+  /**
+   * Create Express/Connect middleware adapter
+   * 
+   * Converts Express req/res to Mau ServerRequest/ServerResponse format.
+   * 
+   * @example
+   * ```typescript
+   * const app = express();
+   * const server = account.createServer();
+   * app.use(server.expressMiddleware());
+   * ```
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  expressMiddleware(): (req: any, res: any, next: any) => void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (req: any, res: any, next: any): void => {
+      const mauReq: ServerRequest = {
+        method: req.method || 'GET',
+        url: req.url || req.originalUrl || '/',
+        path: req.path || req.url || '/',
+        query: (req.query || {}) as Record<string, string>,
+        headers: (req.headers || {}) as Record<string, string>,
+        body: req.body,
+      };
+
+      this.handleRequest(mauReq)
+        .then((mauRes) => {
+          res.status(mauRes.status);
+          Object.entries(mauRes.headers).forEach(([k, v]) => res.setHeader(k, v));
+          res.send(mauRes.body);
+        })
+        .catch(next);
     };
   }
 

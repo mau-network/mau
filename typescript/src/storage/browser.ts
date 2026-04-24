@@ -125,6 +125,42 @@ export class BrowserStorage implements Storage {
     await tx.done;
   }
 
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    const entry = await this.db.get(STORE_NAME, oldPath);
+    if (!entry) {
+      throw new Error(`Path not found: ${oldPath}`);
+    }
+
+    // If renaming a directory, rename all children recursively
+    if (entry.isDirectory) {
+      const prefix = oldPath.endsWith('/') ? oldPath : oldPath + '/';
+      const range = IDBKeyRange.bound(prefix, prefix + '\uffff');
+      const keys = await this.db.getAllKeys(STORE_NAME, range);
+      
+      const tx = this.db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      
+      // Rename all children
+      for (const key of keys) {
+        const child = await store.get(key);
+        if (child) {
+          const newKey = key.replace(oldPath, newPath);
+          await store.put({ ...child, path: newKey });
+          await store.delete(key);
+        }
+      }
+      
+      // Rename the directory itself
+      await store.put({ ...entry, path: newPath });
+      await store.delete(oldPath);
+      await tx.done;
+    } else {
+      // Simple file rename
+      await this.db.put(STORE_NAME, { ...entry, path: newPath });
+      await this.db.delete(STORE_NAME, oldPath);
+    }
+  }
+
   async stat(path: string): Promise<{ size: number; isDirectory: boolean; modifiedTime?: number }> {
     const entry = await this.db.get(STORE_NAME, path);
     if (!entry) {throw new Error(`Path not found: ${path}`);}
