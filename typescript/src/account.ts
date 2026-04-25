@@ -241,6 +241,68 @@ export class Account {
   }
 
   /**
+   * Follow a friend (makes their content directory visible for sync)
+   * Creates a directory named after their fingerprint in the account root.
+   * If already following, this is a no-op.
+   */
+  async follow(fingerprint: Fingerprint): Promise<void> {
+    const followed = this.storage.join(this.rootPath, fingerprint);
+    const unfollowed = this.storage.join(this.rootPath, `.${fingerprint}`);
+
+    // Already following
+    if (await this.storage.exists(followed)) {
+      return;
+    }
+
+    // Was unfollowed, rename to followed
+    if (await this.storage.exists(unfollowed)) {
+      await this.storage.rename(unfollowed, followed);
+      return;
+    }
+
+    // New follow, create directory
+    await this.storage.mkdir(followed);
+  }
+
+  /**
+   * Unfollow a friend (hides their content directory from sync)
+   * Renames their directory to .{fingerprint} (hidden).
+   * If not following, this is a no-op.
+   */
+  async unfollow(fingerprint: Fingerprint): Promise<void> {
+    const followed = this.storage.join(this.rootPath, fingerprint);
+    const unfollowed = this.storage.join(this.rootPath, `.${fingerprint}`);
+
+    // Currently following, rename to unfollowed
+    if (await this.storage.exists(followed)) {
+      await this.storage.rename(followed, unfollowed);
+    }
+  }
+
+  /**
+   * List all followed friends
+   * Returns fingerprints of friends whose directories are visible (not hidden)
+   */
+  async listFollowing(): Promise<Fingerprint[]> {
+    const entries = await this.storage.readDir(this.rootPath);
+    const following: Fingerprint[] = [];
+
+    for (const entry of entries) {
+      // Skip hidden directories (unfollowed) and special directories
+      if (entry.startsWith('.') || entry === MAU_DIR_NAME) {
+        continue;
+      }
+
+      // Check if it's a valid fingerprint directory and a known friend
+      if (this.friends.has(entry)) {
+        following.push(entry);
+      }
+    }
+
+    return following;
+  }
+
+  /**
    * Load all friends from disk
    */
   private async loadFriends(): Promise<void> {
@@ -320,6 +382,39 @@ export class Account {
    */
   getAllPublicKeys(): openpgp.PublicKey[] {
     return [this.publicKey, ...Array.from(this.friends.values())];
+  }
+
+  /**
+   * Get public keys for specific fingerprints
+   * 
+   * @param fingerprints Array of fingerprints to get keys for
+   * @returns Array of public keys (always includes self + specified recipients)
+   * @throws {MauError} If any fingerprint is not found
+   */
+  getPublicKeys(fingerprints: string[]): openpgp.PublicKey[] {
+    const keys: openpgp.PublicKey[] = [this.publicKey]; // Always include self
+    const notFound: string[] = [];
+    const ownFingerprint = this.getFingerprint();
+
+    for (const fp of fingerprints) {
+      if (fp === ownFingerprint) {
+        continue; // Already included
+      } else if (this.friends.has(fp)) {
+        keys.push(this.friends.get(fp)!);
+      } else {
+        notFound.push(fp);
+      }
+    }
+
+    if (notFound.length > 0) {
+      const { MauError } = require('./types/index.js');
+      throw new MauError(
+        `Fingerprints not found: ${notFound.join(', ')}`,
+        'FINGERPRINT_NOT_FOUND'
+      );
+    }
+
+    return keys;
   }
 
   /**

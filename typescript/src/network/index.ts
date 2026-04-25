@@ -29,3 +29,7 @@ export type { SignalingMessage } from './signaling.js';
 
 // Kademlia DHT for distributed peer discovery
 export { KademliaDHT } from './dht.js';
+
+// mDNS for local network peer discovery
+export { MauMDNS, createMDNS } from './mdns.js';
+export type { MDNSService, MDNSOptions } from './mdns.js';
