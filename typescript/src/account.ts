@@ -199,6 +199,13 @@ export class Account {
   }
 
   /**
+   * Follow a peer (spec-compliant alias for addFriend)
+   */
+  async follow(fingerprint: Fingerprint, publicKey: string): Promise<void> {
+    await this.addFriend(publicKey);
+  }
+
+  /**
    * Remove a friend
    */
   async removeFriend(fingerprint: Fingerprint): Promise<void> {
@@ -220,10 +227,24 @@ export class Account {
   }
 
   /**
+   * Unfollow a peer (spec-compliant alias for removeFriend)
+   */
+  async unfollow(fingerprint: Fingerprint): Promise<void> {
+    await this.removeFriend(fingerprint);
+  }
+
+  /**
    * Get list of friend fingerprints
    */
   getFriends(): Fingerprint[] {
     return Array.from(this.friends.keys());
+  }
+
+  /**
+   * List followed peers (spec-compliant alias for getFriends)
+   */
+  listFollowing(): Fingerprint[] {
+    return this.getFriends();
   }
 
   /**

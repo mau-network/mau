@@ -3,6 +3,7 @@
  */
 
 export * from './pgp.js';
+export { sha256 } from './pgp.js';
 
 /**
  * Validate file name to prevent path traversal
